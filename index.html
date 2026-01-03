@@ -45,9 +45,9 @@
             </div>
         </div>
 
-        <div id="conn-status" class="hidden mb-4 px-4 py-2 rounded bg-yellow-100 text-yellow-800 text-sm font-bold text-center no-print flex justify-between items-center">
-            <span>Running in Local Storage Mode (API not connected) - Changes won't sync to database</span>
-            <button onclick="document.getElementById('conn-status').classList.add('hidden')" class="ml-4 text-xl leading-none hover:text-red-600">&times;</button>
+        <!-- Connection Status Indicator (Detailed Error) -->
+        <div id="conn-status" class="hidden mb-4 px-4 py-2 rounded bg-yellow-100 text-yellow-800 text-sm font-bold no-print flex flex-col justify-center items-center">
+            <!-- Content populated by JS -->
         </div>
 
         <!-- Navigation -->
@@ -279,7 +279,20 @@
         async function initData() {
             try {
                 const res = await fetch(`${API_URL}?action=fetch_all`);
-                const json = await res.json();
+                
+                // Check if response is OK (HTTP 200)
+                if (!res.ok) {
+                    throw new Error(`HTTP error! status: ${res.status}`);
+                }
+
+                // Get text first to debug potentially malformed JSON (e.g. PHP warnings mixed in)
+                const text = await res.text();
+                let json;
+                try {
+                    json = JSON.parse(text);
+                } catch (e) {
+                    throw new Error(`Invalid JSON received: ${text.substring(0, 100)}...`);
+                }
                 
                 if (json.status === 'success') {
                     USE_API = true;
@@ -288,12 +301,24 @@
                     g_enrollments = json.data.enrollments || [];
                     g_discounts = json.data.discounts || [];
                     document.getElementById('conn-status').classList.add('hidden');
-                } else { throw new Error('API error'); }
+                } else {
+                    throw new Error(json.message || 'Unknown API error');
+                }
             } catch (e) {
                 console.warn("API Connection failed:", e);
-                console.warn("Falling back to Local Storage (Demo Mode).");
                 USE_API = false;
-                document.getElementById('conn-status').classList.remove('hidden');
+                
+                // Show Detailed Error in Yellow Box
+                const statusDiv = document.getElementById('conn-status');
+                statusDiv.classList.remove('hidden');
+                statusDiv.innerHTML = `
+                    <div class="flex justify-between w-full">
+                        <span><strong>Error:</strong> ${e.message}</span>
+                        <span class="text-xs ml-2 opacity-75">(Using Local Storage Mode)</span>
+                        <button onclick="this.parentElement.parentElement.classList.add('hidden')" class="ml-4 font-bold hover:text-red-700">&times;</button>
+                    </div>
+                `;
+
                 g_students = getStorage('fee_system_students_list_v2');
                 g_fees = getStorage('fee_system_records_v6');
                 g_enrollments = getStorage('fee_system_enrollments_v1');
