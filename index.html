@@ -465,8 +465,8 @@
         // Auto-Degree Logic (Helper)
         function extractDegree(reg) {
             if(!reg) return '';
-            reg = reg.toUpperCase().trim();
-            // Matching patterns per user request
+            reg = reg.toString().toUpperCase().trim();
+            // Updated Matching patterns
             if(reg.startsWith("BAF0")) return "BAF";
             if(reg.startsWith("BCOM0")) return "BCOM";
             if(reg.startsWith("BAF2Y0")) return "BAF2Y";
