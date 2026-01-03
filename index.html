@@ -219,11 +219,12 @@
                 <form id="studentForm" onsubmit="saveStudentList(event)" class="space-y-4">
                     <input type="hidden" id="edit_index" value="-1">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div class="col-span-1 md:col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Registration Number</label><input type="text" name="reg_no" id="input_reg_no" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div>
+                        <div class="col-span-1 md:col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Registration Number</label><input type="text" name="reg_no" id="input_reg_no" oninput="autoFillDegree(this.value)" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div>
                         <div class="col-span-1 md:col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Full Name</label><input type="text" name="name" id="input_name" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div>
                         <div><label class="block text-sm font-medium text-gray-700 mb-1">Degree Program</label><input type="text" name="degree" id="input_degree" class="w-full border border-gray-300 rounded-lg px-4 py-2"></div>
-                        <div><label class="block text-sm font-medium text-gray-700 mb-1">Batch</label><input type="text" name="batch" id="input_batch" class="w-full border border-gray-300 rounded-lg px-4 py-2"></div>
+                        <div><label class="block text-sm font-medium text-gray-700 mb-1">Batch (Session)</label><input type="text" name="batch" id="input_batch" class="w-full border border-gray-300 rounded-lg px-4 py-2"></div>
                         <div class="col-span-1 md:col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Mobile</label><input type="text" name="mobile" id="input_mobile" class="w-full border border-gray-300 rounded-lg px-4 py-2"></div>
+                        <div class="col-span-1 md:col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Email</label><input type="email" name="email" id="input_email" class="w-full border border-gray-300 rounded-lg px-4 py-2"></div>
                     </div>
                     <div class="pt-4 flex gap-2"><button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg">Save Student</button><button type="button" onclick="hideAddForm()" class="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg">Cancel</button></div>
                 </form>
@@ -461,6 +462,31 @@
         }
         function hideAddForm() { document.getElementById('student-dashboard').classList.remove('hidden'); document.getElementById('student-form-container').classList.add('hidden'); }
         
+        // Auto-Degree Logic (Helper)
+        function extractDegree(reg) {
+            if(!reg) return '';
+            reg = reg.toUpperCase().trim();
+            // Matching patterns per user request
+            if(reg.startsWith("BAF0")) return "BAF";
+            if(reg.startsWith("BCOM0")) return "BCOM";
+            if(reg.startsWith("BAF2Y0")) return "BAF2Y";
+            if(reg.startsWith("BSCAF0")) return "BSCAF";
+            if(reg.startsWith("MSFP0")) return "MSFP";
+            if(reg.startsWith("MAF2Y0")) return "MAF2Y";
+            if(reg.startsWith("DAF0")) return "DAF";
+            if(reg.startsWith("BCM0")) return "BCM";
+            if(reg.startsWith("BST0")) return "BST";
+            if(reg.startsWith("BIB0")) return "BIB";
+            return "Unknown";
+        }
+        
+        function autoFillDegree(val) {
+            const degree = extractDegree(val);
+            if(degree && degree !== "Unknown") {
+                document.getElementById('input_degree').value = degree;
+            }
+        }
+
         async function saveStudentList(e) {
             e.preventDefault();
             const fd = new FormData(e.target);
@@ -475,7 +501,8 @@
 
             const student = {
                 reg_no: reg, name: fd.get('name'),
-                degree: fd.get('degree'), batch: fd.get('batch'), mobile: fd.get('mobile')
+                degree: fd.get('degree') || extractDegree(reg), // Use field or auto-calc
+                batch: fd.get('batch'), mobile: fd.get('mobile'), email: fd.get('email')
             };
             
             const res = await saveData('student', student);
@@ -494,6 +521,7 @@
             document.getElementById('input_degree').value = s.degree;
             document.getElementById('input_batch').value = s.batch;
             document.getElementById('input_mobile').value = s.mobile;
+            document.getElementById('input_email').value = s.email || '';
             document.getElementById('edit_index').value = "1"; // Editing mode
             document.getElementById('form-title').textContent = "Edit Student";
             document.getElementById('student-dashboard').classList.add('hidden'); 
@@ -553,12 +581,15 @@
                         
                         if (reg) {
                             if(!g_students.some(s => s.reg_no.trim().toLowerCase() === reg.toString().trim().toLowerCase())) {
+                                const extractedDeg = extractDegree(reg.toString());
                                 newStudents.push({
                                     reg_no: reg,
                                     name: row[getKey('name')] || '',
-                                    degree: row[getKey('degree')] || row[getKey('prog')] || '',
-                                    batch: row[getKey('batch')] || '',
-                                    mobile: row[getKey('mobile')] || row[getKey('phone')] || ''
+                                    // Use degree from excel OR auto-calculate from Reg No
+                                    degree: row[getKey('degree')] || row[getKey('prog')] || extractedDeg,
+                                    batch: row[getKey('session')] || row[getKey('batch')] || '',
+                                    mobile: row[getKey('mobile')] || row[getKey('phone')] || '',
+                                    email: row[getKey('email')] || ''
                                 });
                             } else {
                                 duplicates++;
