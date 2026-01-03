@@ -7,8 +7,8 @@ header("Access-Control-Allow-Headers: Content-Type");
 
 // --- DATABASE CONFIGURATION ---
 $host = "localhost";
-$user = "root";      // CHANGE THIS to your database username
-$pass = "password";  // CHANGE THIS to your database password
+$user = "koolkhan";      // CHANGE THIS to your database username
+$pass = "Mangohair@197";  // CHANGE THIS to your database password
 $dbname = "fee_system";
 
 $conn = new mysqli($host, $user, $pass, $dbname);
