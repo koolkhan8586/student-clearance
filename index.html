@@ -164,7 +164,22 @@
                 </div>
                 <form id="feeForm" onsubmit="addRecord(event)" class="space-y-6">
                     <input type="hidden" name="fee_edit_id" id="fee_edit_id" value="-1">
-                    <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-200"><h3 class="text-sm font-bold text-yellow-800 uppercase mb-3">1. Target Cohort</h3><div class="grid grid-cols-1 md:grid-cols-2 gap-4"><div><label class="block text-xs font-bold text-gray-500 uppercase">Degree Program</label><select name="target_degree" id="fee_degree_select" class="w-full border border-yellow-400 rounded px-3 py-2 bg-white mt-1" required><option value="">Select Degree...</option></select></div><div><label class="block text-xs font-bold text-gray-500 uppercase">Batch</label><select name="target_batch" id="fee_batch_select" class="w-full border border-yellow-400 rounded px-3 py-2 bg-white mt-1" required><option value="">Select Batch...</option></select></div></div></div>
+                    <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                        <h3 class="text-sm font-bold text-yellow-800 uppercase mb-3">1. Target Cohort</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <!-- UPDATED to Inputs with Datalist for flexibility -->
+                            <div>
+                                <label class="block text-xs font-bold text-gray-500 uppercase">Degree Program</label>
+                                <input type="text" list="degree_list" name="target_degree" id="fee_degree_select" class="w-full border border-yellow-400 rounded px-3 py-2 bg-white mt-1" placeholder="Select or Type..." required>
+                                <datalist id="degree_list"></datalist>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-500 uppercase">Batch</label>
+                                <input type="text" list="batch_list" name="target_batch" id="fee_batch_select" class="w-full border border-yellow-400 rounded px-3 py-2 bg-white mt-1" placeholder="Select or Type..." required>
+                                <datalist id="batch_list"></datalist>
+                            </div>
+                        </div>
+                    </div>
                     <div class="bg-gray-50 p-4 rounded-lg border border-gray-200"><h3 class="text-sm font-bold text-gray-700 uppercase mb-3">2. Academic Session</h3><div class="grid grid-cols-2 gap-4"><div><label class="block text-xs font-bold text-gray-500 uppercase">Year</label><select name="year" id="fee_year" class="w-full border rounded px-3 py-2 bg-white mt-1"><option value="2023">2023</option><option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option></select></div><div><label class="block text-xs font-bold text-gray-500 uppercase">Semester</label><select name="semester" id="fee_sem" class="w-full border rounded px-3 py-2 bg-white mt-1"><option value="Winter">Winter</option><option value="Spring">Spring</option><option value="Summer">Summer</option><option value="Fall">Fall</option></select></div></div></div>
                     <div class="bg-gray-50 p-4 rounded-lg border border-gray-200"><h3 class="text-sm font-bold text-gray-700 uppercase mb-3">3. Credit Hour & Tuition Fee</h3><div class="grid grid-cols-1 md:grid-cols-3 gap-4"><div><label class="block text-xs font-bold text-gray-500 uppercase">Total Credit Hrs</label><input type="number" name="cr" id="cr_input" oninput="calculateTotals()" class="w-full border rounded px-3 py-2 mt-1" placeholder="0"></div><div><label class="block text-xs font-bold text-gray-500 uppercase text-green-700">Cost Per Cr. Hour</label><input type="number" name="per_cr_fee" id="rate_input" oninput="calculateTotals()" class="w-full border border-green-300 bg-green-50 rounded px-3 py-2 mt-1" placeholder="0"></div><div><label class="block text-xs font-bold text-gray-500 uppercase">Tuition Fee</label><input type="number" name="tuition_fee" id="tuition_input" class="w-full border rounded px-3 py-2 bg-gray-100 mt-1 font-bold text-gray-700" placeholder="0" readonly></div></div></div>
                     <div class="bg-gray-50 p-4 rounded-lg border border-gray-200"><h3 class="text-sm font-bold text-gray-700 uppercase mb-3">4. Examination Fee</h3><div class="grid grid-cols-1 md:grid-cols-3 gap-4"><div><label class="block text-xs font-bold text-gray-500 uppercase">Total Courses</label><input type="number" name="total_courses" id="courses_input" oninput="calculateTotals()" class="w-full border rounded px-3 py-2 mt-1" placeholder="0"></div><div><label class="block text-xs font-bold text-gray-500 uppercase text-blue-700">Exam Fee (Per Subject)</label><input type="number" name="exam_fee_per_subject" id="exam_rate_input" oninput="calculateTotals()" class="w-full border border-blue-300 bg-blue-50 rounded px-3 py-2 mt-1" placeholder="0"></div><div><label class="block text-xs font-bold text-gray-500 uppercase">Total Exam Fee</label><input type="number" name="exam_fee" id="total_exam_input" class="w-full border rounded px-3 py-2 bg-gray-100 mt-1 font-bold text-gray-700" placeholder="0" readonly></div></div></div>
@@ -597,45 +612,28 @@
                 </tr>`).join('');
         }
 
-        function filterStudents() {
-            const query = document.getElementById('student_list_search').value.toLowerCase();
-            const filtered = g_students.filter(s => 
-                (s.reg_no && s.reg_no.toLowerCase().includes(query)) ||
-                (s.name && s.name.toLowerCase().includes(query)) ||
-                (s.degree && s.degree.toLowerCase().includes(query)) ||
-                (s.batch && s.batch.toLowerCase().includes(query))
-            );
-            renderStudentTable(filtered);
-        }
-        
-        function sortStudentTable(key) {
-            sortDir = -sortDir; // Toggle direction
-            const query = document.getElementById('student_list_search').value.toLowerCase();
-            
-            // Get current list (either full or filtered)
-            let currentList = query ? g_students.filter(s => 
-                (s.reg_no && s.reg_no.toLowerCase().includes(query)) ||
-                (s.name && s.name.toLowerCase().includes(query))
-            ) : [...g_students];
-
-            currentList.sort((a, b) => {
-                const valA = (a[key] || '').toString().toLowerCase();
-                const valB = (b[key] || '').toString().toLowerCase();
-                if (valA < valB) return -1 * sortDir;
-                if (valA > valB) return 1 * sortDir;
-                return 0;
-            });
-            
-            renderStudentTable(currentList);
-        }
-
         // --- GENERIC HELPERS ---
         function loadStudentForSearch(reg) { document.getElementById('search_reg_input').value = reg; switchTab('clearance'); searchStudentByRegNo(); }
         function updateFeeDropdowns() {
-            const deg = [...new Set(g_students.map(s=>s.degree).filter(Boolean))].sort();
-            const bat = [...new Set(g_students.map(s=>s.batch).filter(Boolean))].sort();
-            document.getElementById('fee_degree_select').innerHTML = `<option value="">Select...</option>` + deg.map(x=>`<option>${x}</option>`).join('');
-            document.getElementById('fee_batch_select').innerHTML = `<option value="">Select...</option>` + bat.map(x=>`<option>${x}</option>`).join('');
+            const allItems = [...g_students, ...g_fees];
+            const deg = [...new Set(allItems.map(s => s.degree).filter(Boolean))].sort();
+            const bat = [...new Set(allItems.map(s => s.batch).filter(Boolean))].sort();
+            
+            const degSelect = document.getElementById('fee_degree_select');
+            const batSelect = document.getElementById('fee_batch_select');
+            const curDeg = degSelect.value;
+            const curBat = batSelect.value;
+
+            // Updated to populate datalists instead of selects directly since they are inputs now
+            let dList = document.getElementById('degree_list');
+            if(!dList) { // Fallback if datalist logic fails or user reverted code
+                 // Just keeping structure consistent with datalists defined in HTML
+                 dList = document.getElementById('degree_list');
+            }
+            if(dList) dList.innerHTML = deg.map(x=>`<option value="${x}">`).join('');
+            
+            let bList = document.getElementById('batch_list');
+            if(bList) bList.innerHTML = bat.map(x=>`<option value="${x}">`).join('');
         }
         function updateSummary(t,f,p,b) { document.getElementById('summary_total').textContent = num(t); document.getElementById('summary_fa').textContent = num(f); document.getElementById('summary_paid').textContent = num(p); document.getElementById('summary_balance').textContent = num(b); }
         function handleSearchEnter(e) { if(e.key==='Enter') searchStudentByRegNo(); }
