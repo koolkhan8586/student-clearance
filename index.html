@@ -18,7 +18,6 @@
             .container { max-width: 100%; margin: 0; padding: 0; }
             #search-container { display: none !important; }
         }
-        /* Modal Styles */
         #debug-modal { background-color: rgba(0,0,0,0.5); }
     </style>
 </head>
@@ -47,7 +46,6 @@
             </div>
         </div>
 
-        <!-- Connection Status Indicator (Detailed Error) -->
         <div id="conn-status" class="hidden mb-4 px-4 py-2 rounded bg-yellow-100 text-yellow-800 text-sm font-bold no-print flex flex-col justify-center items-center border border-yellow-200">
             <!-- Content populated by JS -->
         </div>
@@ -139,8 +137,7 @@
         <!-- TAB 2: Student Data -->
         <div id="view-student" class="tab-content hidden">
             <div id="student-dashboard" class="bg-white rounded-lg shadow-lg p-6">
-                <!-- Top Toolbar -->
-                <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4">
+                <div class="flex flex-col xl:flex-row justify-between items-center mb-6 gap-4">
                     <div>
                         <h2 class="text-xl font-bold text-gray-800">Student Directory</h2>
                         <p class="text-sm text-gray-500">Manage all student records here</p>
@@ -148,61 +145,32 @@
                             Total Students: <span id="total_students_count">0</span>
                         </div>
                     </div>
-                    
                     <div class="flex flex-col sm:flex-row gap-3 w-full lg:w-auto items-center">
-                        <!-- Search Bar -->
                         <div class="relative w-full sm:w-64">
                             <input type="text" id="student_list_search" placeholder="Search by Reg, Name, Batch..." onkeyup="filterStudents()" class="border border-gray-300 rounded-lg px-4 py-2 pl-10 w-full text-sm focus:ring-2 focus:ring-blue-500 outline-none shadow-sm transition">
                             <i class="fas fa-search absolute left-3 top-3 text-gray-400 text-xs"></i>
                         </div>
-                        
-                        <!-- Action Buttons -->
                         <div class="flex gap-2 flex-wrap justify-center sm:justify-start">
                             <input type="file" id="student_excel_file" accept=".xlsx, .xls" class="hidden" onchange="handleStudentExcelUpload(event)">
-                            <button onclick="document.getElementById('student_excel_file').click()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-sm" title="Import Excel">
-                                <i class="fas fa-file-excel mr-1"></i> Import
-                            </button>
-                            <button onclick="exportStudentsToExcel()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-sm" title="Export Excel">
-                                <i class="fas fa-file-export mr-1"></i> Export
-                            </button>
-                            <button onclick="showAddForm()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-sm" title="Add Manual">
-                                <i class="fas fa-plus mr-1"></i> Add
-                            </button>
-                            <button onclick="deleteAllStudents()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-sm" title="Delete All">
-                                <i class="fas fa-trash-alt mr-1"></i> Del All
-                            </button>
+                            <button onclick="document.getElementById('student_excel_file').click()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-sm"><i class="fas fa-file-excel mr-1"></i> Import</button>
+                            <button onclick="exportStudentsToExcel()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-sm"><i class="fas fa-file-export mr-1"></i> Export</button>
+                            <button onclick="showAddForm()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-sm"><i class="fas fa-plus mr-1"></i> Add</button>
+                            <button onclick="deleteAllStudents()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-sm"><i class="fas fa-trash-alt mr-1"></i> Del All</button>
                         </div>
                     </div>
                 </div>
-
-                <!-- Progress Bar -->
                 <div id="upload-progress-container" class="hidden mb-4">
-                    <div class="flex justify-between text-xs mb-1 text-gray-600">
-                        <span>Processing Upload...</span>
-                        <span id="progress-text">0%</span>
-                    </div>
-                    <div class="w-full bg-gray-200 rounded-full h-2.5">
-                        <div id="upload-progress-bar" class="bg-blue-600 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
-                    </div>
+                    <div class="flex justify-between text-xs mb-1 text-gray-600"><span>Processing Upload...</span><span id="progress-text">0%</span></div>
+                    <div class="w-full bg-gray-200 rounded-full h-2.5"><div id="upload-progress-bar" class="bg-blue-600 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div></div>
                 </div>
-
-                <!-- Students Table -->
                 <div class="overflow-x-auto border rounded-lg">
                     <table class="w-full text-sm text-left border-collapse border-b border-gray-200">
                         <thead class="bg-gray-50 text-gray-700 uppercase text-xs">
                             <tr>
-                                <th class="border-b p-3 cursor-pointer hover:bg-gray-100 select-none group" onclick="sortStudentTable('reg_no')">
-                                    Reg Number <i class="fas fa-sort ml-1 text-gray-300 group-hover:text-gray-500"></i>
-                                </th>
-                                <th class="border-b p-3 cursor-pointer hover:bg-gray-100 select-none group" onclick="sortStudentTable('name')">
-                                    Name <i class="fas fa-sort ml-1 text-gray-300 group-hover:text-gray-500"></i>
-                                </th>
-                                <th class="border-b p-3 cursor-pointer hover:bg-gray-100 select-none group" onclick="sortStudentTable('degree')">
-                                    Degree <i class="fas fa-sort ml-1 text-gray-300 group-hover:text-gray-500"></i>
-                                </th>
-                                <th class="border-b p-3 cursor-pointer hover:bg-gray-100 select-none group" onclick="sortStudentTable('batch')">
-                                    Batch <i class="fas fa-sort ml-1 text-gray-300 group-hover:text-gray-500"></i>
-                                </th>
+                                <th class="border-b p-3 cursor-pointer hover:bg-gray-100" onclick="sortStudentTable('reg_no')">Reg Number <i class="fas fa-sort ml-1 text-gray-300"></i></th>
+                                <th class="border-b p-3 cursor-pointer hover:bg-gray-100" onclick="sortStudentTable('name')">Name <i class="fas fa-sort ml-1 text-gray-300"></i></th>
+                                <th class="border-b p-3 cursor-pointer hover:bg-gray-100" onclick="sortStudentTable('degree')">Degree <i class="fas fa-sort ml-1 text-gray-300"></i></th>
+                                <th class="border-b p-3 cursor-pointer hover:bg-gray-100" onclick="sortStudentTable('batch')">Batch <i class="fas fa-sort ml-1 text-gray-300"></i></th>
                                 <th class="border-b p-3 text-center">Actions</th>
                             </tr>
                         </thead>
@@ -210,12 +178,8 @@
                     </table>
                 </div>
             </div>
-
             <div id="student-form-container" class="hidden bg-white rounded-lg shadow-lg p-6 max-w-2xl mx-auto mt-4">
-                <div class="flex justify-between items-center border-b pb-4 mb-4">
-                    <h3 class="text-lg font-bold text-gray-800" id="form-title">Add New Student</h3>
-                    <button onclick="hideAddForm()" class="text-gray-500 hover:text-red-500"><i class="fas fa-times"></i></button>
-                </div>
+                <div class="flex justify-between items-center border-b pb-4 mb-4"><h3 class="text-lg font-bold text-gray-800" id="form-title">Add New Student</h3><button onclick="hideAddForm()" class="text-gray-500 hover:text-red-500"><i class="fas fa-times"></i></button></div>
                 <form id="studentForm" onsubmit="saveStudentList(event)" class="space-y-4">
                     <input type="hidden" id="edit_index" value="-1">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -288,92 +252,23 @@
             </div>
         </div>
 
-        <!-- TAB 4: Enrollment (Updated) -->
+        <!-- TAB 4: Enrollment -->
         <div id="view-enrollment" class="tab-content hidden">
             <div id="enrollment-dashboard" class="bg-white rounded-lg shadow-lg p-6">
-                <!-- Top Toolbar -->
-                <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4">
+                <div class="flex flex-col md:flex-row justify-between items-end mb-6 gap-4 border-b pb-4">
                     <div>
-                        <h2 class="text-xl font-bold text-gray-800">Enrollment Data</h2>
-                        <p class="text-sm text-gray-500">Manage student course enrollments</p>
-                        <div class="mt-2 text-sm font-semibold text-orange-600 bg-orange-50 px-3 py-1 rounded-full inline-block">
-                            Total Records: <span id="total_enrollments_count">0</span>
-                        </div>
+                        <h2 class="text-xl font-bold text-gray-800">Enrollment Data</h2><p class="text-sm text-gray-500 mb-2">Upload Excel (Reg #, Name, Courses, Credit Hrs).</p>
+                        <div class="bg-orange-50 p-2 rounded border border-orange-200"><label class="block text-xs font-bold text-orange-700 uppercase mb-1">Target Session for Import:</label><div class="flex gap-2"><select id="enroll_import_year" class="border rounded px-2 py-1 text-sm bg-white"><option value="" disabled selected>Year</option><option value="2023">2023</option><option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option></select><select id="enroll_import_sem" class="border rounded px-2 py-1 text-sm bg-white"><option value="" disabled selected>Semester</option><option value="Winter">Winter</option><option value="Spring">Spring</option><option value="Summer">Summer</option><option value="Fall">Fall</option></select></div></div>
                     </div>
-                    
-                    <div class="flex flex-col gap-3 w-full lg:w-auto">
-                        <!-- Import Section -->
-                        <div class="bg-orange-50 p-2 rounded border border-orange-200 flex flex-col sm:flex-row gap-2 items-center">
-                            <label class="text-xs font-bold text-orange-700 uppercase whitespace-nowrap">Session:</label>
-                            <select id="enroll_import_year" class="border rounded px-2 py-1 text-sm bg-white"><option value="" disabled selected>Year</option><option value="2023">2023</option><option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option></select>
-                            <select id="enroll_import_sem" class="border rounded px-2 py-1 text-sm bg-white"><option value="" disabled selected>Semester</option><option value="Winter">Winter</option><option value="Spring">Spring</option><option value="Summer">Summer</option><option value="Fall">Fall</option></select>
-                            
-                            <input type="file" id="enrollment_excel_file" accept=".xlsx, .xls" class="hidden" onchange="handleEnrollmentExcelUpload(event)">
-                            <button onclick="document.getElementById('enrollment_excel_file').click()" class="bg-orange-600 hover:bg-orange-700 text-white px-3 py-1 rounded transition flex items-center text-xs shadow-sm ml-auto">
-                                <i class="fas fa-file-import mr-1"></i> Import
-                            </button>
-                        </div>
-
-                        <!-- Actions Row -->
-                        <div class="flex flex-col sm:flex-row gap-2 w-full">
-                            <div class="relative w-full">
-                                <input type="text" id="enrollment_list_search" placeholder="Search enrollment..." onkeyup="filterEnrollments()" class="border border-gray-300 rounded px-3 py-2 pl-8 w-full text-sm focus:ring-2 focus:ring-orange-500 outline-none shadow-sm">
-                                <i class="fas fa-search absolute left-2.5 top-2.5 text-gray-400 text-xs"></i>
-                            </div>
-                            <div class="flex gap-2 justify-end">
-                                <button onclick="downloadEnrollmentTemplate()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded transition flex items-center text-sm" title="Template"><i class="fas fa-download"></i></button>
-                                <button onclick="exportEnrollmentsToExcel()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded transition flex items-center text-sm shadow-sm" title="Export"><i class="fas fa-file-export"></i></button>
-                                <button onclick="showEnrollmentForm()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded transition flex items-center text-sm shadow-sm" title="Add Manual"><i class="fas fa-plus"></i></button>
-                                <button onclick="deleteAllEnrollments()" class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded transition flex items-center text-sm shadow-sm" title="Delete All"><i class="fas fa-trash-alt"></i></button>
-                            </div>
-                        </div>
+                    <div class="flex gap-2">
+                        <input type="file" id="enrollment_excel_file" accept=".xlsx, .xls" class="hidden" onchange="handleEnrollmentExcelUpload(event)">
+                        <button onclick="document.getElementById('enrollment_excel_file').click()" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-md"><i class="fas fa-file-import mr-2"></i> Import Enrollment</button>
+                        <button onclick="downloadEnrollmentTemplate()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition flex items-center text-sm"><i class="fas fa-download mr-2"></i> Template</button>
                     </div>
                 </div>
-
-                <div class="overflow-x-auto border rounded-lg max-h-[600px]">
-                    <table class="w-full text-sm text-left border-collapse border-b border-gray-200">
-                        <thead class="bg-orange-50 text-gray-700 uppercase text-xs sticky top-0">
-                            <tr>
-                                <th class="border-b p-3 cursor-pointer hover:bg-orange-100 group" onclick="sortEnrollmentTable('reg_no')">Reg # <i class="fas fa-sort ml-1 text-gray-300 group-hover:text-gray-500"></i></th>
-                                <th class="border-b p-3 cursor-pointer hover:bg-orange-100 group" onclick="sortEnrollmentTable('name')">Name <i class="fas fa-sort ml-1 text-gray-300 group-hover:text-gray-500"></i></th>
-                                <th class="border-b p-3 cursor-pointer hover:bg-orange-100 group" onclick="sortEnrollmentTable('semester')">Semester <i class="fas fa-sort ml-1 text-gray-300 group-hover:text-gray-500"></i></th>
-                                <th class="border-b p-3 text-center">Courses</th>
-                                <th class="border-b p-3 text-center">Cr. Hrs</th>
-                                <th class="border-b p-3 text-center">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="enrollmentTableBody"><tr><td colspan="6" class="p-4 text-center text-gray-500 italic">Loading...</td></tr></tbody>
-                    </table>
+                <div class="overflow-x-auto max-h-[600px] overflow-y-auto">
+                    <table class="w-full text-sm text-left border-collapse border border-gray-200"><thead class="bg-orange-50 text-gray-700 uppercase text-xs sticky top-0"><tr><th class="border p-3">Reg Number</th><th class="border p-3">Name</th><th class="border p-3">Semester</th><th class="border p-3 text-center">Courses</th><th class="border p-3 text-center">Credit Hours</th></tr></thead><tbody id="enrollmentTableBody"><tr><td colspan="5" class="p-4 text-center text-gray-500 italic">Loading...</td></tr></tbody></table>
                 </div>
-            </div>
-
-            <!-- Enrollment Form Modal -->
-            <div id="enrollment-form-container" class="hidden bg-white rounded-lg shadow-lg p-6 max-w-2xl mx-auto mt-4">
-                <div class="flex justify-between items-center border-b pb-4 mb-4">
-                    <h3 class="text-lg font-bold text-gray-800" id="enroll-form-title">Add Enrollment</h3>
-                    <button onclick="hideEnrollmentForm()" class="text-gray-500 hover:text-red-500"><i class="fas fa-times"></i></button>
-                </div>
-                <form id="enrollmentForm" onsubmit="saveEnrollmentList(event)" class="space-y-4">
-                    <input type="hidden" id="enroll_edit_id" value="-1"> <!-- ID for editing -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div class="col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Registration Number</label><input type="text" name="reg_no" id="enroll_reg_no" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div>
-                        <div class="col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Student Name</label><input type="text" name="name" id="enroll_name" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Session Year</label>
-                            <select name="year" id="enroll_year" class="w-full border border-gray-300 rounded-lg px-4 py-2"><option>2023</option><option>2024</option><option>2025</option><option>2026</option></select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Semester</label>
-                            <select name="semester" id="enroll_sem" class="w-full border border-gray-300 rounded-lg px-4 py-2"><option>Winter</option><option>Spring</option><option>Summer</option><option>Fall</option></select>
-                        </div>
-                        <div><label class="block text-sm font-medium text-gray-700 mb-1">Total Courses</label><input type="number" name="courses" id="enroll_courses" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div>
-                        <div><label class="block text-sm font-medium text-gray-700 mb-1">Total Credit Hours</label><input type="number" name="cr" id="enroll_cr" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div>
-                    </div>
-                    <div class="pt-4 flex gap-2">
-                        <button type="submit" class="flex-1 bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 px-4 rounded-lg">Save Record</button>
-                        <button type="button" onclick="hideEnrollmentForm()" class="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg">Cancel</button>
-                    </div>
-                </form>
             </div>
         </div>
 
@@ -407,7 +302,7 @@
         let activeStudent = null;
         let lastRawResponse = '';
         let sortDir = 1;
-        let enrollSortDir = 1; // Separate sort dir for enrollment
+        let enrollSortDir = 1;
 
         // --- EDIT HERE TO ADD/REMOVE DEGREES ---
         const DEGREE_PATTERNS = [
@@ -491,7 +386,7 @@
                 let act = '';
                 if(type === 'student') act = 'save_student';
                 if(type === 'fee') act = 'save_fee';
-                if(type === 'enrollment') act = 'save_enrollment'; // Needs backend support
+                if(type === 'enrollment') act = 'save_enrollment';
                 
                 const res = await fetch(`${API_URL}?action=${act}`, { method: 'POST', body: JSON.stringify(data) });
                 return await res.json();
@@ -509,8 +404,12 @@
 
         async function deleteData(type, id) {
              if (USE_API) {
-                 let act = (type === 'student') ? 'delete_student' : 'delete_fee';
-                 const body = (type === 'student') ? {reg_no: id} : {id: id};
+                 let act = '';
+                 let body = {};
+                 if (type === 'student') { act = 'delete_student'; body = {reg_no: id}; }
+                 else if (type === 'fee') { act = 'delete_fee'; body = {id: id}; }
+                 else if (type === 'enrollment') { act = 'delete_enrollment'; body = {id: id}; }
+                 
                  await fetch(`${API_URL}?action=${act}`, { method: 'POST', body: JSON.stringify(body) });
                  await initData();
              } else {
@@ -522,12 +421,17 @@
                      g_fees = g_fees.filter(f => f.id != id);
                      setStorage('fee_system_records_v6', g_fees);
                      renderFeeDashboard();
+                 } else if (type === 'enrollment') {
+                    g_enrollments = g_enrollments.filter(e => e.id !== id);
+                    setStorage('fee_system_enrollments_v1', g_enrollments);
+                    renderEnrollmentTable();
                  }
              }
         }
 
         async function deleteStudentData(regNo) { deleteData('student', regNo); }
         async function deleteFeeData(id) { deleteData('fee', id); }
+        async function deleteEnrollmentData(id) { deleteData('enrollment', id); }
 
         async function deleteAllStudentsData() {
             if (USE_API) {
@@ -540,22 +444,8 @@
             }
         }
         
-        async function deleteEnrollmentData(id) {
-             if (USE_API) {
-                await fetch(`${API_URL}?action=delete_enrollment`, { method: 'POST', body: JSON.stringify({id: id}) });
-                await initData();
-            } else {
-                // For local storage, we might not have 'id' if added manually without one, so filtering by reg/sem is safer, 
-                // but generated records usually have timestamps as IDs.
-                g_enrollments = g_enrollments.filter(e => e.id !== id);
-                setStorage('fee_system_enrollments_v1', g_enrollments);
-                renderEnrollmentTable();
-            }
-        }
-        
         async function deleteAllEnrollmentsData() {
             if (USE_API) {
-                // Important: Send empty JSON object if PHP expects body
                 await fetch(`${API_URL}?action=delete_all_enrollments`, { method: 'POST', body: JSON.stringify({}) });
                 await initData();
             } else {
@@ -747,7 +637,7 @@
             const id = document.getElementById('enroll_edit_id').value;
             
             const enrollment = {
-                id: (id === "-1") ? Date.now().toString() : id, // Generate ID if new
+                id: (id === "-1") ? Date.now().toString() : id,
                 reg_no: fd.get('reg_no'), 
                 name: toProperCase(fd.get('name')), 
                 semester: sess, 
@@ -758,7 +648,6 @@
             const res = await saveData('enrollment', enrollment);
             if(res.status === 'success') {
                 if(USE_API) await initData(); else {
-                    // Update Local
                     if(id !== "-1") g_enrollments = g_enrollments.filter(x => x.id != id);
                     g_enrollments.push(enrollment);
                     setStorage('fee_system_enrollments_v1', g_enrollments);
@@ -770,7 +659,6 @@
         }
         
         function editEnrollment(id) {
-            // Find enrollment by ID or fallback logic
             const e = g_enrollments.find(x => x.id == id);
             if(!e) return;
             
@@ -779,7 +667,6 @@
             document.getElementById('enroll_courses').value = e.courses;
             document.getElementById('enroll_cr').value = e.cr;
             
-            // Parse Session
             const parts = e.semester.split(' ');
             document.getElementById('enroll_sem').value = parts[0] || 'Fall';
             document.getElementById('enroll_year').value = parts[1] || '2023';
@@ -1045,7 +932,26 @@
         function normalizeTerm(t) { return t ? t.toString().toLowerCase().replace(/[^a-z0-9]/g, '') : ""; }
         
         // --- OTHER RENDERERS ---
-        function renderFeeDashboard() { const t=document.getElementById('feeDashboardBody'); if(g_fees.length==0) { t.innerHTML='<tr><td colspan="7" class="p-4 text-center italic">No records.</td></tr>'; return; } t.innerHTML=g_fees.slice().reverse().map(r=>`<tr class="hover:bg-gray-50 border-b"><td class="p-2">${r.degree}</td><td class="p-2">${r.batch}</td><td class="p-2 text-right">${num(r.per_cr_fee)}</td><td class="p-2 text-right">${num(r.exam_fee)}</td><td class="p-2 text-right">${num(r.other_fee)}</td><td class="p-2 text-right font-bold">${num(parseFloat(r.tuition_fee)+parseFloat(r.exam_fee)+parseFloat(r.other_fee)+parseFloat(r.reg_fee))}</td><td class="p-2 text-center text-xs">${r.semester} ${r.year}</td></tr>`).join(''); }
+        function renderFeeDashboard() { 
+            const t=document.getElementById('feeDashboardBody'); 
+            if(g_fees.length==0) { t.innerHTML='<tr><td colspan="8" class="p-4 text-center italic">No records.</td></tr>'; return; } 
+            t.innerHTML=g_fees.slice().reverse().map(r=>`
+            <tr class="hover:bg-gray-50 border-b">
+                <td class="p-2 font-medium">${r.degree}</td>
+                <td class="p-2">${r.batch}</td>
+                <td class="p-2 text-right text-gray-600">${num(r.per_cr_fee)}</td>
+                <td class="p-2 text-right text-blue-600">${num(r.exam_fee)}</td>
+                <td class="p-2 text-right text-gray-600">${num(r.other_fee)}</td>
+                <td class="p-2 text-right font-bold">${num(parseFloat(r.tuition_fee)+parseFloat(r.exam_fee)+parseFloat(r.other_fee)+parseFloat(r.reg_fee))}</td>
+                <td class="p-2 text-center text-xs text-gray-500">${r.semester} ${r.year}</td>
+                <td class="p-2 text-center space-x-1">
+                    <button onclick="editFeeRecord(${r.id})" class="text-blue-600 hover:text-blue-800" title="Edit"><i class="fas fa-edit"></i></button>
+                    <button onclick="duplicateFeeRecord(${r.id})" class="text-orange-600 hover:text-orange-800" title="Duplicate"><i class="fas fa-copy"></i></button>
+                    <button onclick="deleteFeeRecord(${r.id})" class="text-red-600 hover:text-red-800" title="Delete"><i class="fas fa-trash"></i></button>
+                </td>
+            </tr>`).join(''); 
+        }
+
         function renderEnrollmentTable(data = g_enrollments) {
             document.getElementById('total_enrollments_count').textContent = data.length;
             const t=document.getElementById('enrollmentTableBody'); 
@@ -1065,19 +971,93 @@
         }
         function renderDiscountTable() { const t=document.getElementById('discountTableBody'); if(g_discounts.length==0) { t.innerHTML='<tr><td colspan="4" class="p-4 text-center italic">No data.</td></tr>'; return; } t.innerHTML=g_discounts.slice().reverse().map(d=>`<tr class="hover:bg-purple-50 border-b"><td class="p-3">${d.reg_no}</td><td class="p-3">${d.name}</td><td class="p-3">${d.term}</td><td class="p-3 text-right font-bold text-green-600">${d.discount}%</td></tr>`).join(''); }
         
-        // --- ADD BATCH FEE ---
+        // --- ADD BATCH FEE (UPDATED) ---
         async function addRecord(e) {
             e.preventDefault();
             const fd = new FormData(e.target);
             const rec = {
+                id: document.getElementById('fee_edit_id').value, // Use hidden ID
                 degree: fd.get('target_degree'), batch: fd.get('target_batch'), year: fd.get('year'), semester: fd.get('semester'),
                 cr: fd.get('cr'), per_cr_fee: fd.get('per_cr_fee'), tuition_fee: fd.get('tuition_fee'),
                 total_courses: fd.get('total_courses'), exam_fee_per_subject: fd.get('exam_fee_per_subject'), exam_fee: fd.get('exam_fee'),
                 reg_fee: fd.get('reg_fee'), other_fee: fd.get('other_fee'), paid: fd.get('paid'), total_fee: 0 
             };
             const res = await saveData('fee', rec);
-            if(res.status==='success') { if(USE_API) await initData(); else renderFeeDashboard(); alert("Fee record saved!"); e.target.reset(); }
+            if(res.status==='success') { 
+                if(USE_API) await initData(); else renderFeeDashboard(); 
+                alert("Fee record saved!"); 
+                e.target.reset(); 
+                document.getElementById('fee_edit_id').value = "-1";
+                document.getElementById('fee_submit_btn').innerHTML = '<i class="fas fa-plus-circle mr-2"></i> Add Batch Fee Record';
+                document.getElementById('fee_cancel_btn').classList.add('hidden');
+            }
         }
+
+        // New Fee Logic Functions
+        function editFeeRecord(id) {
+            const f = g_fees.find(x => x.id == id);
+            if(!f) return;
+            // Populate form
+            document.getElementById('fee_edit_id').value = f.id;
+            updateFeeDropdowns(); // Ensure options exist
+            document.getElementById('fee_degree_select').value = f.degree;
+            document.getElementById('fee_batch_select').value = f.batch;
+            document.getElementById('fee_year').value = f.year;
+            document.getElementById('fee_sem').value = f.semester;
+            document.getElementById('cr_input').value = f.cr;
+            document.getElementById('rate_input').value = f.per_cr_fee;
+            document.getElementById('tuition_input').value = f.tuition_fee;
+            document.getElementById('courses_input').value = f.total_courses;
+            document.getElementById('exam_rate_input').value = f.exam_fee_per_subject;
+            document.getElementById('total_exam_input').value = f.exam_fee;
+            document.getElementById('reg_fee_input').value = f.reg_fee;
+            document.getElementById('other_fee_input').value = f.other_fee;
+            document.getElementById('paid_input').value = f.paid;
+            
+            // UI Change
+            document.getElementById('fee_submit_btn').innerHTML = '<i class="fas fa-save mr-2"></i> Update Fee Record';
+            document.getElementById('fee_cancel_btn').classList.remove('hidden');
+            document.documentElement.scrollTop = 0; // Scroll to top
+        }
+
+        function duplicateFeeRecord(id) {
+            const f = g_fees.find(x => x.id == id);
+            if(!f) return;
+            // Populate form but keep ID as -1 (new)
+            document.getElementById('fee_edit_id').value = "-1";
+            updateFeeDropdowns();
+            document.getElementById('fee_degree_select').value = f.degree;
+            document.getElementById('fee_batch_select').value = f.batch;
+            // Maybe shift year/sem automatically? For now just copy
+            document.getElementById('fee_year').value = f.year;
+            document.getElementById('fee_sem').value = f.semester;
+            document.getElementById('cr_input').value = f.cr;
+            document.getElementById('rate_input').value = f.per_cr_fee;
+            document.getElementById('tuition_input').value = f.tuition_fee;
+            document.getElementById('courses_input').value = f.total_courses;
+            document.getElementById('exam_rate_input').value = f.exam_fee_per_subject;
+            document.getElementById('total_exam_input').value = f.exam_fee;
+            document.getElementById('reg_fee_input').value = f.reg_fee;
+            document.getElementById('other_fee_input').value = f.other_fee;
+            document.getElementById('paid_input').value = f.paid;
+            
+            alert("Duplicate loaded! Change Session/Batch and click Save.");
+            document.documentElement.scrollTop = 0;
+        }
+
+        function deleteFeeRecord(id) {
+            if(confirm("Delete this fee structure?")) {
+                deleteFeeData(id);
+            }
+        }
+
+        function cancelFeeEdit() {
+            document.getElementById('feeForm').reset();
+            document.getElementById('fee_edit_id').value = "-1";
+            document.getElementById('fee_submit_btn').innerHTML = '<i class="fas fa-plus-circle mr-2"></i> Add Batch Fee Record';
+            document.getElementById('fee_cancel_btn').classList.add('hidden');
+        }
+
         function calculateTotals() {
             const cr=parseFloat(document.getElementById('cr_input').value)||0, rate=parseFloat(document.getElementById('rate_input').value)||0;
             document.getElementById('tuition_input').value = cr*rate;
