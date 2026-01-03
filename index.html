@@ -46,16 +46,7 @@
             </div>
         </div>
 
-        <!-- Connection Status & Sync Button -->
-        <div id="conn-status" class="hidden mb-4 px-4 py-3 rounded bg-yellow-100 text-yellow-800 text-sm font-bold no-print flex flex-col sm:flex-row justify-between items-center border border-yellow-200">
-            <span id="conn-msg"></span>
-            <div class="flex gap-2 mt-2 sm:mt-0">
-                <button id="sync-btn" onclick="syncLocalToServer()" class="hidden bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 transition shadow-sm">
-                    <i class="fas fa-cloud-upload-alt mr-1"></i> Found Local Data: Sync to Server
-                </button>
-                <button onclick="showDebugModal()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1 rounded text-xs">Debug</button>
-            </div>
-        </div>
+        <div id="conn-status" class="hidden mb-4 px-4 py-2 rounded bg-yellow-100 text-yellow-800 text-sm font-bold no-print flex flex-col justify-center items-center border border-yellow-200"></div>
 
         <!-- Debug Modal -->
         <div id="debug-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -221,7 +212,13 @@
                     <input type="text" id="enrollment_list_search" placeholder="Search enrollment..." onkeyup="filterEnrollments()" class="border border-gray-300 rounded px-3 py-2 pl-8 w-full text-sm focus:ring-2 focus:ring-orange-500 outline-none shadow-sm">
                     <i class="fas fa-search absolute left-2.5 top-2.5 text-gray-400 text-xs"></i>
                 </div>
-                <div class="overflow-x-auto max-h-[600px] overflow-y-auto"><table class="w-full text-sm text-left border-collapse border border-gray-200"><thead class="bg-orange-50 text-gray-700 uppercase text-xs sticky top-0"><tr><th class="border-b p-3 cursor-pointer" onclick="sortEnrollmentTable('reg_no')">Reg # <i class="fas fa-sort ml-1"></i></th><th class="border-b p-3 cursor-pointer" onclick="sortEnrollmentTable('name')">Name <i class="fas fa-sort ml-1"></i></th><th class="border-b p-3 cursor-pointer" onclick="sortEnrollmentTable('semester')">Semester <i class="fas fa-sort ml-1"></i></th><th class="border-b p-3 text-center">Courses</th><th class="border-b p-3 text-center">Cr. Hrs</th><th class="border-b p-3 text-center">Actions</th></tr></thead><tbody id="enrollmentTableBody"><tr><td colspan="6" class="p-4 text-center text-gray-500 italic">Loading...</td></tr></tbody></table></div>
+                <div class="overflow-x-auto max-h-[600px] overflow-y-auto"><table class="w-full text-sm text-left border-collapse border border-gray-200"><thead class="bg-orange-50 text-gray-700 uppercase text-xs sticky top-0"><tr>
+                    <th class="border-b p-3 cursor-pointer" onclick="sortEnrollmentTable('reg_no')">Reg # <i class="fas fa-sort ml-1"></i></th>
+                    <th class="border-b p-3 cursor-pointer" onclick="sortEnrollmentTable('name')">Name <i class="fas fa-sort ml-1"></i></th>
+                    <th class="border-b p-3 cursor-pointer" onclick="sortEnrollmentTable('semester')">Semester <i class="fas fa-sort ml-1"></i></th>
+                    <th class="border-b p-3 text-center">Courses</th><th class="border-b p-3 text-center">Cr. Hrs</th>
+                    <th class="border-b p-3 text-center">Actions</th> <!-- Actions Column -->
+                </tr></thead><tbody id="enrollmentTableBody"><tr><td colspan="6" class="p-4 text-center text-gray-500 italic">Loading...</td></tr></tbody></table></div>
             </div>
             
              <!-- Enrollment Form Modal -->
@@ -281,7 +278,9 @@
                         <button onclick="downloadDiscountTemplate()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition flex items-center text-sm"><i class="fas fa-download mr-2"></i> Template</button>
                     </div>
                 </div>
-                <div class="overflow-x-auto max-h-[600px] overflow-y-auto"><table class="w-full text-sm text-left border-collapse border border-gray-200"><thead class="bg-purple-50 text-gray-700 uppercase text-xs sticky top-0"><tr><th class="border p-3">Reg Number</th><th class="border p-3">Name</th><th class="border p-3">Academic Term</th><th class="border p-3 text-right">Discount %</th></tr></thead><tbody id="discountTableBody"><tr><td colspan="4" class="p-4 text-center text-gray-500 italic">Loading...</td></tr></tbody></table></div>
+                <div class="overflow-x-auto max-h-[600px] overflow-y-auto">
+                    <table class="w-full text-sm text-left border-collapse border border-gray-200"><thead class="bg-purple-50 text-gray-700 uppercase text-xs sticky top-0"><tr><th class="border p-3">Reg Number</th><th class="border p-3">Name</th><th class="border p-3">Academic Term</th><th class="border p-3 text-right">Discount %</th></tr></thead><tbody id="discountTableBody"><tr><td colspan="4" class="p-4 text-center text-gray-500 italic">Loading...</td></tr></tbody></table>
+                </div>
             </div>
         </div>
     </div>
@@ -301,7 +300,6 @@
         let sortDir = 1;
         let enrollSortDir = 1;
         let paidSortDir = 1;
-        let discountSortDir = 1; // Sort dir for discount
 
         // --- EDIT HERE TO ADD/REMOVE DEGREES ---
         const DEGREE_PATTERNS = [
@@ -313,6 +311,13 @@
 
         // --- INIT ---
         document.getElementById('printDate').textContent = new Date().toLocaleString();
+        
+        // Define helpers early
+        function getStorage(k) { const s=localStorage.getItem(k); return s?JSON.parse(s):[]; }
+        function setStorage(k,v) { localStorage.setItem(k,JSON.stringify(v)); }
+        function num(n) { return parseFloat(n).toLocaleString('en-US'); }
+        function normalizeTerm(t) { return t ? t.toString().toLowerCase().replace(/[^a-z0-9]/g, '') : ""; }
+
         initData();
 
         async function initData() {
@@ -330,16 +335,22 @@
                     g_fees = json.data.fees || [];
                     g_enrollments = json.data.enrollments || [];
                     g_discounts = json.data.discounts || [];
-                    g_payments = json.data.payments || []; // Load Payments
-                    // Check if DB is empty but we have local data (Migration check)
+                    g_payments = json.data.payments || []; 
+                    
+                    // Check migration
                     const localStudents = getStorage('fee_system_students_list_v2');
                     if (g_students.length === 0 && localStudents.length > 0) {
                         document.getElementById('conn-status').classList.remove('hidden');
-                        document.getElementById('conn-msg').innerHTML = `<strong class="text-green-700">Connected to Database (Empty)</strong>. Local data found in browser.`;
-                        document.getElementById('sync-btn').classList.remove('hidden');
+                        document.getElementById('conn-status').innerHTML = `
+                             <div class="flex justify-between w-full items-center">
+                                <div class="flex flex-col"><span class="text-green-700"><strong>Connected to Database (Empty)</strong>. Local data found.</span></div>
+                                <div class="flex gap-2"><button onclick="syncLocalToServer()" class="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 transition shadow-sm"><i class="fas fa-cloud-upload-alt mr-1"></i> Sync Local to Server</button></div>
+                            </div>
+                        `;
                     } else {
                         document.getElementById('conn-status').classList.add('hidden');
                     }
+
                 } else { throw new Error(json.message || 'Unknown API error'); }
             } catch (e) {
                 console.warn("API Error:", e);
@@ -365,15 +376,16 @@
 
         function showDebugModal() { document.getElementById('debug-content').textContent = lastRawResponse || "No response recorded."; document.getElementById('debug-modal').classList.remove('hidden'); }
         
-        // --- SYNC FUNCTION ---
         async function syncLocalToServer() {
             if(!confirm("Upload all local browser data to the server database? This cannot be undone.")) return;
+            // Get local data
             const s = getStorage('fee_system_students_list_v2');
             const f = getStorage('fee_system_records_v6');
             const e = getStorage('fee_system_enrollments_v1');
             const p = getStorage('fee_system_payments_v1');
             const d = getStorage('fee_system_discounts_v1');
             
+            // Upload in sequence
             if(s.length) await bulkImport('students', s);
             if(f.length) await bulkImport('fees', f);
             if(e.length) await bulkImport('enrollments', e);
@@ -403,13 +415,21 @@
                     g_fees.push(data); setStorage('fee_system_records_v6', g_fees); 
                 }
                 else if (type === 'enrollment') { 
-                    // Add ID for local storage if missing
-                    if(!data.id || data.id === "-1") data.id = Date.now().toString();
-                    if(data.id) g_enrollments = g_enrollments.filter(x=>x.id!=data.id);
+                    if(data.id && data.id !== "-1") g_enrollments = g_enrollments.filter(x=>x.id!=data.id);
+                    // Generate ID for local
+                    if(!data.id || data.id === "-1") data.id = Date.now().toString(); 
                     g_enrollments.push(data); setStorage('fee_system_enrollments_v1', g_enrollments); 
                 }
-                else if (type === 'payment') { if(data.id) g_payments = g_payments.filter(x=>x.id!=data.id); g_payments.push(data); setStorage('fee_system_payments_v1', g_payments); }
-                else if (type === 'discount') { if(data.id) g_discounts = g_discounts.filter(x=>x.id!=data.id); g_discounts.push(data); setStorage('fee_system_discounts_v1', g_discounts); }
+                else if (type === 'payment') { 
+                    if(data.id && data.id !== "-1") g_payments = g_payments.filter(x=>x.id!=data.id);
+                    if(!data.id || data.id === "-1") data.id = Date.now().toString();
+                    g_payments.push(data); setStorage('fee_system_payments_v1', g_payments); 
+                }
+                else if (type === 'discount') { 
+                    if(data.id && data.id !== "-1") g_discounts = g_discounts.filter(x=>x.id!=data.id);
+                    if(!data.id || data.id === "-1") data.id = Date.now().toString();
+                    g_discounts.push(data); setStorage('fee_system_discounts_v1', g_discounts); 
+                }
                 return { status: 'success' };
             }
         }
@@ -421,7 +441,7 @@
                  else if (type === 'fee') { act = 'delete_fee'; body = {id: id}; }
                  else if (type === 'enrollment') { act = 'delete_enrollment'; body = {id: id}; }
                  else if (type === 'payment') { act = 'delete_payment'; body = {id: id}; }
-                 else if (type === 'discount') { act = 'delete_discount'; body = {id: id}; }
+                 else if (type === 'discount') { act = 'delete_discount'; body = {id: id}; } // Only works if api.php has this
                  
                  await fetch(`${API_URL}?action=${act}`, { method: 'POST', body: JSON.stringify(body) });
                  await initData();
@@ -483,9 +503,18 @@
                     const toAdd = arr.map(e => ({...e, id: Date.now() + Math.random()}));
                     g_enrollments=[...g_enrollments,...toAdd]; setStorage('fee_system_enrollments_v1', g_enrollments); 
                 }
-                if(type==='discounts') { g_discounts=[...g_discounts,...arr]; setStorage('fee_system_discounts_v1', g_discounts); }
-                if(type==='payments') { g_payments=[...g_payments,...arr]; setStorage('fee_system_payments_v1', g_payments); }
-                if(type==='fees') { g_fees=[...g_fees,...arr]; setStorage('fee_system_records_v6', g_fees); }
+                if(type==='discounts') { 
+                     const toAdd = arr.map(d => ({...d, id: Date.now() + Math.random()}));
+                    g_discounts=[...g_discounts,...toAdd]; setStorage('fee_system_discounts_v1', g_discounts); 
+                }
+                if(type==='payments') { 
+                    const toAdd = arr.map(p => ({...p, id: Date.now() + Math.random()}));
+                    g_payments=[...g_payments,...toAdd]; setStorage('fee_system_payments_v1', g_payments); 
+                }
+                if(type==='fees') { 
+                    const toAdd = arr.map(f => ({...f, id: Date.now() + Math.random()}));
+                    g_fees=[...g_fees,...toAdd]; setStorage('fee_system_records_v6', g_fees); 
+                }
                 renderStudentTable(); renderEnrollmentTable(); renderDiscountTable(); renderPaymentTable(); renderFeeDashboard();
                 return { status: 'success' };
             }
