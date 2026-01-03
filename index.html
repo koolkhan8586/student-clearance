@@ -300,6 +300,7 @@
         let sortDir = 1;
         let enrollSortDir = 1;
         let paidSortDir = 1;
+        let discountSortDir = 1; // Sort dir for discount
 
         // --- EDIT HERE TO ADD/REMOVE DEGREES ---
         const DEGREE_PATTERNS = [
@@ -415,21 +416,13 @@
                     g_fees.push(data); setStorage('fee_system_records_v6', g_fees); 
                 }
                 else if (type === 'enrollment') { 
-                    if(data.id && data.id !== "-1") g_enrollments = g_enrollments.filter(x=>x.id!=data.id);
-                    // Generate ID for local
-                    if(!data.id || data.id === "-1") data.id = Date.now().toString(); 
+                    // Add ID for local storage if missing
+                    if(!data.id || data.id === "-1") data.id = Date.now().toString();
+                    if(data.id) g_enrollments = g_enrollments.filter(x=>x.id!=data.id);
                     g_enrollments.push(data); setStorage('fee_system_enrollments_v1', g_enrollments); 
                 }
-                else if (type === 'payment') { 
-                    if(data.id && data.id !== "-1") g_payments = g_payments.filter(x=>x.id!=data.id);
-                    if(!data.id || data.id === "-1") data.id = Date.now().toString();
-                    g_payments.push(data); setStorage('fee_system_payments_v1', g_payments); 
-                }
-                else if (type === 'discount') { 
-                    if(data.id && data.id !== "-1") g_discounts = g_discounts.filter(x=>x.id!=data.id);
-                    if(!data.id || data.id === "-1") data.id = Date.now().toString();
-                    g_discounts.push(data); setStorage('fee_system_discounts_v1', g_discounts); 
-                }
+                else if (type === 'payment') { if(data.id) g_payments = g_payments.filter(x=>x.id!=data.id); g_payments.push(data); setStorage('fee_system_payments_v1', g_payments); }
+                else if (type === 'discount') { if(data.id) g_discounts = g_discounts.filter(x=>x.id!=data.id); g_discounts.push(data); setStorage('fee_system_discounts_v1', g_discounts); }
                 return { status: 'success' };
             }
         }
@@ -441,7 +434,7 @@
                  else if (type === 'fee') { act = 'delete_fee'; body = {id: id}; }
                  else if (type === 'enrollment') { act = 'delete_enrollment'; body = {id: id}; }
                  else if (type === 'payment') { act = 'delete_payment'; body = {id: id}; }
-                 else if (type === 'discount') { act = 'delete_discount'; body = {id: id}; } // Only works if api.php has this
+                 else if (type === 'discount') { act = 'delete_discount'; body = {id: id}; }
                  
                  await fetch(`${API_URL}?action=${act}`, { method: 'POST', body: JSON.stringify(body) });
                  await initData();
