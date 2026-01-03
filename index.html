@@ -193,7 +193,8 @@
 
         <!-- TAB 4: Enrollment -->
         <div id="view-enrollment" class="tab-content hidden">
-            <div class="bg-white rounded-lg shadow-lg p-6">
+            <!-- (Content same as previous version) -->
+             <div class="bg-white rounded-lg shadow-lg p-6">
                 <div class="flex flex-col md:flex-row justify-between items-end mb-6 gap-4 border-b pb-4">
                     <div><h2 class="text-xl font-bold text-gray-800">Enrollment Data</h2><p class="text-sm text-gray-500 mb-2">Upload Excel (Reg #, Name, Courses, Credit Hrs).</p><div class="bg-orange-50 p-2 rounded border border-orange-200"><label class="block text-xs font-bold text-orange-700 uppercase mb-1">Target Session for Import:</label><div class="flex gap-2"><select id="enroll_import_year" class="border rounded px-2 py-1 text-sm bg-white"><option value="" disabled selected>Year</option><option value="2023">2023</option><option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option></select><select id="enroll_import_sem" class="border rounded px-2 py-1 text-sm bg-white"><option value="" disabled selected>Semester</option><option value="Winter">Winter</option><option value="Spring">Spring</option><option value="Summer">Summer</option><option value="Fall">Fall</option></select></div></div></div>
                     <div class="flex gap-2"><input type="file" id="enrollment_excel_file" accept=".xlsx, .xls" class="hidden" onchange="handleEnrollmentExcelUpload(event)"><button onclick="document.getElementById('enrollment_excel_file').click()" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-md"><i class="fas fa-file-import mr-1"></i> Import</button><button onclick="downloadEnrollmentTemplate()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition flex items-center text-sm"><i class="fas fa-download mr-2"></i> Template</button></div>
@@ -229,7 +230,9 @@
                         <button onclick="downloadDiscountTemplate()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition flex items-center text-sm"><i class="fas fa-download mr-2"></i> Template</button>
                     </div>
                 </div>
-                <div class="overflow-x-auto max-h-[600px] overflow-y-auto"><table class="w-full text-sm text-left border-collapse border border-gray-200"><thead class="bg-purple-50 text-gray-700 uppercase text-xs sticky top-0"><tr><th class="border p-3">Reg Number</th><th class="border p-3">Name</th><th class="border p-3">Academic Term</th><th class="border p-3 text-right">Discount %</th></tr></thead><tbody id="discountTableBody"><tr><td colspan="4" class="p-4 text-center text-gray-500 italic">Loading...</td></tr></tbody></table></div>
+                <div class="overflow-x-auto max-h-[600px] overflow-y-auto">
+                    <table class="w-full text-sm text-left border-collapse border border-gray-200"><thead class="bg-purple-50 text-gray-700 uppercase text-xs sticky top-0"><tr><th class="border p-3">Reg Number</th><th class="border p-3">Name</th><th class="border p-3">Academic Term</th><th class="border p-3 text-right">Discount %</th></tr></thead><tbody id="discountTableBody"><tr><td colspan="4" class="p-4 text-center text-gray-500 italic">Loading...</td></tr></tbody></table>
+                </div>
             </div>
         </div>
     </div>
@@ -362,6 +365,8 @@
             if (USE_API) { await fetch(`${API_URL}?action=delete_all_payments`, { method: 'POST' }); await initData(); } 
             else { g_payments = []; setStorage('fee_system_payments_v1', []); renderPaymentTable(); }
         }
+        
+        // NEW DELETE ALL FEES FUNCTION
         async function deleteAllFeesData() {
             if (USE_API) { await fetch(`${API_URL}?action=delete_all_fees`, { method: 'POST' }); await initData(); } 
             else { g_fees = []; setStorage('fee_system_records_v6', []); renderFeeDashboard(); }
@@ -374,7 +379,9 @@
                 if(type==='enrollments') act='import_enrollments';
                 if(type==='discounts') act='import_discounts';
                 if(type==='payments') act='import_payments';
+                // NEW FEE IMPORT HANDLER
                 if(type==='fees') act='import_fees';
+
                 const res = await fetch(`${API_URL}?action=${act}`, { method: 'POST', body: JSON.stringify(arr) });
                 const r = await res.json();
                 if(r.status==='success') await initData();
@@ -559,7 +566,11 @@
                 
                 // Calculate Paid from Payments Table
                 const sessionPayments = g_payments.filter(p => p.reg_no === s.reg_no && normalizeTerm(p.semester) === item.key);
-                const pd = sessionPayments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+                const paymentTabTotal = sessionPayments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+                
+                // Add Legacy/Master Paid if exists
+                const masterPaid = parseFloat(m.paid) || 0;
+                const pd = paymentTabTotal + masterPaid;
                 
                 const net = rowTotal - faAmt;
                 const bal = net - pd;
@@ -651,22 +662,13 @@
             e.preventDefault();
             const fd = new FormData(e.target);
             const rec = {
-                id: document.getElementById('fee_edit_id').value, // Add ID for update
                 degree: fd.get('target_degree'), batch: fd.get('target_batch'), year: fd.get('year'), semester: fd.get('semester'),
                 cr: fd.get('cr'), per_cr_fee: fd.get('per_cr_fee'), tuition_fee: fd.get('tuition_fee'),
                 total_courses: fd.get('total_courses'), exam_fee_per_subject: fd.get('exam_fee_per_subject'), exam_fee: fd.get('exam_fee'),
                 reg_fee: fd.get('reg_fee'), other_fee: fd.get('other_fee'), paid: fd.get('paid'), total_fee: 0 
             };
             const res = await saveData('fee', rec);
-            if(res.status==='success') { 
-                if(USE_API) await initData(); else renderFeeDashboard(); 
-                alert("Fee record saved!"); 
-                e.target.reset();
-                // Reset Edit Mode
-                document.getElementById('fee_edit_id').value = "-1";
-                document.getElementById('fee_submit_btn').innerHTML = '<i class="fas fa-plus-circle mr-2"></i> Add Batch Fee Record';
-                document.getElementById('fee_cancel_btn').classList.add('hidden');
-            }
+            if(res.status==='success') { if(USE_API) await initData(); else renderFeeDashboard(); alert("Fee record saved!"); e.target.reset(); }
         }
         function calculateTotals() {
             const cr=parseFloat(document.getElementById('cr_input').value)||0, rate=parseFloat(document.getElementById('rate_input').value)||0;
