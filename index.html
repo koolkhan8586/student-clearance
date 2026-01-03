@@ -337,6 +337,22 @@
         let lastRawResponse = '';
         let sortDir = 1;
 
+        // --- EDIT HERE TO ADD/REMOVE DEGREES ---
+        const DEGREE_PATTERNS = [
+            { prefix: "BAF0", code: "BAF" },
+            { prefix: "BCOM0", code: "BCOM" },
+            { prefix: "BAF2Y0", code: "BAF2Y" },
+            { prefix: "BSCAF0", code: "BSCAF" },
+            { prefix: "MSFP0", code: "MSFP" },
+            { prefix: "MAF2Y0", code: "MAF2Y" },
+            { prefix: "DAF0", code: "DAF" },
+            { prefix: "BCM0", code: "BCM" },
+            { prefix: "BST0", code: "BST" },
+            { prefix: "BIB0", code: "BIB" },
+            { prefix: "PAF0", code: "PAF" }, // Added PAF here
+            // Add new line here: { prefix: "XYZ", code: "XYZ_DEGREE" },
+        ];
+
         // --- INIT ---
         document.getElementById('printDate').textContent = new Date().toLocaleString();
         initData();
@@ -462,22 +478,16 @@
         }
         function hideAddForm() { document.getElementById('student-dashboard').classList.remove('hidden'); document.getElementById('student-form-container').classList.add('hidden'); }
         
-        // Auto-Degree Logic (Helper)
+        // --- NEW AUTO-DEGREE LOGIC ---
         function extractDegree(reg) {
             if(!reg) return '';
             reg = reg.toString().toUpperCase().trim();
-            // Updated Matching patterns
-            if(reg.startsWith("BAF0")) return "BAF";
-            if(reg.startsWith("BCOM0")) return "BCOM";
-            if(reg.startsWith("BAF2Y0")) return "BAF2Y";
-            if(reg.startsWith("BSCAF0")) return "BSCAF";
-            if(reg.startsWith("MSFP0")) return "MSFP";
-            if(reg.startsWith("MAF2Y0")) return "MAF2Y";
-            if(reg.startsWith("DAF0")) return "DAF";
-            if(reg.startsWith("BCM0")) return "BCM";
-            if(reg.startsWith("BST0")) return "BST";
-            if(reg.startsWith("BIB0")) return "BIB";
-            if(reg.startsWith("PAF0")) return "PAF";
+            
+            for (const item of DEGREE_PATTERNS) {
+                if (reg.startsWith(item.prefix)) {
+                    return item.code;
+                }
+            }
             return "Unknown";
         }
         
@@ -491,7 +501,7 @@
         async function saveStudentList(e) {
             e.preventDefault();
             const fd = new FormData(e.target);
-            const reg = fd.get('reg_no');
+            const reg = fd.get('reg_no').trim(); // Ensure trim
             
             if(document.getElementById('edit_index').value === "-1") {
                 if(g_students.some(s => s.reg_no.toLowerCase() === reg.toLowerCase())) {
