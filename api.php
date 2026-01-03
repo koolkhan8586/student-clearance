@@ -10,7 +10,6 @@ header("Access-Control-Allow-Headers: Content-Type");
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit; }
 
-// DATABASE CONFIG
 $host = "localhost";
 $user = "koolkhan";      // CHANGE THIS
 $pass = "Mangohair@197";  // CHANGE THIS
@@ -37,58 +36,18 @@ try {
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         if ($action === 'fetch_all') {
             $data = ['students' => [], 'fees' => [], 'enrollments' => [], 'discounts' => [], 'payments' => []];
-            
             $tables = ['students', 'fee_structure', 'enrollments', 'discounts', 'payments'];
             foreach($tables as $t) {
                 $res = $conn->query("SELECT * FROM $t");
-                while($row = $res->fetch_assoc()) $data[$t][] = $row;
+                while($row = $res->fetch_assoc()) $data[$t === 'fee_structure' ? 'fees' : $t][] = $row;
             }
             echo json_encode(['status' => 'success', 'data' => $data]);
         }
     }
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        // ... (Existing actions for student, fee, enrollment omitted for brevity but assumed present) ...
-        
-        // --- PAYMENT ACTIONS ---
-        if ($action === 'save_payment') {
-            $reg = sanitize($conn, $input['reg_no']);
-            $name = sanitize($conn, $input['name']);
-            $sem = sanitize($conn, $input['semester']);
-            $amount = (float)$input['amount'];
-            $date = sanitize($conn, $input['date']);
-            $id = $input['id'] ?? null;
-
-            if ($id && $id !== "-1" && is_numeric($id)) {
-                $conn->query("UPDATE payments SET reg_no='$reg', name='$name', semester='$sem', amount=$amount, date='$date' WHERE id=$id");
-            } else {
-                $conn->query("INSERT INTO payments (reg_no, name, semester, amount, date) VALUES ('$reg', '$name', '$sem', $amount, '$date')");
-            }
-            echo json_encode(["status" => "success"]);
-        }
-        elseif ($action === 'delete_payment') {
-            $id = (int)$input['id'];
-            $conn->query("DELETE FROM payments WHERE id = $id");
-            echo json_encode(["status" => "success"]);
-        }
-        elseif ($action === 'delete_all_payments') {
-            $conn->query("TRUNCATE TABLE payments");
-            echo json_encode(["status" => "success"]);
-        }
-        elseif ($action === 'import_payments') {
-            $conn->begin_transaction();
-            $stmt = $conn->prepare("INSERT INTO payments (reg_no, name, semester, amount, date) VALUES (?, ?, ?, ?, ?)");
-            foreach ($input as $row) {
-                $stmt->bind_param("sssds", $row['reg_no'], $row['name'], $row['semester'], $row['amount'], $row['date']);
-                $stmt->execute();
-            }
-            $conn->commit();
-            echo json_encode(["status" => "success"]);
-        }
-        // ... (Include other previous actions here: save_student, delete_student, etc.) ...
-        
-        // RE-INCLUDING ESSENTIAL PREVIOUS LOGIC FOR COMPLETENESS IN CASE YOU COPY-PASTE
-        elseif ($action === 'save_student') {
+        // --- STUDENT ACTIONS ---
+        if ($action === 'save_student') {
             $reg = sanitize($conn, $input['reg_no']); $name = sanitize($conn, $input['name']);
             $deg = sanitize($conn, $input['degree']); $batch = sanitize($conn, $input['batch']); $mob = sanitize($conn, $input['mobile']);
             $conn->query("INSERT INTO students (reg_no, name, degree, batch, mobile) VALUES ('$reg', '$name', '$deg', '$batch', '$mob') ON DUPLICATE KEY UPDATE name='$name', degree='$deg', batch='$batch', mobile='$mob'");
@@ -96,7 +55,8 @@ try {
         }
         elseif ($action === 'delete_student') { $reg = sanitize($conn, $input['reg_no']); $conn->query("DELETE FROM students WHERE reg_no = '$reg'"); echo json_encode(["status" => "success"]); }
         elseif ($action === 'delete_all_students') { $conn->query("DELETE FROM students"); echo json_encode(["status" => "success"]); }
-        
+
+        // --- ENROLLMENT ACTIONS ---
         elseif ($action === 'save_enrollment') {
             $reg = sanitize($conn, $input['reg_no']); $name = sanitize($conn, $input['name']); $sem = sanitize($conn, $input['semester']);
             $courses = (int)$input['courses']; $cr = (int)$input['cr']; $id = $input['id'] ?? null;
@@ -107,6 +67,7 @@ try {
         elseif ($action === 'delete_enrollment') { $id = (int)$input['id']; $conn->query("DELETE FROM enrollments WHERE id = $id"); echo json_encode(["status" => "success"]); }
         elseif ($action === 'delete_all_enrollments') { $conn->query("TRUNCATE TABLE enrollments"); echo json_encode(["status" => "success"]); }
 
+        // --- FEE ACTIONS ---
         elseif ($action === 'save_fee') {
             $d = sanitize($conn, $input); $id = $input['id'] ?? null;
             if ($id && $id !== "-1" && is_numeric($id)) {
@@ -117,31 +78,55 @@ try {
             echo json_encode(["status" => "success"]);
         }
         elseif ($action === 'delete_fee') { $id = (int)$input['id']; $conn->query("DELETE FROM fee_structure WHERE id = $id"); echo json_encode(["status" => "success"]); }
+        elseif ($action === 'delete_all_fees') { $conn->query("TRUNCATE TABLE fee_structure"); echo json_encode(["status" => "success"]); }
 
+        // --- PAYMENT ACTIONS ---
+        elseif ($action === 'save_payment') {
+            $reg = sanitize($conn, $input['reg_no']); $name = sanitize($conn, $input['name']); $sem = sanitize($conn, $input['semester']);
+            $amount = (float)$input['amount']; $date = sanitize($conn, $input['date']); $id = $input['id'] ?? null;
+            if ($id && $id !== "-1" && is_numeric($id)) $conn->query("UPDATE payments SET reg_no='$reg', name='$name', semester='$sem', amount=$amount, date='$date' WHERE id=$id");
+            else $conn->query("INSERT INTO payments (reg_no, name, semester, amount, date) VALUES ('$reg', '$name', '$sem', $amount, '$date')");
+            echo json_encode(["status" => "success"]);
+        }
+        elseif ($action === 'delete_payment') { $id = (int)$input['id']; $conn->query("DELETE FROM payments WHERE id = $id"); echo json_encode(["status" => "success"]); }
+        elseif ($action === 'delete_all_payments') { $conn->query("TRUNCATE TABLE payments"); echo json_encode(["status" => "success"]); }
+
+        // --- BULK IMPORTS ---
         elseif ($action === 'import_students') {
-            $conn->begin_transaction();
-            $stmt = $conn->prepare("INSERT INTO students (reg_no, name, degree, batch, mobile) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE name=VALUES(name), degree=VALUES(degree), batch=VALUES(batch), mobile=VALUES(mobile)");
+            $conn->begin_transaction(); $stmt = $conn->prepare("INSERT INTO students (reg_no, name, degree, batch, mobile) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE name=VALUES(name), degree=VALUES(degree), batch=VALUES(batch), mobile=VALUES(mobile)");
             foreach ($input as $row) { $stmt->bind_param("sssss", $row['reg_no'], $row['name'], $row['degree'], $row['batch'], $row['mobile']); $stmt->execute(); }
             $conn->commit(); echo json_encode(["status" => "success"]);
         }
         elseif ($action === 'import_enrollments') {
-            $conn->begin_transaction();
-            $stmt = $conn->prepare("INSERT INTO enrollments (reg_no, name, semester, courses, cr) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE courses=VALUES(courses), cr=VALUES(cr)");
+            $conn->begin_transaction(); $stmt = $conn->prepare("INSERT INTO enrollments (reg_no, name, semester, courses, cr) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE courses=VALUES(courses), cr=VALUES(cr)");
             foreach ($input as $row) { $stmt->bind_param("sssii", $row['reg_no'], $row['name'], $row['semester'], $row['courses'], $row['cr']); $stmt->execute(); }
             $conn->commit(); echo json_encode(["status" => "success"]);
         }
         elseif ($action === 'import_discounts') {
-            $conn->begin_transaction();
-            $stmt = $conn->prepare("INSERT INTO discounts (reg_no, name, term, discount) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE discount=VALUES(discount)");
+            $conn->begin_transaction(); $stmt = $conn->prepare("INSERT INTO discounts (reg_no, name, term, discount) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE discount=VALUES(discount)");
             foreach ($input as $row) { $stmt->bind_param("sssd", $row['reg_no'], $row['name'], $row['term'], $row['discount']); $stmt->execute(); }
             $conn->commit(); echo json_encode(["status" => "success"]);
         }
-        
+        elseif ($action === 'import_payments') {
+            $conn->begin_transaction(); $stmt = $conn->prepare("INSERT INTO payments (reg_no, name, semester, amount, date) VALUES (?, ?, ?, ?, ?)");
+            foreach ($input as $row) { $stmt->bind_param("sssds", $row['reg_no'], $row['name'], $row['semester'], $row['amount'], $row['date']); $stmt->execute(); }
+            $conn->commit(); echo json_encode(["status" => "success"]);
+        }
+        // NEW: Fee Structure Import
+        elseif ($action === 'import_fees') {
+            $conn->begin_transaction();
+            $stmt = $conn->prepare("INSERT INTO fee_structure (degree, batch, year, semester, cr, per_cr_fee, tuition_fee, total_courses, exam_fee_per_subject, exam_fee, reg_fee, other_fee, paid, total_fee) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            foreach ($input as $r) {
+                $stmt->bind_param("ssisiddidddddd", $r['degree'], $r['batch'], $r['year'], $r['semester'], $r['cr'], $r['per_cr_fee'], $r['tuition_fee'], $r['total_courses'], $r['exam_fee_per_subject'], $r['exam_fee'], $r['reg_fee'], $r['other_fee'], $r['paid'], $r['total_fee']);
+                $stmt->execute();
+            }
+            $conn->commit(); echo json_encode(["status" => "success"]);
+        }
+
         elseif ($action === 'reset') {
             $conn->query("SET FOREIGN_KEY_CHECKS = 0");
             $conn->query("TRUNCATE TABLE students"); $conn->query("TRUNCATE TABLE fee_structure");
-            $conn->query("TRUNCATE TABLE enrollments"); $conn->query("TRUNCATE TABLE discounts");
-            $conn->query("TRUNCATE TABLE payments");
+            $conn->query("TRUNCATE TABLE enrollments"); $conn->query("TRUNCATE TABLE discounts"); $conn->query("TRUNCATE TABLE payments");
             $conn->query("SET FOREIGN_KEY_CHECKS = 1");
             echo json_encode(["status" => "success"]);
         }
