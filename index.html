@@ -46,7 +46,16 @@
             </div>
         </div>
 
-        <div id="conn-status" class="hidden mb-4 px-4 py-2 rounded bg-yellow-100 text-yellow-800 text-sm font-bold no-print flex flex-col justify-center items-center border border-yellow-200"></div>
+        <!-- Connection Status & Sync Button -->
+        <div id="conn-status" class="hidden mb-4 px-4 py-3 rounded bg-yellow-100 text-yellow-800 text-sm font-bold no-print flex flex-col sm:flex-row justify-between items-center border border-yellow-200">
+            <span id="conn-msg"></span>
+            <div class="flex gap-2 mt-2 sm:mt-0">
+                <button id="sync-btn" onclick="syncLocalToServer()" class="hidden bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 transition shadow-sm">
+                    <i class="fas fa-cloud-upload-alt mr-1"></i> Found Local Data: Sync to Server
+                </button>
+                <button onclick="showDebugModal()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1 rounded text-xs">Debug</button>
+            </div>
+        </div>
 
         <!-- Debug Modal -->
         <div id="debug-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -64,7 +73,7 @@
             </div>
         </div>
 
-        <!-- Navigation (Updated with Correct IDs) -->
+        <!-- Navigation -->
         <div class="bg-white rounded-lg shadow-sm mb-6 no-print">
             <nav class="flex flex-col sm:flex-row flex-wrap">
                 <button onclick="switchTab('clearance')" id="tab-clearance" class="py-4 px-6 block hover:text-green-600 text-green-600 border-b-2 border-green-600 font-medium w-full sm:w-auto"><i class="fas fa-file-invoice mr-2"></i> Clearance Report</button>
@@ -193,7 +202,6 @@
 
         <!-- TAB 4: Enrollment -->
         <div id="view-enrollment" class="tab-content hidden">
-            <!-- (Content same as previous version) -->
              <div class="bg-white rounded-lg shadow-lg p-6">
                 <div class="flex flex-col md:flex-row justify-between items-end mb-6 gap-4 border-b pb-4">
                     <div><h2 class="text-xl font-bold text-gray-800">Enrollment Data</h2><p class="text-sm text-gray-500 mb-2">Upload Excel (Reg #, Name, Courses, Credit Hrs).</p><div class="mt-2 text-sm font-semibold text-orange-600 bg-orange-50 px-3 py-1 rounded-full inline-block">Total Records: <span id="total_enrollments_count">0</span></div><div class="bg-orange-50 p-2 rounded border border-orange-200 mt-2"><label class="block text-xs font-bold text-orange-700 uppercase mb-1">Target Session for Import:</label><div class="flex gap-2"><select id="enroll_import_year" class="border rounded px-2 py-1 text-sm bg-white"><option value="" disabled selected>Year</option><option value="2023">2023</option><option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option></select><select id="enroll_import_sem" class="border rounded px-2 py-1 text-sm bg-white"><option value="" disabled selected>Semester</option><option value="Winter">Winter</option><option value="Spring">Spring</option><option value="Summer">Summer</option><option value="Fall">Fall</option></select></div></div></div>
@@ -293,6 +301,7 @@
         let sortDir = 1;
         let enrollSortDir = 1;
         let paidSortDir = 1;
+        let discountSortDir = 1; // Sort dir for discount
 
         // --- EDIT HERE TO ADD/REMOVE DEGREES ---
         const DEGREE_PATTERNS = [
@@ -322,7 +331,15 @@
                     g_enrollments = json.data.enrollments || [];
                     g_discounts = json.data.discounts || [];
                     g_payments = json.data.payments || []; // Load Payments
-                    document.getElementById('conn-status').classList.add('hidden');
+                    // Check if DB is empty but we have local data (Migration check)
+                    const localStudents = getStorage('fee_system_students_list_v2');
+                    if (g_students.length === 0 && localStudents.length > 0) {
+                        document.getElementById('conn-status').classList.remove('hidden');
+                        document.getElementById('conn-msg').innerHTML = `<strong class="text-green-700">Connected to Database (Empty)</strong>. Local data found in browser.`;
+                        document.getElementById('sync-btn').classList.remove('hidden');
+                    } else {
+                        document.getElementById('conn-status').classList.add('hidden');
+                    }
                 } else { throw new Error(json.message || 'Unknown API error'); }
             } catch (e) {
                 console.warn("API Error:", e);
@@ -347,6 +364,25 @@
         }
 
         function showDebugModal() { document.getElementById('debug-content').textContent = lastRawResponse || "No response recorded."; document.getElementById('debug-modal').classList.remove('hidden'); }
+        
+        // --- SYNC FUNCTION ---
+        async function syncLocalToServer() {
+            if(!confirm("Upload all local browser data to the server database? This cannot be undone.")) return;
+            const s = getStorage('fee_system_students_list_v2');
+            const f = getStorage('fee_system_records_v6');
+            const e = getStorage('fee_system_enrollments_v1');
+            const p = getStorage('fee_system_payments_v1');
+            const d = getStorage('fee_system_discounts_v1');
+            
+            if(s.length) await bulkImport('students', s);
+            if(f.length) await bulkImport('fees', f);
+            if(e.length) await bulkImport('enrollments', e);
+            if(p.length) await bulkImport('payments', p);
+            if(d.length) await bulkImport('discounts', d);
+            
+            alert("Sync Complete! Reloading...");
+            location.reload();
+        }
 
         // --- DATA OPS ---
         async function saveData(type, data) {
@@ -356,6 +392,7 @@
                 if(type === 'fee') act = 'save_fee';
                 if(type === 'enrollment') act = 'save_enrollment';
                 if(type === 'payment') act = 'save_payment';
+                if(type === 'discount') act = 'save_discount';
                 
                 const res = await fetch(`${API_URL}?action=${act}`, { method: 'POST', body: JSON.stringify(data) });
                 return await res.json();
@@ -365,8 +402,14 @@
                     if(data.id && data.id !== '-1') g_fees = g_fees.filter(f => f.id != data.id);
                     g_fees.push(data); setStorage('fee_system_records_v6', g_fees); 
                 }
-                else if (type === 'enrollment') { if(data.id) g_enrollments = g_enrollments.filter(x=>x.id!=data.id); g_enrollments.push(data); setStorage('fee_system_enrollments_v1', g_enrollments); }
+                else if (type === 'enrollment') { 
+                    // Add ID for local storage if missing
+                    if(!data.id || data.id === "-1") data.id = Date.now().toString();
+                    if(data.id) g_enrollments = g_enrollments.filter(x=>x.id!=data.id);
+                    g_enrollments.push(data); setStorage('fee_system_enrollments_v1', g_enrollments); 
+                }
                 else if (type === 'payment') { if(data.id) g_payments = g_payments.filter(x=>x.id!=data.id); g_payments.push(data); setStorage('fee_system_payments_v1', g_payments); }
+                else if (type === 'discount') { if(data.id) g_discounts = g_discounts.filter(x=>x.id!=data.id); g_discounts.push(data); setStorage('fee_system_discounts_v1', g_discounts); }
                 return { status: 'success' };
             }
         }
@@ -378,6 +421,7 @@
                  else if (type === 'fee') { act = 'delete_fee'; body = {id: id}; }
                  else if (type === 'enrollment') { act = 'delete_enrollment'; body = {id: id}; }
                  else if (type === 'payment') { act = 'delete_payment'; body = {id: id}; }
+                 else if (type === 'discount') { act = 'delete_discount'; body = {id: id}; }
                  
                  await fetch(`${API_URL}?action=${act}`, { method: 'POST', body: JSON.stringify(body) });
                  await initData();
@@ -386,6 +430,7 @@
                  else if (type === 'fee') { g_fees = g_fees.filter(f => f.id != id); setStorage('fee_system_records_v6', g_fees); renderFeeDashboard(); } 
                  else if (type === 'enrollment') { g_enrollments = g_enrollments.filter(e => e.id !== id); setStorage('fee_system_enrollments_v1', g_enrollments); renderEnrollmentTable(); }
                  else if (type === 'payment') { g_payments = g_payments.filter(e => e.id !== id); setStorage('fee_system_payments_v1', g_payments); renderPaymentTable(); }
+                 else if (type === 'discount') { g_discounts = g_discounts.filter(e => e.id !== id); setStorage('fee_system_discounts_v1', g_discounts); renderDiscountTable(); }
              }
         }
 
@@ -393,6 +438,7 @@
         async function deleteFeeData(id) { deleteData('fee', id); }
         async function deleteEnrollmentData(id) { deleteData('enrollment', id); }
         async function deletePaymentData(id) { deleteData('payment', id); }
+        async function deleteDiscountData(id) { deleteData('discount', id); }
 
         async function deleteAllStudentsData() {
             if (USE_API) { await fetch(`${API_URL}?action=delete_all_students`, { method: 'POST' }); await initData(); } 
@@ -411,6 +457,10 @@
         async function deleteAllFeesData() {
             if (USE_API) { await fetch(`${API_URL}?action=delete_all_fees`, { method: 'POST' }); await initData(); } 
             else { g_fees = []; setStorage('fee_system_records_v6', []); renderFeeDashboard(); }
+        }
+         async function deleteAllDiscountsData() {
+            if (USE_API) { await fetch(`${API_URL}?action=delete_all_discounts`, { method: 'POST' }); await initData(); } 
+            else { g_discounts = []; setStorage('fee_system_discounts_v1', []); renderDiscountTable(); }
         }
 
         async function bulkImport(type, arr) {
