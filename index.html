@@ -18,6 +18,8 @@
             .container { max-width: 100%; margin: 0; padding: 0; }
             #search-container { display: none !important; }
         }
+        /* Modal Styles */
+        #debug-modal { background-color: rgba(0,0,0,0.5); }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen p-4 md:p-8 font-sans">
@@ -46,8 +48,24 @@
         </div>
 
         <!-- Connection Status Indicator (Detailed Error) -->
-        <div id="conn-status" class="hidden mb-4 px-4 py-2 rounded bg-yellow-100 text-yellow-800 text-sm font-bold no-print flex flex-col justify-center items-center">
+        <div id="conn-status" class="hidden mb-4 px-4 py-2 rounded bg-yellow-100 text-yellow-800 text-sm font-bold no-print flex flex-col justify-center items-center border border-yellow-200">
             <!-- Content populated by JS -->
+        </div>
+
+        <!-- Debug Modal -->
+        <div id="debug-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-lg shadow-2xl w-full max-w-2xl h-3/4 flex flex-col">
+                <div class="p-4 border-b flex justify-between items-center bg-gray-50 rounded-t-lg">
+                    <h3 class="font-bold text-lg text-red-600">Raw Server Response</h3>
+                    <button onclick="document.getElementById('debug-modal').classList.add('hidden')" class="text-gray-500 hover:text-gray-800 text-xl">&times;</button>
+                </div>
+                <div class="p-4 flex-grow overflow-auto bg-gray-100 font-mono text-xs">
+                    <pre id="debug-content" class="whitespace-pre-wrap break-all"></pre>
+                </div>
+                <div class="p-4 border-t flex justify-end bg-gray-50 rounded-b-lg">
+                    <button onclick="document.getElementById('debug-modal').classList.add('hidden')" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">Close</button>
+                </div>
+            </div>
         </div>
 
         <!-- Navigation -->
@@ -271,6 +289,7 @@
         let g_enrollments = [];
         let g_discounts = [];
         let activeStudent = null;
+        let lastRawResponse = '';
 
         // --- INIT ---
         document.getElementById('printDate').textContent = new Date().toLocaleString();
@@ -279,14 +298,9 @@
         async function initData() {
             try {
                 const res = await fetch(`${API_URL}?action=fetch_all`);
-                
-                // Check if response is OK (HTTP 200)
-                if (!res.ok) {
-                    throw new Error(`HTTP error! status: ${res.status}`);
-                }
-
-                // Get text first to debug potentially malformed JSON (e.g. PHP warnings mixed in)
                 const text = await res.text();
+                lastRawResponse = text; // Store for debugging
+
                 let json;
                 try {
                     json = JSON.parse(text);
@@ -305,27 +319,22 @@
                     throw new Error(json.message || 'Unknown API error');
                 }
             } catch (e) {
-                console.warn("API Connection failed:", e);
+                console.warn("API Error:", e);
                 USE_API = false;
                 
-                // Show Detailed Error in Yellow Box
+                // Show Detailed Error with "View Raw" button
                 const statusDiv = document.getElementById('conn-status');
                 statusDiv.classList.remove('hidden');
-                
-                // Sanitized error message for display
-                let errorMsg = e.message;
-                if (errorMsg.includes("Invalid JSON")) {
-                    errorMsg += " <br><span class='text-xs text-red-600 font-normal'>Possible causes: Database connection error, PHP errors, or wrong URL. Check console for raw response.</span>";
-                }
-
                 statusDiv.innerHTML = `
                     <div class="flex justify-between w-full items-center">
                         <div class="flex flex-col">
-                            <span><strong>Connection Failed:</strong> API not responding correctly.</span>
-                            <span class="text-xs mt-1 text-red-700 break-all">${errorMsg}</span>
+                            <span class="text-red-700"><strong>Connection Error:</strong> ${e.message}</span>
                             <span class="text-xs mt-1 opacity-75">(Switched to Local Storage Mode)</span>
                         </div>
-                        <button onclick="this.parentElement.parentElement.classList.add('hidden')" class="ml-4 font-bold hover:text-red-700 text-xl">&times;</button>
+                        <div class="flex gap-2">
+                            <button onclick="showDebugModal()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1 rounded text-xs">View Raw Error</button>
+                            <button onclick="this.parentElement.parentElement.parentElement.classList.add('hidden')" class="font-bold hover:text-red-700 text-xl">&times;</button>
+                        </div>
                     </div>
                 `;
 
@@ -337,6 +346,11 @@
             renderStudentTable(); renderFeeDashboard(); renderEnrollmentTable(); renderDiscountTable();
             const saved = localStorage.getItem('active_student_session');
             if (saved) { activeStudent = JSON.parse(saved); loadActiveStudentUI(); renderClearanceTable(); }
+        }
+
+        function showDebugModal() {
+            document.getElementById('debug-content').textContent = lastRawResponse || "No response recorded.";
+            document.getElementById('debug-modal').classList.remove('hidden');
         }
 
         // --- DATA OPS ---
