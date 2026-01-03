@@ -1,144 +1,718 @@
-<?php
-// api.php
-// 1. Suppress HTML error output (prevents "Invalid JSON" errors)
-error_reporting(E_ALL);
-ini_set('display_errors', 0); 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Fee Clearance System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        @media print {
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            body { background: white; padding: 0; }
+            .shadow-lg { box-shadow: none; }
+            #view-clearance { display: block !important; }
+            #view-student, #view-fee, #view-discount, #view-enrollment, #view-paid { display: none !important; }
+            .container { max-width: 100%; margin: 0; padding: 0; }
+            #search-container { display: none !important; }
+        }
+        #debug-modal { background-color: rgba(0,0,0,0.5); }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen p-4 md:p-8 font-sans">
 
-// 2. Set JSON headers immediately
-header("Content-Type: application/json");
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type");
+    <div class="max-w-7xl mx-auto container">
+        <!-- Header -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6 flex flex-col md:flex-row justify-between items-center border-b-4 border-green-600 no-print">
+            <div class="flex items-center gap-4 mb-4 md:mb-0">
+                <div class="bg-green-600 text-white p-3 rounded-full">
+                    <i class="fas fa-university text-2xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-800">Fee Management System</h1>
+                    <p class="text-sm text-gray-500">School of Accountancy & Finance</p>
+                </div>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="window.print()" class="bg-gray-700 hover:bg-gray-800 text-white px-4 py-2 rounded-lg transition">
+                    <i class="fas fa-print mr-2"></i> Print Report
+                </button>
+                <button onclick="resetSystem()" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition">
+                    <i class="fas fa-trash mr-2"></i> Reset System
+                </button>
+            </div>
+        </div>
 
-// 3. Handle Preflight Request
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
-    exit;
-}
+        <div id="conn-status" class="hidden mb-4 px-4 py-2 rounded bg-yellow-100 text-yellow-800 text-sm font-bold no-print flex flex-col justify-center items-center border border-yellow-200"></div>
 
-// 4. Database Config (UPDATE THESE)
-$host = "localhost";
-$user = "koolkhan";      // CHANGE THIS
-$pass = "Mangohair@197";  // CHANGE THIS
-$dbname = "fee_system";
+        <!-- Debug Modal -->
+        <div id="debug-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-lg shadow-2xl w-full max-w-2xl h-3/4 flex flex-col">
+                <div class="p-4 border-b flex justify-between items-center bg-gray-50 rounded-t-lg">
+                    <h3 class="font-bold text-lg text-red-600">Raw Server Response</h3>
+                    <button onclick="document.getElementById('debug-modal').classList.add('hidden')" class="text-gray-500 hover:text-gray-800 text-xl">&times;</button>
+                </div>
+                <div class="p-4 flex-grow overflow-auto bg-gray-100 font-mono text-xs">
+                    <pre id="debug-content" class="whitespace-pre-wrap break-all"></pre>
+                </div>
+                <div class="p-4 border-t flex justify-end bg-gray-50 rounded-b-lg">
+                    <button onclick="document.getElementById('debug-modal').classList.add('hidden')" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">Close</button>
+                </div>
+            </div>
+        </div>
 
-// 5. Connect with Exception Handling
-try {
-    mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
-    $conn = new mysqli($host, $user, $pass, $dbname);
-    $conn->set_charset("utf8mb4");
-} catch (Exception $e) {
-    echo json_encode(["status" => "error", "message" => "Database Connection Failed: " . $e->getMessage()]);
-    exit;
-}
+        <!-- Navigation -->
+        <div class="bg-white rounded-lg shadow-sm mb-6 no-print">
+            <nav class="flex flex-col sm:flex-row flex-wrap">
+                <button onclick="switchTab('clearance')" id="tab-clearance" class="py-4 px-6 block hover:text-green-600 text-green-600 border-b-2 border-green-600 font-medium w-full sm:w-auto"><i class="fas fa-file-invoice mr-2"></i> Clearance Report</button>
+                <button onclick="switchTab('student')" id="tab-student" class="py-4 px-6 block hover:text-green-600 text-gray-500 font-medium w-full sm:w-auto"><i class="fas fa-users-cog mr-2"></i> Student Data</button>
+                <button onclick="switchTab('fee')" id="tab-fee" class="py-4 px-6 block hover:text-green-600 text-gray-500 font-medium w-full sm:w-auto"><i class="fas fa-layer-group mr-2"></i> Fee Structure</button>
+                <button onclick="switchTab('enrollment')" id="tab-enrollment" class="py-4 px-6 block hover:text-green-600 text-gray-500 font-medium w-full sm:w-auto"><i class="fas fa-book-reader mr-2"></i> Enrollment</button>
+                <button onclick="switchTab('paid')" id="tab-paid" class="py-4 px-6 block hover:text-green-600 text-gray-500 font-medium w-full sm:w-auto"><i class="fas fa-money-bill-wave mr-2"></i> Fee Paid</button>
+                <button onclick="switchTab('discount')" id="tab-discount" class="py-4 px-6 block hover:text-green-600 text-gray-500 font-medium w-full sm:w-auto"><i class="fas fa-tags mr-2"></i> Discounts</button>
+            </nav>
+        </div>
 
-$action = $_GET['action'] ?? '';
-$input = json_decode(file_get_contents('php://input'), true);
+        <!-- TAB 1: Clearance Report -->
+        <div id="view-clearance" class="tab-content block">
+            <div id="search-container" class="bg-blue-50 rounded-lg p-4 mb-6 border border-blue-200 no-print flex flex-col md:flex-row gap-4 items-end">
+                <div class="flex-grow w-full">
+                    <label class="block text-xs font-bold text-blue-700 uppercase mb-1">Search Student by Reg #</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="search_reg_input" placeholder="e.g. BSCAF052530040" class="w-full border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500 font-mono" onkeypress="handleSearchEnter(event)">
+                        <button onclick="searchStudentByRegNo()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-bold transition flex items-center"><i class="fas fa-search mr-2"></i> Search</button>
+                    </div>
+                </div>
+            </div>
 
-function sanitize($conn, $input) {
-    if (is_array($input)) return array_map(function($item) use ($conn) { return sanitize($conn, $item); }, $input);
-    return $conn->real_escape_string($input ?? '');
-}
+            <div class="bg-white rounded-lg shadow-lg p-8 min-h-[800px] relative" id="printableArea">
+                <div class="absolute top-8 right-8 no-print">
+                    <button onclick="window.print()" class="bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded shadow flex items-center text-sm"><i class="fas fa-print mr-2"></i> Print Official Report</button>
+                </div>
+                <div class="text-center mb-8 border-b-2 border-gray-800 pb-4 mt-4">
+                    <h2 class="text-2xl font-bold uppercase tracking-wide">The University of Lahore</h2>
+                    <h3 class="text-xl font-semibold text-gray-700">School of Accountancy & Finance</h3>
+                    <p class="text-sm text-gray-500 mt-1">Student Fee Clearance Report</p>
+                </div>
+                <div class="grid grid-cols-2 gap-x-8 gap-y-4 mb-6 text-sm">
+                    <div class="flex"><span class="font-bold w-32">Reg #:</span><span class="border-b border-gray-400 flex-1 px-2 text-gray-800 font-mono" id="display_reg_no">--</span></div>
+                    <div class="flex"><span class="font-bold w-32">Degree Program:</span><span class="border-b border-gray-400 flex-1 px-2 text-gray-800" id="display_degree">--</span></div>
+                    <div class="flex"><span class="font-bold w-32">Name:</span><span class="border-b border-gray-400 flex-1 px-2 text-gray-800" id="display_name">--</span></div>
+                    <div class="flex"><span class="font-bold w-32">Batch:</span><span class="border-b border-gray-400 flex-1 px-2 text-gray-800" id="display_batch">--</span></div>
+                    <div class="flex"><span class="font-bold w-32">Registration Fee:</span><span class="border-b border-gray-400 flex-1 px-2 text-gray-800 font-mono" id="display_base_reg_fee">--</span></div>
+                    <div class="flex"><span class="font-bold w-32 text-gray-700">Per Crhr Fee:</span><span class="border-b border-gray-400 flex-1 px-2 text-gray-800 font-mono" id="display_per_cr_fee">--</span></div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs md:text-sm text-left border-collapse border border-gray-300">
+                        <thead class="bg-gray-100 text-gray-700 font-bold uppercase text-xs">
+                            <tr>
+                                <th class="border p-2 text-center w-10">Sr</th><th class="border p-2">Session</th><th class="border p-2 text-center w-12">Cr</th><th class="border p-2 text-center w-16">Subjects</th>
+                                <th class="border p-2 text-right">Tuition</th><th class="border p-2 text-right">Exam</th><th class="border p-2 text-right">Others</th><th class="border p-2 text-right bg-gray-50">Total</th>
+                                <th class="border p-2 text-center w-12">FA%</th><th class="border p-2 text-right">FA Amt</th><th class="border p-2 text-right font-semibold">Net Fee</th>
+                                <th class="border p-2 text-right text-green-700">Paid</th><th class="border p-2 text-right text-red-700">Bal</th>
+                            </tr>
+                        </thead>
+                        <tbody id="feeTableBody"><tr><td colspan="13" class="text-center p-4 text-gray-500 italic">No records found.</td></tr></tbody>
+                        <tfoot class="bg-gray-50 font-bold text-gray-800" id="tableFooter"></tfoot>
+                    </table>
+                </div>
+                <div class="mt-8 flex justify-end">
+                    <div class="w-64 border border-gray-800 p-4 bg-gray-50">
+                        <h4 class="font-bold text-center border-b border-gray-400 mb-2 pb-1">Summary</h4>
+                        <div class="flex justify-between mb-1"><span>Total Fee:</span><span id="summary_total">0</span></div>
+                        <div class="flex justify-between mb-1 text-green-600"><span>Fin. Assist:</span><span id="summary_fa">0</span></div>
+                        <div class="flex justify-between mb-1 text-blue-600"><span>Paid (Receipts):</span><span id="summary_paid">0</span></div>
+                        <div class="border-t border-gray-400 my-2"></div>
+                        <div class="flex justify-between font-bold text-lg text-red-600"><span>Balance:</span><span id="summary_balance">0</span></div>
+                    </div>
+                </div>
+                <div class="absolute bottom-4 left-8 right-8 flex justify-between text-xs text-gray-400 mt-12"><span>Printed: <span id="printDate"></span></span><span>System generated report</span></div>
+            </div>
+        </div>
 
-try {
-    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-        if ($action === 'fetch_all') {
-            $data = ['students' => [], 'fees' => [], 'enrollments' => [], 'discounts' => [], 'payments' => []];
-            $tables = ['students', 'fee_structure', 'enrollments', 'discounts', 'payments'];
+        <!-- TAB 2: Student Data -->
+        <div id="view-student" class="tab-content hidden">
+            <div id="student-dashboard" class="bg-white rounded-lg shadow-lg p-6">
+                <div class="flex flex-col xl:flex-row justify-between items-center mb-6 gap-4">
+                    <div><h2 class="text-xl font-bold text-gray-800">Student Directory</h2><p class="text-sm text-gray-500">Manage all student records here</p><div class="mt-2 text-sm font-semibold text-blue-600 bg-blue-50 px-3 py-1 rounded-full inline-block">Total Students: <span id="total_students_count">0</span></div></div>
+                    <div class="flex flex-col sm:flex-row gap-3 w-full lg:w-auto items-center">
+                        <div class="relative w-full sm:w-64"><input type="text" id="student_list_search" placeholder="Search by Reg, Name, Batch..." onkeyup="filterStudents()" class="border border-gray-300 rounded-lg px-4 py-2 pl-10 w-full text-sm focus:ring-2 focus:ring-blue-500 outline-none shadow-sm transition"><i class="fas fa-search absolute left-3 top-3 text-gray-400 text-xs"></i></div>
+                        <div class="flex gap-2 flex-wrap justify-center sm:justify-start">
+                            <input type="file" id="student_excel_file" accept=".xlsx, .xls" class="hidden" onchange="handleStudentExcelUpload(event)">
+                            <button onclick="document.getElementById('student_excel_file').click()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-sm"><i class="fas fa-file-excel mr-1"></i> Import</button>
+                            <button onclick="exportStudentsToExcel()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-sm"><i class="fas fa-file-export mr-1"></i> Export</button>
+                            <button onclick="showAddForm()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-sm"><i class="fas fa-plus mr-1"></i> Add</button>
+                            <button onclick="deleteAllStudents()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-sm"><i class="fas fa-trash-alt mr-1"></i> Del All</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="upload-progress-container" class="hidden mb-4"><div class="flex justify-between text-xs mb-1 text-gray-600"><span>Processing Upload...</span><span id="progress-text">0%</span></div><div class="w-full bg-gray-200 rounded-full h-2.5"><div id="upload-progress-bar" class="bg-blue-600 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div></div></div>
+                <div class="overflow-x-auto border rounded-lg"><table class="w-full text-sm text-left border-collapse border-b border-gray-200"><thead class="bg-gray-50 text-gray-700 uppercase text-xs"><tr><th class="border-b p-3 cursor-pointer" onclick="sortStudentTable('reg_no')">Reg Number</th><th class="border-b p-3 cursor-pointer" onclick="sortStudentTable('name')">Name</th><th class="border-b p-3 cursor-pointer" onclick="sortStudentTable('degree')">Degree</th><th class="border-b p-3 cursor-pointer" onclick="sortStudentTable('batch')">Batch</th><th class="border-b p-3 text-center">Actions</th></tr></thead><tbody id="studentsTableBody"><tr><td colspan="5" class="p-4 text-center text-gray-500">Loading...</td></tr></tbody></table></div>
+            </div>
+            <div id="student-form-container" class="hidden bg-white rounded-lg shadow-lg p-6 max-w-2xl mx-auto mt-4"><div class="flex justify-between items-center border-b pb-4 mb-4"><h3 class="text-lg font-bold text-gray-800" id="form-title">Add New Student</h3><button onclick="hideAddForm()" class="text-gray-500 hover:text-red-500"><i class="fas fa-times"></i></button></div><form id="studentForm" onsubmit="saveStudentList(event)" class="space-y-4"><input type="hidden" id="edit_index" value="-1"><div class="grid grid-cols-1 md:grid-cols-2 gap-4"><div class="col-span-1 md:col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Registration Number</label><input type="text" name="reg_no" id="input_reg_no" oninput="autoFillDegree(this.value)" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div class="col-span-1 md:col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Full Name</label><input type="text" name="name" id="input_name" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div><label class="block text-sm font-medium text-gray-700 mb-1">Degree Program</label><input type="text" name="degree" id="input_degree" class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div><label class="block text-sm font-medium text-gray-700 mb-1">Batch (Session)</label><input type="text" name="batch" id="input_batch" class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div class="col-span-1 md:col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Mobile</label><input type="text" name="mobile" id="input_mobile" class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div class="col-span-1 md:col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Email</label><input type="email" name="email" id="input_email" class="w-full border border-gray-300 rounded-lg px-4 py-2"></div></div><div class="pt-4 flex gap-2"><button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg">Save Student</button><button type="button" onclick="hideAddForm()" class="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg">Cancel</button></div></form></div>
+        </div>
+
+        <!-- TAB 3: Fee Record -->
+        <div id="view-fee" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow-lg p-6 max-w-4xl mx-auto">
+                <div class="flex items-center gap-3 mb-6 border-b pb-4">
+                    <div class="bg-green-100 text-green-600 p-3 rounded-full"><i class="fas fa-layer-group text-xl"></i></div>
+                    <div><h2 class="text-xl font-bold text-gray-800">Fee Structure</h2><p class="text-sm text-gray-500">Define fee records by Degree & Batch.</p></div>
+                </div>
+                <div class="flex justify-end mb-4">
+                     <div class="flex gap-2">
+                        <input type="file" id="fee_excel_file" accept=".xlsx, .xls" class="hidden" onchange="handleFeeExcelUpload(event)">
+                        <button onclick="document.getElementById('fee_excel_file').click()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-sm"><i class="fas fa-file-excel mr-1"></i> Import Fees</button>
+                        <button onclick="downloadFeeTemplate()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition flex items-center text-sm"><i class="fas fa-download mr-1"></i> Template</button>
+                         <button onclick="deleteAllFeesData()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-sm"><i class="fas fa-trash-alt mr-1"></i> Delete All</button>
+                     </div>
+                </div>
+
+                <form id="feeForm" onsubmit="addRecord(event)" class="space-y-6">
+                    <input type="hidden" name="fee_edit_id" id="fee_edit_id" value="-1">
+                    <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                        <h3 class="text-sm font-bold text-yellow-800 uppercase mb-3">1. Target Cohort</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div><label class="block text-xs font-bold text-gray-500 uppercase">Degree Program</label><input type="text" list="degree_list" name="target_degree" id="fee_degree_select" class="w-full border border-yellow-400 rounded px-3 py-2 bg-white mt-1" placeholder="Select or Type..." required><datalist id="degree_list"></datalist></div>
+                            <div><label class="block text-xs font-bold text-gray-500 uppercase">Batch</label><input type="text" list="batch_list" name="target_batch" id="fee_batch_select" class="w-full border border-yellow-400 rounded px-3 py-2 bg-white mt-1" placeholder="Select or Type..." required><datalist id="batch_list"></datalist></div>
+                        </div>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-lg border border-gray-200"><h3 class="text-sm font-bold text-gray-700 uppercase mb-3">2. Academic Session</h3><div class="grid grid-cols-2 gap-4"><div><label class="block text-xs font-bold text-gray-500 uppercase">Year</label><select name="year" id="fee_year" class="w-full border rounded px-3 py-2 bg-white mt-1"><option value="2023">2023</option><option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option></select></div><div><label class="block text-xs font-bold text-gray-500 uppercase">Semester</label><select name="semester" id="fee_sem" class="w-full border rounded px-3 py-2 bg-white mt-1"><option value="Winter">Winter</option><option value="Spring">Spring</option><option value="Summer">Summer</option><option value="Fall">Fall</option></select></div></div></div>
+                    <div class="bg-gray-50 p-4 rounded-lg border border-gray-200"><h3 class="text-sm font-bold text-gray-700 uppercase mb-3">3. Credit Hour & Tuition Fee</h3><div class="grid grid-cols-1 md:grid-cols-3 gap-4"><div><label class="block text-xs font-bold text-gray-500 uppercase">Total Credit Hrs</label><input type="number" name="cr" id="cr_input" oninput="calculateTotals()" class="w-full border rounded px-3 py-2 mt-1" placeholder="0"></div><div><label class="block text-xs font-bold text-gray-500 uppercase text-green-700">Cost Per Cr. Hour</label><input type="number" name="per_cr_fee" id="rate_input" oninput="calculateTotals()" class="w-full border border-green-300 bg-green-50 rounded px-3 py-2 mt-1" placeholder="0"></div><div><label class="block text-xs font-bold text-gray-500 uppercase">Tuition Fee</label><input type="number" name="tuition_fee" id="tuition_input" class="w-full border rounded px-3 py-2 bg-gray-100 mt-1 font-bold text-gray-700" placeholder="0" readonly></div></div></div>
+                    <div class="bg-gray-50 p-4 rounded-lg border border-gray-200"><h3 class="text-sm font-bold text-gray-700 uppercase mb-3">4. Examination Fee</h3><div class="grid grid-cols-1 md:grid-cols-3 gap-4"><div><label class="block text-xs font-bold text-gray-500 uppercase">Total Courses</label><input type="number" name="total_courses" id="courses_input" oninput="calculateTotals()" class="w-full border rounded px-3 py-2 mt-1" placeholder="0"></div><div><label class="block text-xs font-bold text-gray-500 uppercase text-blue-700">Exam Fee (Per Subject)</label><input type="number" name="exam_fee_per_subject" id="exam_rate_input" oninput="calculateTotals()" class="w-full border border-blue-300 bg-blue-50 rounded px-3 py-2 mt-1" placeholder="0"></div><div><label class="block text-xs font-bold text-gray-500 uppercase">Total Exam Fee</label><input type="number" name="exam_fee" id="total_exam_input" class="w-full border rounded px-3 py-2 bg-gray-100 mt-1 font-bold text-gray-700" placeholder="0" readonly></div></div></div>
+                    <div class="bg-gray-50 p-4 rounded-lg border border-gray-200"><h3 class="text-sm font-bold text-gray-700 uppercase mb-3">5. Other Charges & Payments</h3><div class="grid grid-cols-1 md:grid-cols-3 gap-4"><div><label class="block text-xs font-bold text-gray-500 uppercase">Registration Fee</label><input type="number" name="reg_fee" id="reg_fee_input" class="w-full border rounded px-3 py-2 mt-1" placeholder="0"></div><div><label class="block text-xs font-bold text-gray-500 uppercase">Other Charges</label><input type="number" name="other_fee" id="other_fee_input" class="w-full border rounded px-3 py-2 mt-1" placeholder="0"></div><div><label class="block text-xs font-bold text-gray-500 uppercase">Total Paid (Legacy)</label><input type="number" name="paid" id="paid_input" class="w-full border rounded px-3 py-2 mt-1" placeholder="0" title="Use Fee Paid tab for new records"></div></div></div>
+                    <button type="submit" id="fee_submit_btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition shadow-md"><i class="fas fa-plus-circle mr-2"></i> Add Batch Fee Record</button>
+                    <button type="button" onclick="cancelFeeEdit()" id="fee_cancel_btn" class="hidden w-full bg-gray-400 hover:bg-gray-500 text-white font-bold py-3 px-4 rounded-lg transition shadow-md mt-2">Cancel</button>
+                </form>
+                <div class="mt-8 border-t pt-4"><h4 class="text-gray-700 text-lg font-bold mb-4">Fee Record Dashboard</h4><div class="overflow-x-auto"><table class="w-full text-sm text-left border-collapse border border-gray-200"><thead class="bg-gray-100 text-gray-700 uppercase text-xs"><tr><th class="border p-2">Degree Program</th><th class="border p-2">Batch</th><th class="border p-2 text-right">Per Cr. Fee</th><th class="border p-2 text-right">Total Exam Fee</th><th class="border p-2 text-right">Others</th><th class="border p-2 text-right">Total Semester Fee</th><th class="border p-2 text-center">Session</th><th class="border p-2 text-center">Actions</th></tr></thead><tbody id="feeDashboardBody"><tr><td colspan="8" class="p-4 text-center text-gray-500 italic">Loading...</td></tr></tbody></table></div></div>
+            </div>
+        </div>
+
+        <!-- TAB 4: Enrollment -->
+        <div id="view-enrollment" class="tab-content hidden">
+             <div class="bg-white rounded-lg shadow-lg p-6">
+                <div class="flex flex-col md:flex-row justify-between items-end mb-6 gap-4 border-b pb-4">
+                    <div><h2 class="text-xl font-bold text-gray-800">Enrollment Data</h2><p class="text-sm text-gray-500 mb-2">Upload Excel (Reg #, Name, Courses, Credit Hrs).</p><div class="mt-2 text-sm font-semibold text-orange-600 bg-orange-50 px-3 py-1 rounded-full inline-block">Total Records: <span id="total_enrollments_count">0</span></div><div class="bg-orange-50 p-2 rounded border border-orange-200 mt-2"><label class="block text-xs font-bold text-orange-700 uppercase mb-1">Target Session for Import:</label><div class="flex gap-2"><select id="enroll_import_year" class="border rounded px-2 py-1 text-sm bg-white"><option value="" disabled selected>Year</option><option value="2023">2023</option><option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option></select><select id="enroll_import_sem" class="border rounded px-2 py-1 text-sm bg-white"><option value="" disabled selected>Semester</option><option value="Winter">Winter</option><option value="Spring">Spring</option><option value="Summer">Summer</option><option value="Fall">Fall</option></select></div></div></div>
+                    <div class="flex flex-col gap-2">
+                        <div class="flex gap-2">
+                            <input type="file" id="enrollment_excel_file" accept=".xlsx, .xls" class="hidden" onchange="handleEnrollmentExcelUpload(event)">
+                            <button onclick="document.getElementById('enrollment_excel_file').click()" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-md"><i class="fas fa-file-import mr-1"></i> Import</button>
+                            <button onclick="downloadEnrollmentTemplate()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition flex items-center text-sm"><i class="fas fa-download mr-2"></i> Template</button>
+                        </div>
+                        <div class="flex gap-2">
+                             <button onclick="showEnrollmentForm()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-sm" title="Add Manual"><i class="fas fa-plus"></i> Add Manual</button>
+                             <button onclick="deleteAllEnrollments()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-sm" title="Delete All"><i class="fas fa-trash-alt"></i> Delete All</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="relative w-full mb-4">
+                    <input type="text" id="enrollment_list_search" placeholder="Search enrollment..." onkeyup="filterEnrollments()" class="border border-gray-300 rounded px-3 py-2 pl-8 w-full text-sm focus:ring-2 focus:ring-orange-500 outline-none shadow-sm">
+                    <i class="fas fa-search absolute left-2.5 top-2.5 text-gray-400 text-xs"></i>
+                </div>
+                <div class="overflow-x-auto max-h-[600px] overflow-y-auto"><table class="w-full text-sm text-left border-collapse border border-gray-200"><thead class="bg-orange-50 text-gray-700 uppercase text-xs sticky top-0"><tr><th class="border-b p-3 cursor-pointer" onclick="sortEnrollmentTable('reg_no')">Reg # <i class="fas fa-sort ml-1"></i></th><th class="border-b p-3 cursor-pointer" onclick="sortEnrollmentTable('name')">Name <i class="fas fa-sort ml-1"></i></th><th class="border-b p-3 cursor-pointer" onclick="sortEnrollmentTable('semester')">Semester <i class="fas fa-sort ml-1"></i></th><th class="border-b p-3 text-center">Courses</th><th class="border-b p-3 text-center">Cr. Hrs</th><th class="border-b p-3 text-center">Actions</th></tr></thead><tbody id="enrollmentTableBody"><tr><td colspan="6" class="p-4 text-center text-gray-500 italic">Loading...</td></tr></tbody></table></div>
+            </div>
             
-            foreach($tables as $t) {
-                try {
-                    $res = $conn->query("SELECT * FROM $t");
-                    $key = ($t === 'fee_structure') ? 'fees' : $t;
-                    while($row = $res->fetch_assoc()) $data[$key][] = $row;
-                } catch (Exception $e) { /* Ignore if table missing */ }
-            }
-            echo json_encode(['status' => 'success', 'data' => $data]);
-        }
-    }
+             <!-- Enrollment Form Modal -->
+            <div id="enrollment-form-container" class="hidden bg-white rounded-lg shadow-lg p-6 max-w-2xl mx-auto mt-4">
+                <div class="flex justify-between items-center border-b pb-4 mb-4">
+                    <h3 class="text-lg font-bold text-gray-800" id="enroll-form-title">Add Enrollment</h3>
+                    <button onclick="hideEnrollmentForm()" class="text-gray-500 hover:text-red-500"><i class="fas fa-times"></i></button>
+                </div>
+                <form id="enrollmentForm" onsubmit="saveEnrollmentList(event)" class="space-y-4">
+                    <input type="hidden" id="enroll_edit_id" value="-1"> <!-- ID for editing -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Registration Number</label><input type="text" name="reg_no" id="enroll_reg_no" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div>
+                        <div class="col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Student Name</label><input type="text" name="name" id="enroll_name" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Session Year</label>
+                            <select name="year" id="enroll_year" class="w-full border border-gray-300 rounded-lg px-4 py-2"><option>2023</option><option>2024</option><option>2025</option><option>2026</option></select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Semester</label>
+                            <select name="semester" id="enroll_sem" class="w-full border border-gray-300 rounded-lg px-4 py-2"><option>Winter</option><option>Spring</option><option>Summer</option><option>Fall</option></select>
+                        </div>
+                        <div><label class="block text-sm font-medium text-gray-700 mb-1">Total Courses</label><input type="number" name="courses" id="enroll_courses" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div>
+                        <div><label class="block text-sm font-medium text-gray-700 mb-1">Total Credit Hours</label><input type="number" name="cr" id="enroll_cr" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div>
+                    </div>
+                    <div class="pt-4 flex gap-2">
+                        <button type="submit" class="flex-1 bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 px-4 rounded-lg">Save Record</button>
+                        <button type="button" onclick="hideEnrollmentForm()" class="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
 
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        <!-- NEW TAB 5: Fee Paid -->
+        <div id="view-paid" class="tab-content hidden">
+            <div id="paid-dashboard" class="bg-white rounded-lg shadow-lg p-6">
+                <!-- Top Toolbar -->
+                <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4">
+                    <div><h2 class="text-xl font-bold text-gray-800">Fee Payments</h2><p class="text-sm text-gray-500">Manage individual student payments</p><div class="mt-2 text-sm font-semibold text-teal-600 bg-teal-50 px-3 py-1 rounded-full inline-block">Total Records: <span id="total_payments_count">0</span></div></div>
+                    <div class="flex flex-col gap-3 w-full lg:w-auto">
+                        <div class="bg-teal-50 p-2 rounded border border-teal-200 flex flex-col sm:flex-row gap-2 items-center"><label class="text-xs font-bold text-teal-700 uppercase whitespace-nowrap">Session:</label><select id="paid_import_year" class="border rounded px-2 py-1 text-sm bg-white"><option value="" disabled selected>Year</option><option value="2023">2023</option><option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option></select><select id="paid_import_sem" class="border rounded px-2 py-1 text-sm bg-white"><option value="" disabled selected>Semester</option><option value="Winter">Winter</option><option value="Spring">Spring</option><option value="Summer">Summer</option><option value="Fall">Fall</option></select><input type="file" id="paid_excel_file" accept=".xlsx, .xls" class="hidden" onchange="handlePaidExcelUpload(event)"><button onclick="document.getElementById('paid_excel_file').click()" class="bg-teal-600 hover:bg-teal-700 text-white px-3 py-1 rounded transition flex items-center text-xs shadow-sm ml-auto"><i class="fas fa-file-import mr-1"></i> Import</button></div>
+                        <div class="flex flex-col sm:flex-row gap-2 w-full"><div class="relative w-full"><input type="text" id="paid_list_search" placeholder="Search payments..." onkeyup="filterPayments()" class="border border-gray-300 rounded px-3 py-2 pl-8 w-full text-sm focus:ring-2 focus:ring-teal-500 outline-none shadow-sm"><i class="fas fa-search absolute left-2.5 top-2.5 text-gray-400 text-xs"></i></div><div class="flex gap-2 justify-end"><button onclick="downloadPaidTemplate()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded transition flex items-center text-sm" title="Template"><i class="fas fa-download"></i></button><button onclick="exportPaymentsToExcel()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded transition flex items-center text-sm shadow-sm" title="Export"><i class="fas fa-file-export"></i></button><button onclick="showPaidForm()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded transition flex items-center text-sm shadow-sm" title="Add Manual"><i class="fas fa-plus"></i></button><button onclick="deleteAllPayments()" class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded transition flex items-center text-sm shadow-sm" title="Delete All"><i class="fas fa-trash-alt"></i></button></div></div>
+                    </div>
+                </div>
+                <div class="overflow-x-auto border rounded-lg max-h-[600px]"><table class="w-full text-sm text-left border-collapse border-b border-gray-200"><thead class="bg-teal-50 text-gray-700 uppercase text-xs sticky top-0"><tr><th class="border-b p-3 cursor-pointer" onclick="sortPaidTable('reg_no')">Reg #</th><th class="border-b p-3 cursor-pointer" onclick="sortPaidTable('name')">Name</th><th class="border-b p-3 cursor-pointer" onclick="sortPaidTable('semester')">Semester</th><th class="border-b p-3 text-right">Amount</th><th class="border-b p-3 text-center">Date</th><th class="border-b p-3 text-center">Actions</th></tr></thead><tbody id="paidTableBody"><tr><td colspan="6" class="p-4 text-center text-gray-500 italic">Loading...</td></tr></tbody></table></div>
+            </div>
+            <div id="paid-form-container" class="hidden bg-white rounded-lg shadow-lg p-6 max-w-2xl mx-auto mt-4"><div class="flex justify-between items-center border-b pb-4 mb-4"><h3 class="text-lg font-bold text-gray-800" id="paid-form-title">Add Payment</h3><button onclick="hidePaidForm()" class="text-gray-500 hover:text-red-500"><i class="fas fa-times"></i></button></div><form id="paidForm" onsubmit="savePaymentList(event)" class="space-y-4"><input type="hidden" id="paid_edit_id" value="-1"><div class="grid grid-cols-1 md:grid-cols-2 gap-4"><div class="col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Registration Number</label><input type="text" name="reg_no" id="paid_reg_no" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div class="col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Student Name</label><input type="text" name="name" id="paid_name" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div><label class="block text-sm font-medium text-gray-700 mb-1">Session Year</label><select name="year" id="paid_year" class="w-full border border-gray-300 rounded-lg px-4 py-2"><option>2023</option><option>2024</option><option>2025</option><option>2026</option></select></div><div><label class="block text-sm font-medium text-gray-700 mb-1">Semester</label><select name="semester" id="paid_sem" class="w-full border border-gray-300 rounded-lg px-4 py-2"><option>Winter</option><option>Spring</option><option>Summer</option><option>Fall</option></select></div><div><label class="block text-sm font-medium text-gray-700 mb-1">Amount Paid</label><input type="number" name="amount" id="paid_amount" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div><label class="block text-sm font-medium text-gray-700 mb-1">Date</label><input type="date" name="date" id="paid_date" class="w-full border border-gray-300 rounded-lg px-4 py-2"></div></div><div class="pt-4 flex gap-2"><button type="submit" class="flex-1 bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-4 rounded-lg">Save Payment</button><button type="button" onclick="hidePaidForm()" class="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg">Cancel</button></div></form></div>
+        </div>
+
+        <!-- TAB 6: Discounts -->
+        <div id="view-discount" class="tab-content hidden">
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b pb-4">
+                    <div><h2 class="text-xl font-bold text-gray-800">Discount Registry</h2><p class="text-sm text-gray-500">Upload Excel with Reg Number, Name, Academic Term, Student Discount</p></div>
+                    <div class="flex gap-2">
+                        <input type="file" id="discount_excel_file" accept=".xlsx, .xls" class="hidden" onchange="handleDiscountExcelUpload(event)">
+                        <button onclick="document.getElementById('discount_excel_file').click()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm"><i class="fas fa-file-import mr-2"></i> Import Discounts</button>
+                        <button onclick="downloadDiscountTemplate()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition flex items-center text-sm"><i class="fas fa-download mr-2"></i> Template</button>
+                        <button onclick="showDiscountForm()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded transition flex items-center text-sm shadow-sm" title="Add Manual"><i class="fas fa-plus"></i></button>
+                        <button onclick="deleteAllDiscounts()" class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded transition flex items-center text-sm shadow-sm" title="Delete All"><i class="fas fa-trash-alt"></i></button>
+                    </div>
+                </div>
+                
+                <div class="relative w-full mb-4">
+                    <input type="text" id="discount_list_search" placeholder="Search discounts..." onkeyup="filterDiscounts()" class="border border-gray-300 rounded px-3 py-2 pl-8 w-full text-sm focus:ring-2 focus:ring-purple-500 outline-none shadow-sm">
+                    <i class="fas fa-search absolute left-2.5 top-2.5 text-gray-400 text-xs"></i>
+                </div>
+                <div class="mt-2 text-sm font-semibold text-purple-600 bg-purple-50 px-3 py-1 rounded-full inline-block mb-4">Total Records: <span id="total_discounts_count">0</span></div>
+
+                <div class="overflow-x-auto max-h-[600px] overflow-y-auto"><table class="w-full text-sm text-left border-collapse border border-gray-200"><thead class="bg-purple-50 text-gray-700 uppercase text-xs sticky top-0"><tr>
+                    <th class="border-b p-3 cursor-pointer" onclick="sortDiscountTable('reg_no')">Reg # <i class="fas fa-sort ml-1"></i></th>
+                    <th class="border-b p-3 cursor-pointer" onclick="sortDiscountTable('name')">Name <i class="fas fa-sort ml-1"></i></th>
+                    <th class="border-b p-3 cursor-pointer" onclick="sortDiscountTable('term')">Term <i class="fas fa-sort ml-1"></i></th>
+                    <th class="border-b p-3 text-right">Discount %</th>
+                    <th class="border-b p-3 text-center">Actions</th>
+                </tr></thead><tbody id="discountTableBody"><tr><td colspan="5" class="p-4 text-center text-gray-500 italic">Loading...</td></tr></tbody></table></div>
+            </div>
+
+             <!-- Discount Form Modal -->
+            <div id="discount-form-container" class="hidden bg-white rounded-lg shadow-lg p-6 max-w-2xl mx-auto mt-4">
+                <div class="flex justify-between items-center border-b pb-4 mb-4">
+                    <h3 class="text-lg font-bold text-gray-800" id="discount-form-title">Add Discount</h3>
+                    <button onclick="hideDiscountForm()" class="text-gray-500 hover:text-red-500"><i class="fas fa-times"></i></button>
+                </div>
+                <form id="discountForm" onsubmit="saveDiscountList(event)" class="space-y-4">
+                    <input type="hidden" id="discount_edit_id" value="-1"> <!-- ID for editing -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Registration Number</label><input type="text" name="reg_no" id="discount_reg_no" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div>
+                        <div class="col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Student Name</label><input type="text" name="name" id="discount_name" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div>
+                        <div><label class="block text-sm font-medium text-gray-700 mb-1">Term (e.g. Fall 2025)</label><input type="text" name="term" id="discount_term" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div>
+                        <div><label class="block text-sm font-medium text-gray-700 mb-1">Discount %</label><input type="number" name="discount" id="discount_val" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div>
+                    </div>
+                    <div class="pt-4 flex gap-2">
+                        <button type="submit" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-lg">Save Record</button>
+                        <button type="button" onclick="hideDiscountForm()" class="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- API & DATA CONFIG ---
+        const API_URL = 'api.php'; 
+        let USE_API = true; 
+
+        let g_students = [];
+        let g_fees = [];
+        let g_enrollments = [];
+        let g_discounts = [];
+        let g_payments = []; // New Global
+        let activeStudent = null;
+        let lastRawResponse = '';
+        let sortDir = 1;
+        let enrollSortDir = 1;
+        let paidSortDir = 1;
+        let discountSortDir = 1;
+
+        // --- EDIT HERE TO ADD/REMOVE DEGREES ---
+        const DEGREE_PATTERNS = [
+            { prefix: "BAF0", code: "BAF" }, { prefix: "BCOM0", code: "BCOM" }, { prefix: "BAF2Y0", code: "BAF2Y" },
+            { prefix: "BSCAF0", code: "BSCAF" }, { prefix: "MSFP0", code: "MSFP" }, { prefix: "MAF2Y0", code: "MAF2Y" },
+            { prefix: "DAF0", code: "DAF" }, { prefix: "BCM0", code: "BCM" }, { prefix: "BST0", code: "BST" },
+            { prefix: "BIB0", code: "BIB" }, { prefix: "PAF0", code: "PAF" }, 
+        ];
+
+        // --- INIT ---
+        document.getElementById('printDate').textContent = new Date().toLocaleString();
         
-        // --- STUDENT ACTIONS ---
-        if ($action === 'save_student') {
-            $reg = sanitize($conn, $input['reg_no']); $name = sanitize($conn, $input['name']);
-            $deg = sanitize($conn, $input['degree']); $batch = sanitize($conn, $input['batch']); $mob = sanitize($conn, $input['mobile']);
-            $conn->query("INSERT INTO students (reg_no, name, degree, batch, mobile) VALUES ('$reg', '$name', '$deg', '$batch', '$mob') ON DUPLICATE KEY UPDATE name='$name', degree='$deg', batch='$batch', mobile='$mob'");
-            echo json_encode(["status" => "success"]);
-        }
-        elseif ($action === 'delete_student') { $reg = sanitize($conn, $input['reg_no']); $conn->query("DELETE FROM students WHERE reg_no = '$reg'"); echo json_encode(["status" => "success"]); }
-        elseif ($action === 'delete_all_students') { $conn->query("TRUNCATE TABLE students"); echo json_encode(["status" => "success"]); }
-        elseif ($action === 'import_students') {
-            $conn->begin_transaction(); $stmt = $conn->prepare("INSERT INTO students (reg_no, name, degree, batch, mobile) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE name=VALUES(name), degree=VALUES(degree), batch=VALUES(batch), mobile=VALUES(mobile)");
-            foreach ($input as $row) { $stmt->bind_param("sssss", $row['reg_no'], $row['name'], $row['degree'], $row['batch'], $row['mobile']); $stmt->execute(); }
-            $conn->commit(); echo json_encode(["status" => "success"]);
-        }
+        // Define helpers early
+        function getStorage(k) { const s=localStorage.getItem(k); return s?JSON.parse(s):[]; }
+        function setStorage(k,v) { localStorage.setItem(k,JSON.stringify(v)); }
+        function num(n) { return parseFloat(n).toLocaleString('en-US'); }
+        function normalizeTerm(t) { return t ? t.toString().toLowerCase().replace(/[^a-z0-9]/g, '') : ""; }
 
-        // --- FEE ACTIONS ---
-        elseif ($action === 'save_fee') {
-            $d = sanitize($conn, $input); $id = $input['id'] ?? null;
-            if ($id && $id !== "-1" && is_numeric($id)) {
-                $conn->query("UPDATE fee_structure SET degree='{$d['degree']}', batch='{$d['batch']}', year='{$d['year']}', semester='{$d['semester']}', cr='{$d['cr']}', per_cr_fee='{$d['per_cr_fee']}', tuition_fee='{$d['tuition_fee']}', total_courses='{$d['total_courses']}', exam_fee_per_subject='{$d['exam_fee_per_subject']}', exam_fee='{$d['exam_fee']}', reg_fee='{$d['reg_fee']}', other_fee='{$d['other_fee']}', paid='{$d['paid']}', total_fee='{$d['total_fee']}' WHERE id=$id");
-            } else {
-                $conn->query("INSERT INTO fee_structure (degree, batch, year, semester, cr, per_cr_fee, tuition_fee, total_courses, exam_fee_per_subject, exam_fee, reg_fee, other_fee, paid, total_fee) VALUES ('{$d['degree']}', '{$d['batch']}', '{$d['year']}', '{$d['semester']}', '{$d['cr']}', '{$d['per_cr_fee']}', '{$d['tuition_fee']}', '{$d['total_courses']}', '{$d['exam_fee_per_subject']}', '{$d['exam_fee']}', '{$d['reg_fee']}', '{$d['other_fee']}', '{$d['paid']}', '{$d['total_fee']}')");
+        initData();
+
+        async function initData() {
+            try {
+                const res = await fetch(`${API_URL}?action=fetch_all`);
+                const text = await res.text();
+                lastRawResponse = text; 
+
+                let json;
+                try { json = JSON.parse(text); } catch (e) { throw new Error(`Invalid JSON received. Response start: "${text.substring(0, 150)}..."`); }
+                
+                if (json.status === 'success') {
+                    USE_API = true;
+                    g_students = json.data.students || [];
+                    g_fees = json.data.fees || [];
+                    g_enrollments = json.data.enrollments || [];
+                    g_discounts = json.data.discounts || [];
+                    g_payments = json.data.payments || []; 
+                    
+                    // Check migration
+                    const localStudents = getStorage('fee_system_students_list_v2');
+                    if (g_students.length === 0 && localStudents.length > 0) {
+                        document.getElementById('conn-status').classList.remove('hidden');
+                        document.getElementById('conn-status').innerHTML = `
+                             <div class="flex justify-between w-full items-center">
+                                <div class="flex flex-col"><span class="text-green-700"><strong>Connected to Database (Empty)</strong>. Local data found.</span></div>
+                                <div class="flex gap-2"><button onclick="syncLocalToServer()" class="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 transition shadow-sm"><i class="fas fa-cloud-upload-alt mr-1"></i> Sync Local to Server</button></div>
+                            </div>
+                        `;
+                    } else {
+                        document.getElementById('conn-status').classList.add('hidden');
+                    }
+
+                } else { throw new Error(json.message || 'Unknown API error'); }
+            } catch (e) {
+                console.warn("API Error:", e);
+                USE_API = false;
+                const statusDiv = document.getElementById('conn-status');
+                statusDiv.classList.remove('hidden');
+                statusDiv.innerHTML = `
+                    <div class="flex justify-between w-full items-center">
+                        <div class="flex flex-col"><span class="text-red-700"><strong>Connection Error:</strong> ${e.message}</span><span class="text-xs mt-1 opacity-75">(Switched to Local Storage Mode)</span></div>
+                        <div class="flex gap-2"><button onclick="showDebugModal()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1 rounded text-xs">View Raw Error</button><button onclick="this.parentElement.parentElement.parentElement.classList.add('hidden')" class="font-bold hover:text-red-700 text-xl">&times;</button></div>
+                    </div>`;
+
+                g_students = getStorage('fee_system_students_list_v2');
+                g_fees = getStorage('fee_system_records_v6');
+                g_enrollments = getStorage('fee_system_enrollments_v1');
+                g_discounts = getStorage('fee_system_discounts_v1');
+                g_payments = getStorage('fee_system_payments_v1'); 
             }
-            echo json_encode(["status" => "success"]);
-        }
-        elseif ($action === 'delete_fee') { $id = (int)$input['id']; $conn->query("DELETE FROM fee_structure WHERE id = $id"); echo json_encode(["status" => "success"]); }
-        elseif ($action === 'delete_all_fees') { $conn->query("TRUNCATE TABLE fee_structure"); echo json_encode(["status" => "success"]); }
-        elseif ($action === 'import_fees') {
-            $conn->begin_transaction(); $stmt = $conn->prepare("INSERT INTO fee_structure (degree, batch, year, semester, cr, per_cr_fee, tuition_fee, total_courses, exam_fee_per_subject, exam_fee, reg_fee, other_fee, paid, total_fee) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-            foreach ($input as $r) { $stmt->bind_param("ssisiddidddddd", $r['degree'], $r['batch'], $r['year'], $r['semester'], $r['cr'], $r['per_cr_fee'], $r['tuition_fee'], $r['total_courses'], $r['exam_fee_per_subject'], $r['exam_fee'], $r['reg_fee'], $r['other_fee'], $r['paid'], $r['total_fee']); $stmt->execute(); }
-            $conn->commit(); echo json_encode(["status" => "success"]);
+            renderStudentTable(); renderFeeDashboard(); renderEnrollmentTable(); renderDiscountTable(); renderPaymentTable();
+            const saved = localStorage.getItem('active_student_session');
+            if (saved) { activeStudent = JSON.parse(saved); loadActiveStudentUI(); renderClearanceTable(); }
         }
 
-        // --- ENROLLMENT ACTIONS ---
-        elseif ($action === 'save_enrollment') {
-            $reg = sanitize($conn, $input['reg_no']); $name = sanitize($conn, $input['name']); $sem = sanitize($conn, $input['semester']);
-            $courses = (int)$input['courses']; $cr = (int)$input['cr']; $id = $input['id'] ?? null;
-            if ($id && $id !== "-1" && is_numeric($id)) $conn->query("UPDATE enrollments SET reg_no='$reg', name='$name', semester='$sem', courses=$courses, cr=$cr WHERE id=$id");
-            else $conn->query("INSERT INTO enrollments (reg_no, name, semester, courses, cr) VALUES ('$reg', '$name', '$sem', $courses, $cr)");
-            echo json_encode(["status" => "success"]);
-        }
-        elseif ($action === 'delete_enrollment') { $id = (int)$input['id']; $conn->query("DELETE FROM enrollments WHERE id = $id"); echo json_encode(["status" => "success"]); }
-        elseif ($action === 'delete_all_enrollments') { $conn->query("TRUNCATE TABLE enrollments"); echo json_encode(["status" => "success"]); }
-        elseif ($action === 'import_enrollments') {
-            $conn->begin_transaction(); $stmt = $conn->prepare("INSERT INTO enrollments (reg_no, name, semester, courses, cr) VALUES (?, ?, ?, ?, ?)");
-            foreach ($input as $row) { $stmt->bind_param("sssii", $row['reg_no'], $row['name'], $row['semester'], $row['courses'], $row['cr']); $stmt->execute(); }
-            $conn->commit(); echo json_encode(["status" => "success"]);
-        }
-
-        // --- PAYMENT ACTIONS ---
-        elseif ($action === 'save_payment') {
-            $reg = sanitize($conn, $input['reg_no']); $name = sanitize($conn, $input['name']); $sem = sanitize($conn, $input['semester']);
-            $amount = (float)$input['amount']; $date = sanitize($conn, $input['date']); $id = $input['id'] ?? null;
-            if ($id && $id !== "-1" && is_numeric($id)) $conn->query("UPDATE payments SET reg_no='$reg', name='$name', semester='$sem', amount=$amount, date='$date' WHERE id=$id");
-            else $conn->query("INSERT INTO payments (reg_no, name, semester, amount, date) VALUES ('$reg', '$name', '$sem', $amount, '$date')");
-            echo json_encode(["status" => "success"]);
-        }
-        elseif ($action === 'delete_payment') { $id = (int)$input['id']; $conn->query("DELETE FROM payments WHERE id = $id"); echo json_encode(["status" => "success"]); }
-        elseif ($action === 'delete_all_payments') { $conn->query("TRUNCATE TABLE payments"); echo json_encode(["status" => "success"]); }
-        elseif ($action === 'import_payments') {
-            $conn->begin_transaction(); $stmt = $conn->prepare("INSERT INTO payments (reg_no, name, semester, amount, date) VALUES (?, ?, ?, ?, ?)");
-            foreach ($input as $row) { $stmt->bind_param("sssds", $row['reg_no'], $row['name'], $row['semester'], $row['amount'], $row['date']); $stmt->execute(); }
-            $conn->commit(); echo json_encode(["status" => "success"]);
+        function showDebugModal() { document.getElementById('debug-content').textContent = lastRawResponse || "No response recorded."; document.getElementById('debug-modal').classList.remove('hidden'); }
+        
+        async function syncLocalToServer() {
+            if(!confirm("Upload all local browser data to the server database? This cannot be undone.")) return;
+            // Get local data
+            const s = getStorage('fee_system_students_list_v2');
+            const f = getStorage('fee_system_records_v6');
+            const e = getStorage('fee_system_enrollments_v1');
+            const p = getStorage('fee_system_payments_v1');
+            const d = getStorage('fee_system_discounts_v1');
+            
+            // Upload in sequence
+            if(s.length) await bulkImport('students', s);
+            if(f.length) await bulkImport('fees', f);
+            if(e.length) await bulkImport('enrollments', e);
+            if(p.length) await bulkImport('payments', p);
+            if(d.length) await bulkImport('discounts', d);
+            
+            alert("Sync Complete! Reloading...");
+            location.reload();
         }
 
-        // --- DISCOUNT ACTIONS ---
-        elseif ($action === 'import_discounts') {
-            $conn->begin_transaction(); $stmt = $conn->prepare("INSERT INTO discounts (reg_no, name, term, discount) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE discount=VALUES(discount)");
-            foreach ($input as $row) { $stmt->bind_param("sssd", $row['reg_no'], $row['name'], $row['term'], $row['discount']); $stmt->execute(); }
-            $conn->commit(); echo json_encode(["status" => "success"]);
+        // --- DATA OPS ---
+        async function saveData(type, data) {
+            if (USE_API) {
+                let act = '';
+                if(type === 'student') act = 'save_student';
+                if(type === 'fee') act = 'save_fee';
+                if(type === 'enrollment') act = 'save_enrollment';
+                if(type === 'payment') act = 'save_payment';
+                if(type === 'discount') act = 'save_discount';
+                
+                const res = await fetch(`${API_URL}?action=${act}`, { method: 'POST', body: JSON.stringify(data) });
+                return await res.json();
+            } else {
+                if (type === 'student') { 
+                    if(data.reg_no) g_students = g_students.filter(s => s.reg_no !== data.reg_no); // Update logic for local
+                    g_students.push(data); setStorage('fee_system_students_list_v2', g_students); 
+                }
+                else if (type === 'fee') { 
+                    if(data.id && data.id !== '-1') g_fees = g_fees.filter(f => f.id != data.id);
+                    g_fees.push(data); setStorage('fee_system_records_v6', g_fees); 
+                }
+                else if (type === 'enrollment') { 
+                    if(data.id && data.id !== "-1") g_enrollments = g_enrollments.filter(x=>x.id!=data.id);
+                    // Generate ID for local
+                    if(!data.id || data.id === "-1") data.id = Date.now().toString(); 
+                    g_enrollments.push(data); setStorage('fee_system_enrollments_v1', g_enrollments); 
+                }
+                else if (type === 'payment') { 
+                    if(data.id && data.id !== "-1") g_payments = g_payments.filter(x=>x.id!=data.id);
+                    if(!data.id || data.id === "-1") data.id = Date.now().toString();
+                    g_payments.push(data); setStorage('fee_system_payments_v1', g_payments); 
+                }
+                else if (type === 'discount') { 
+                    if(data.id && data.id !== "-1") g_discounts = g_discounts.filter(x=>x.id!=data.id);
+                    if(!data.id || data.id === "-1") data.id = Date.now().toString();
+                    g_discounts.push(data); setStorage('fee_system_discounts_v1', g_discounts); 
+                }
+                return { status: 'success' };
+            }
         }
 
-        elseif ($action === 'reset') {
-            $conn->query("SET FOREIGN_KEY_CHECKS = 0");
-            $tables = ['students', 'fee_structure', 'enrollments', 'discounts', 'payments'];
-            foreach($tables as $t) $conn->query("TRUNCATE TABLE $t");
-            $conn->query("SET FOREIGN_KEY_CHECKS = 1");
-            echo json_encode(["status" => "success"]);
+        async function deleteData(type, id) {
+             if (USE_API) {
+                 let act = ''; let body = {};
+                 if (type === 'student') { act = 'delete_student'; body = {reg_no: id}; }
+                 else if (type === 'fee') { act = 'delete_fee'; body = {id: id}; }
+                 else if (type === 'enrollment') { act = 'delete_enrollment'; body = {id: id}; }
+                 else if (type === 'payment') { act = 'delete_payment'; body = {id: id}; }
+                 else if (type === 'discount') { act = 'delete_discount'; body = {id: id}; } // Only works if api.php has this
+                 
+                 await fetch(`${API_URL}?action=${act}`, { method: 'POST', body: JSON.stringify(body) });
+                 await initData();
+             } else {
+                 if (type === 'student') { g_students = g_students.filter(s => s.reg_no !== id); setStorage('fee_system_students_list_v2', g_students); renderStudentTable(); } 
+                 else if (type === 'fee') { g_fees = g_fees.filter(f => f.id != id); setStorage('fee_system_records_v6', g_fees); renderFeeDashboard(); } 
+                 else if (type === 'enrollment') { g_enrollments = g_enrollments.filter(e => e.id !== id); setStorage('fee_system_enrollments_v1', g_enrollments); renderEnrollmentTable(); }
+                 else if (type === 'payment') { g_payments = g_payments.filter(e => e.id !== id); setStorage('fee_system_payments_v1', g_payments); renderPaymentTable(); }
+                 else if (type === 'discount') { g_discounts = g_discounts.filter(e => e.id !== id); setStorage('fee_system_discounts_v1', g_discounts); renderDiscountTable(); }
+             }
         }
-    }
-} catch (Exception $e) { echo json_encode(["status" => "error", "message" => $e->getMessage()]); }
-$conn->close();
-?>
+
+        async function deleteStudentData(regNo) { deleteData('student', regNo); }
+        async function deleteFeeData(id) { deleteData('fee', id); }
+        async function deleteEnrollmentData(id) { deleteData('enrollment', id); }
+        async function deletePaymentData(id) { deleteData('payment', id); }
+        async function deleteDiscountData(id) { deleteData('discount', id); }
+
+        async function deleteAllStudentsData() {
+            if (USE_API) { await fetch(`${API_URL}?action=delete_all_students`, { method: 'POST' }); await initData(); } 
+            else { g_students = []; setStorage('fee_system_students_list_v2', []); renderStudentTable(); }
+        }
+        async function deleteAllEnrollmentsData() {
+            if (USE_API) { await fetch(`${API_URL}?action=delete_all_enrollments`, { method: 'POST' }); await initData(); } 
+            else { g_enrollments = []; setStorage('fee_system_enrollments_v1', []); renderEnrollmentTable(); }
+        }
+        async function deleteAllPaymentsData() {
+            if (USE_API) { await fetch(`${API_URL}?action=delete_all_payments`, { method: 'POST' }); await initData(); } 
+            else { g_payments = []; setStorage('fee_system_payments_v1', []); renderPaymentTable(); }
+        }
+        async function deleteAllFeesData() {
+            if (USE_API) { await fetch(`${API_URL}?action=delete_all_fees`, { method: 'POST' }); await initData(); } 
+            else { g_fees = []; setStorage('fee_system_records_v6', []); renderFeeDashboard(); }
+        }
+        async function deleteAllDiscountsData() {
+             if (USE_API) { /* Ensure API supports this */ } 
+            else { g_discounts = []; setStorage('fee_system_discounts_v1', []); renderDiscountTable(); }
+        }
+
+        async function bulkImport(type, arr) {
+            if (USE_API) {
+                let act = '';
+                if(type==='students') act='import_students';
+                if(type==='enrollments') act='import_enrollments';
+                if(type==='discounts') act='import_discounts';
+                if(type==='payments') act='import_payments';
+                if(type==='fees') act='import_fees';
+
+                const res = await fetch(`${API_URL}?action=${act}`, { method: 'POST', body: JSON.stringify(arr) });
+                const r = await res.json();
+                if(r.status==='success') await initData();
+                return r;
+            } else {
+                if(type==='students') { g_students=[...g_students,...arr]; setStorage('fee_system_students_list_v2', g_students); }
+                if(type==='enrollments') { 
+                    // Add IDs for local storage imports
+                    const toAdd = arr.map(e => ({...e, id: Date.now() + Math.random()}));
+                    g_enrollments=[...g_enrollments,...toAdd]; setStorage('fee_system_enrollments_v1', g_enrollments); 
+                }
+                if(type==='discounts') { 
+                     const toAdd = arr.map(d => ({...d, id: Date.now() + Math.random()}));
+                    g_discounts=[...g_discounts,...toAdd]; setStorage('fee_system_discounts_v1', g_discounts); 
+                }
+                if(type==='payments') { 
+                    const toAdd = arr.map(p => ({...p, id: Date.now() + Math.random()}));
+                    g_payments=[...g_payments,...toAdd]; setStorage('fee_system_payments_v1', g_payments); 
+                }
+                if(type==='fees') { 
+                    const toAdd = arr.map(f => ({...f, id: Date.now() + Math.random()}));
+                    g_fees=[...g_fees,...toAdd]; setStorage('fee_system_records_v6', g_fees); 
+                }
+                renderStudentTable(); renderEnrollmentTable(); renderDiscountTable(); renderPaymentTable(); renderFeeDashboard();
+                return { status: 'success' };
+            }
+        }
+
+        // --- STUDENT UI ---
+        function showAddForm() { document.getElementById('studentForm').reset(); document.getElementById('edit_index').value = "-1"; document.getElementById('form-title').textContent = "Add New Student"; document.getElementById('student-dashboard').classList.add('hidden'); document.getElementById('student-form-container').classList.remove('hidden'); }
+        function hideAddForm() { document.getElementById('student-dashboard').classList.remove('hidden'); document.getElementById('student-form-container').classList.add('hidden'); }
+        function extractDegree(reg) { if(!reg) return ''; reg = reg.toString().toUpperCase().trim(); for (const item of DEGREE_PATTERNS) { if (reg.startsWith(item.prefix)) return item.code; } return "Unknown"; }
+        function autoFillDegree(val) { const degree = extractDegree(val); if(degree && degree !== "Unknown") { document.getElementById('input_degree').value = degree; } }
+        function toProperCase(str) { if (!str) return ''; return str.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' '); }
+
+        async function saveStudentList(e) {
+            e.preventDefault(); const fd = new FormData(e.target); const reg = fd.get('reg_no').trim();
+            if(document.getElementById('edit_index').value === "-1" && g_students.some(s => s.reg_no.toLowerCase() === reg.toLowerCase())) { alert("Duplicate Reg Number!"); return; }
+            const student = { reg_no: reg, name: toProperCase(fd.get('name')), degree: fd.get('degree') || extractDegree(reg), batch: fd.get('batch'), mobile: fd.get('mobile'), email: fd.get('email') };
+            const res = await saveData('student', student); if(res.status === 'success') { if(USE_API) await initData(); else renderStudentTable(); hideAddForm(); alert("Student saved!"); }
+        }
+
+        function editStudent(reg) { const s = g_students.find(x => x.reg_no === reg); if(!s) return; document.getElementById('input_reg_no').value = s.reg_no; document.getElementById('input_name').value = s.name; document.getElementById('input_degree').value = s.degree; document.getElementById('input_batch').value = s.batch; document.getElementById('input_mobile').value = s.mobile; document.getElementById('input_email').value = s.email || ''; document.getElementById('edit_index').value = "1"; document.getElementById('form-title').textContent = "Edit Student"; document.getElementById('student-dashboard').classList.add('hidden'); document.getElementById('student-form-container').classList.remove('hidden'); }
+        function deleteStudent(reg) { if(confirm('Delete this student?')) deleteStudentData(reg); }
+        function deleteAllStudents() { if(confirm('WARNING: Delete ALL students?')) deleteAllStudentsData(); }
+        function exportStudentsToExcel() { if(g_students.length === 0) { alert("No data."); return; } const ws = XLSX.utils.json_to_sheet(g_students); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Students"); XLSX.writeFile(wb, "All_Students.xlsx"); }
+
+        function handleStudentExcelUpload(e) { /* Logic same as previous, abbreviated */ const f = e.target.files[0]; if(!f) return; document.getElementById('upload-progress-container').classList.remove('hidden'); const pBar = document.getElementById('upload-progress-bar'); const pText = document.getElementById('progress-text'); pBar.style.width = '30%'; pText.textContent = 'Parsing...'; const r = new FileReader(); r.onload = async function(ev) { try { const wb = XLSX.read(new Uint8Array(ev.target.result), {type:'array'}); const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]); let newStudents = []; let duplicates = 0; pBar.style.width = '60%'; pText.textContent = 'Checking Duplicates...'; await new Promise(r => setTimeout(r, 100)); json.forEach(row => { const keys = Object.keys(row); const getKey = (term) => keys.find(k => k.toLowerCase().includes(term)); const reg = row[getKey('reg')] || row[getKey('id')]; if (reg) { if(!g_students.some(s => s.reg_no.trim().toLowerCase() === reg.toString().trim().toLowerCase())) { const extractedDeg = extractDegree(reg.toString()); newStudents.push({ reg_no: reg, name: toProperCase(row[getKey('name')] || ''), degree: row[getKey('degree')] || row[getKey('prog')] || extractedDeg, batch: row[getKey('session')] || row[getKey('batch')] || '', mobile: row[getKey('mobile')] || row[getKey('phone')] || '', email: row[getKey('email')] || '' }); } else { duplicates++; } } }); if(newStudents.length > 0) { pBar.style.width = '90%'; pText.textContent = 'Saving...'; const res = await bulkImport('students', newStudents); if(res.status === 'success') { pBar.style.width = '100%'; pText.textContent = 'Done!'; setTimeout(() => { alert(`Imported ${newStudents.length} new.\nSkipped ${duplicates} duplicates.`); document.getElementById('upload-progress-container').classList.add('hidden'); pBar.style.width = '0%'; }, 500); } } else { pBar.style.width = '100%'; pText.textContent = 'Done!'; setTimeout(() => { alert(`No new students.\nSkipped ${duplicates} duplicates.`); document.getElementById('upload-progress-container').classList.add('hidden'); pBar.style.width = '0%'; }, 500); } } catch(err) { console.error(err); alert("Error parsing Excel."); document.getElementById('upload-progress-container').classList.add('hidden'); } }; r.readAsArrayBuffer(f); e.target.value = ''; }
+
+        // --- ENROLLMENT UI ---
+        function showEnrollmentForm() { document.getElementById('enrollmentForm').reset(); document.getElementById('enroll_edit_id').value = "-1"; document.getElementById('enroll-form-title').textContent = "Add Enrollment"; document.getElementById('enrollment-dashboard').classList.add('hidden'); document.getElementById('enrollment-form-container').classList.remove('hidden'); }
+        function hideEnrollmentForm() { document.getElementById('enrollment-dashboard').classList.remove('hidden'); document.getElementById('enrollment-form-container').classList.add('hidden'); }
+        async function saveEnrollmentList(e) { e.preventDefault(); const fd = new FormData(e.target); const sess = `${fd.get('semester')} ${fd.get('year')}`; const id = document.getElementById('enroll_edit_id').value; const enrollment = { id: (id === "-1") ? Date.now().toString() : id, reg_no: fd.get('reg_no'), name: toProperCase(fd.get('name')), semester: sess, courses: parseInt(fd.get('courses')), cr: parseInt(fd.get('cr')) }; const res = await saveData('enrollment', enrollment); if(res.status === 'success') { if(USE_API) await initData(); else { if(id !== "-1") g_enrollments = g_enrollments.filter(x => x.id != id); g_enrollments.push(enrollment); setStorage('fee_system_enrollments_v1', g_enrollments); renderEnrollmentTable(); } hideEnrollmentForm(); alert("Enrollment saved!"); } }
+        function editEnrollment(id) { const e = g_enrollments.find(x => x.id == id); if(!e) return; document.getElementById('enroll_reg_no').value = e.reg_no; document.getElementById('enroll_name').value = e.name; document.getElementById('enroll_courses').value = e.courses; document.getElementById('enroll_cr').value = e.cr; const parts = e.semester.split(' '); document.getElementById('enroll_sem').value = parts[0] || 'Fall'; document.getElementById('enroll_year').value = parts[1] || '2023'; document.getElementById('enroll_edit_id').value = e.id || id; document.getElementById('enroll-form-title').textContent = "Edit Enrollment"; document.getElementById('enrollment-dashboard').classList.add('hidden'); document.getElementById('enrollment-form-container').classList.remove('hidden'); }
+        function deleteEnrollment(id) { if(confirm("Delete this enrollment?")) deleteEnrollmentData(id); }
+        function deleteAllEnrollments() { if(confirm("Delete ALL enrollment data?")) deleteAllEnrollmentsData(); }
+        function exportEnrollmentsToExcel() { if(g_enrollments.length === 0) { alert("No data."); return; } const ws = XLSX.utils.json_to_sheet(g_enrollments); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Enrollments"); XLSX.writeFile(wb, "Enrollments.xlsx"); }
+        function filterEnrollments() { const query = document.getElementById('enrollment_list_search').value.toLowerCase(); const filtered = g_enrollments.filter(e => (e.reg_no && e.reg_no.toLowerCase().includes(query)) || (e.name && e.name.toLowerCase().includes(query)) || (e.semester && e.semester.toLowerCase().includes(query))); renderEnrollmentTable(filtered); }
+        function sortEnrollmentTable(key) { enrollSortDir = -enrollSortDir; const query = document.getElementById('enrollment_list_search').value.toLowerCase(); let currentList = query ? g_enrollments.filter(e => (e.reg_no && e.reg_no.toLowerCase().includes(query)) || (e.name && e.name.toLowerCase().includes(query))) : [...g_enrollments]; currentList.sort((a,b) => { const valA = (a[key] || '').toString().toLowerCase(); const valB = (b[key] || '').toString().toLowerCase(); if (valA < valB) return -1 * enrollSortDir; if (valA > valB) return 1 * enrollSortDir; return 0; }); renderEnrollmentTable(currentList); }
+
+        // --- FEE PAID UI (NEW) ---
+        function showPaidForm() { document.getElementById('paidForm').reset(); document.getElementById('paid_edit_id').value = "-1"; document.getElementById('paid-form-title').textContent = "Add Payment"; document.getElementById('paid-dashboard').classList.add('hidden'); document.getElementById('paid-form-container').classList.remove('hidden'); }
+        function hidePaidForm() { document.getElementById('paid-dashboard').classList.remove('hidden'); document.getElementById('paid-form-container').classList.add('hidden'); }
+        async function savePaymentList(e) { e.preventDefault(); const fd = new FormData(e.target); const sess = `${fd.get('semester')} ${fd.get('year')}`; const id = document.getElementById('paid_edit_id').value; const payment = { id: (id === "-1") ? Date.now().toString() : id, reg_no: fd.get('reg_no'), name: toProperCase(fd.get('name')), semester: sess, amount: parseFloat(fd.get('amount')), date: fd.get('date') }; const res = await saveData('payment', payment); if(res.status === 'success') { if(USE_API) await initData(); else { if(id !== "-1") g_payments = g_payments.filter(x => x.id != id); g_payments.push(payment); setStorage('fee_system_payments_v1', g_payments); renderPaymentTable(); } hidePaidForm(); alert("Payment saved!"); } }
+        function editPayment(id) { const e = g_payments.find(x => x.id == id); if(!e) return; document.getElementById('paid_reg_no').value = e.reg_no; document.getElementById('paid_name').value = e.name; document.getElementById('paid_amount').value = e.amount; document.getElementById('paid_date').value = e.date; const parts = e.semester.split(' '); document.getElementById('paid_sem').value = parts[0] || 'Fall'; document.getElementById('paid_year').value = parts[1] || '2023'; document.getElementById('paid_edit_id').value = e.id || id; document.getElementById('paid-form-title').textContent = "Edit Payment"; document.getElementById('paid-dashboard').classList.add('hidden'); document.getElementById('paid-form-container').classList.remove('hidden'); }
+        function deletePayment(id) { if(confirm("Delete this payment?")) deletePaymentData(id); }
+        function deleteAllPayments() { if(confirm("Delete ALL payments?")) deleteAllPaymentsData(); }
+        function exportPaymentsToExcel() { if(g_payments.length === 0) { alert("No data."); return; } const ws = XLSX.utils.json_to_sheet(g_payments); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Payments"); XLSX.writeFile(wb, "Payments.xlsx"); }
+        function filterPayments() { const query = document.getElementById('paid_list_search').value.toLowerCase(); const filtered = g_payments.filter(e => (e.reg_no && e.reg_no.toLowerCase().includes(query)) || (e.name && e.name.toLowerCase().includes(query)) || (e.semester && e.semester.toLowerCase().includes(query))); renderPaymentTable(filtered); }
+        function sortPaidTable(key) { paidSortDir = -paidSortDir; const query = document.getElementById('paid_list_search').value.toLowerCase(); let currentList = query ? g_payments.filter(e => (e.reg_no && e.reg_no.toLowerCase().includes(query)) || (e.name && e.name.toLowerCase().includes(query))) : [...g_payments]; currentList.sort((a,b) => { const valA = (a[key] || '').toString().toLowerCase(); const valB = (b[key] || '').toString().toLowerCase(); if (valA < valB) return -1 * paidSortDir; if (valA > valB) return 1 * paidSortDir; return 0; }); renderPaymentTable(currentList); }
+        function renderPaymentTable(data = g_payments) {
+            document.getElementById('total_payments_count').textContent = data.length;
+            const t=document.getElementById('paidTableBody'); 
+            if(data.length==0) { t.innerHTML='<tr><td colspan="6" class="p-4 text-center italic">No data.</td></tr>'; return; } 
+            t.innerHTML=data.map((e) => `
+                <tr class="hover:bg-teal-50 border-b">
+                    <td class="p-3">${e.reg_no}</td><td class="p-3">${e.name}</td><td class="p-3 font-bold text-teal-700">${e.semester}</td>
+                    <td class="p-3 text-right font-bold">${num(e.amount)}</td><td class="p-3 text-center">${e.date || '-'}</td>
+                    <td class="p-3 text-center space-x-1">
+                        <button onclick="editPayment('${e.id || ''}')" class="text-blue-600 hover:text-blue-800" title="Edit"><i class="fas fa-edit"></i></button>
+                        <button onclick="deletePayment('${e.id || ''}')" class="text-red-600 hover:text-red-800" title="Delete"><i class="fas fa-trash"></i></button>
+                    </td>
+                </tr>`).join(''); 
+        }
+        function handlePaidExcelUpload(e) {
+            const y=document.getElementById('paid_import_year').value, s=document.getElementById('paid_import_sem').value;
+            if(!y||!s) { alert("Select session."); e.target.value=''; return; }
+            processExcel(e, 'payments', r => ({ reg_no: r.reg, name: r.name, semester: `${s} ${y}`, amount: parseFloat(r.amount||r.paid||0), date: r.date }));
+        }
+        function handleFeeExcelUpload(e) {
+            processExcel(e, 'fees', r => ({
+                degree: r.degree, batch: r.batch, year: parseInt(r.year), semester: r.semester,
+                cr: parseInt(r.cr||0), per_cr_fee: parseFloat(r.per_cr_fee||0), tuition_fee: parseFloat(r.tuition_fee||0),
+                total_courses: parseInt(r.courses||0), exam_fee_per_subject: parseFloat(r.exam_rate||0), exam_fee: parseFloat(r.exam_fee||0),
+                reg_fee: parseFloat(r.reg_fee||0), other_fee: parseFloat(r.other_fee||0), paid: 0, total_fee: 0
+            }));
+        }
+        function downloadPaidTemplate() { XLSX.writeFile(XLSX.utils.book_append_sheet(XLSX.utils.book_new(), XLSX.utils.json_to_sheet([{ "Reg": "123", "Name": "A", "Amount": 5000, "Date": "2023-01-01" }]), "P"), "Payments_Template.xlsx"); }
+        function downloadFeeTemplate() { XLSX.writeFile(XLSX.utils.book_append_sheet(XLSX.utils.book_new(), XLSX.utils.json_to_sheet([{ "Degree": "BSCAF", "Batch": "Fall 2025", "Year": 2025, "Semester": "Fall", "Cr": 15, "Per_Cr_Fee": 5000, "Tuition_Fee": 75000, "Courses": 5, "Exam_Rate": 1000, "Exam_Fee": 5000, "Reg_Fee": 20000, "Other_Fee": 0 }]), "F"), "Fees_Template.xlsx"); }
+
+
+        // --- DISCOUNT UI & LOGIC (UPDATED WITH CRUD) ---
+        function showDiscountForm() { document.getElementById('discountForm').reset(); document.getElementById('discount_edit_id').value = "-1"; document.getElementById('discount-form-title').textContent = "Add Discount"; document.getElementById('discount-dashboard').classList.add('hidden'); document.getElementById('discount-form-container').classList.remove('hidden'); }
+        function hideDiscountForm() { document.getElementById('discount-dashboard').classList.remove('hidden'); document.getElementById('discount-form-container').classList.add('hidden'); }
+        
+        async function saveDiscountList(e) { 
+            e.preventDefault(); const fd = new FormData(e.target); const id = document.getElementById('discount_edit_id').value;
+            // Note: API needs 'save_discount' handler if you want live DB edit/delete
+            const discount = { 
+                id: (id === "-1") ? Date.now().toString() : id,
+                reg_no: fd.get('reg_no'), name: toProperCase(fd.get('name')), term: normalizeTerm(fd.get('term')), discount: parseFloat(fd.get('discount'))
+            };
+            const res = await saveData('discount', discount); 
+            if(res.status === 'success') { 
+                if(USE_API) await initData(); 
+                else { 
+                    if(id !== "-1") g_discounts = g_discounts.filter(x => x.id != id); 
+                    g_discounts.push(discount); 
+                    setStorage('fee_system_discounts_v1', g_discounts); 
+                    renderDiscountTable(); 
+                } 
+                hideDiscountForm(); alert("Discount saved!"); 
+            }
+        }
+        
+        function editDiscount(id) {
+            const d = g_discounts.find(x => x.id == id); if(!d) return;
+            document.getElementById('discount_reg_no').value = d.reg_no;
+            document.getElementById('discount_name').value = d.name;
+            document.getElementById('discount_term').value = d.term;
+            document.getElementById('discount_val').value = d.discount;
+            document.getElementById('discount_edit_id').value = d.id || id;
+            document.getElementById('discount-form-title').textContent = "Edit Discount";
+            document.getElementById('discount-dashboard').classList.add('hidden');
+            document.getElementById('discount-form-container').classList.remove('hidden');
+        }
+        
+        function deleteDiscount(id) { if(confirm("Delete this discount?")) deleteDiscountData(id); }
+        function deleteAllDiscounts() { if(confirm("Delete ALL discounts?")) deleteAllDiscountsData(); }
+        function filterDiscounts() { const query = document.getElementById('discount_list_search').value.toLowerCase(); const filtered = g_discounts.filter(d => (d.reg_no && d.reg_no.toLowerCase().includes(query)) || (d.name && d.name.toLowerCase().includes(query))); renderDiscountTable(filtered); }
+        function sortDiscountTable(key) { discountSortDir = -discountSortDir; const query = document.getElementById('discount_list_search').value.toLowerCase(); let currentList = query ? g_discounts.filter(d => (d.reg_no && d.reg_no.toLowerCase().includes(query))) : [...g_discounts]; currentList.sort((a,b) => { const valA = (a[key] || '').toString().toLowerCase(); const valB = (b[key] || '').toString().toLowerCase(); if (valA < valB) return -1 * discountSortDir; if (valA > valB) return 1 * discountSortDir; return 0; }); renderDiscountTable(currentList); }
+
+        function renderDiscountTable(data = g_discounts) { 
+            document.getElementById('total_discounts_count').textContent = data.length;
+            const t=document.getElementById('discountTableBody'); 
+            if(data.length==0) { t.innerHTML='<tr><td colspan="5" class="p-4 text-center italic">No data.</td></tr>'; return; } 
+            t.innerHTML=data.map(d=>`
+                <tr class="hover:bg-purple-50 border-b">
+                    <td class="p-3">${d.reg_no}</td><td class="p-3">${d.name}</td><td class="p-3 font-bold text-purple-700">${d.term}</td>
+                    <td class="p-3 text-right font-bold text-green-600">${d.discount}%</td>
+                    <td class="p-3 text-center space-x-1">
+                        <button onclick="editDiscount('${d.id || ''}')" class="text-blue-600 hover:text-blue-800" title="Edit"><i class="fas fa-edit"></i></button>
+                        <button onclick="deleteDiscount('${d.id || ''}')" class="text-red-600 hover:text-red-800" title="Delete"><i class="fas fa-trash"></i></button>
+                    </td>
+                </tr>`).join(''); 
+        }
+
+        function switchTab(tabId) { 
+            // 1. Hide all tab content
+            document.querySelectorAll('.tab-content').forEach(el => {
+                el.classList.add('hidden');
+                el.classList.remove('block');
+            });
+
+            // 2. Show selected tab content
+            const selectedContent = document.getElementById('view-' + tabId);
+            if(selectedContent) {
+                selectedContent.classList.remove('hidden');
+                selectedContent.classList.add('block');
+            }
+
+            // 3. Reset all tab buttons
+            const tabs = ['clearance', 'student', 'fee', 'enrollment', 'paid', 'discount'];
+            tabs.forEach(t => {
+                const btn = document.getElementById('tab-' + t);
+                if(btn) {
+                    btn.classList.remove('text-green-600', 'border-b-2', 'border-green-600');
+                    btn.classList.add('text-gray-500');
+                }
+            });
+
+            // 4. Highlight active tab button
+            const activeBtn = document.getElementById('tab-' + tabId);
+            if(activeBtn) {
+                activeBtn.classList.remove('text-gray-500');
+                activeBtn.classList.add('text-green-600', 'border-b-2', 'border-green-600');
+            }
+
+            // 5. Special handlers
+            if(tabId === 'fee') updateFeeDropdowns();
+        }
+
+    </script>
+</body>
+</html>
