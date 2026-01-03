@@ -12,7 +12,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit; }
 
 $host = "localhost";
 $user = "koolkhan";      // CHANGE THIS
-$pass = "Mangohair197";  // CHANGE THIS
+$pass = "Mangohair@197";  // CHANGE THIS
 $dbname = "fee_system";
 
 try {
