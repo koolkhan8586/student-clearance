@@ -19,7 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 // 4. Database Config
 $host = "localhost";
 $user = "koolkhan";      // CHANGE THIS IF NEEDED
-$pass = "Mangohair197";  // CHANGE THIS IF NEEDED
+$pass = "Mangohair@197";  // CHANGE THIS IF NEEDED
 $dbname = "fee_system";
 
 // 5. Connect
