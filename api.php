@@ -24,6 +24,7 @@
 <body class="bg-gray-100 min-h-screen p-4 md:p-8 font-sans">
 
     <div class="max-w-7xl mx-auto container">
+        
         <!-- Header -->
         <div class="bg-white rounded-lg shadow-lg p-6 mb-6 flex flex-col md:flex-row justify-between items-center border-b-4 border-green-600 no-print">
             <div class="flex items-center gap-4 mb-4 md:mb-0">
@@ -190,7 +191,7 @@
             </div>
         </div>
 
-        <!-- TAB 4: Enrollment -->
+        <!-- TAB 4: Enrollment (Updated with Actions) -->
         <div id="view-enrollment" class="tab-content hidden">
              <div class="bg-white rounded-lg shadow-lg p-6">
                 <div class="flex flex-col md:flex-row justify-between items-end mb-6 gap-4 border-b pb-4">
@@ -211,7 +212,13 @@
                     <input type="text" id="enrollment_list_search" placeholder="Search enrollment..." onkeyup="filterEnrollments()" class="border border-gray-300 rounded px-3 py-2 pl-8 w-full text-sm focus:ring-2 focus:ring-orange-500 outline-none shadow-sm">
                     <i class="fas fa-search absolute left-2.5 top-2.5 text-gray-400 text-xs"></i>
                 </div>
-                <div class="overflow-x-auto max-h-[600px] overflow-y-auto"><table class="w-full text-sm text-left border-collapse border border-gray-200"><thead class="bg-orange-50 text-gray-700 uppercase text-xs sticky top-0"><tr><th class="border-b p-3 cursor-pointer" onclick="sortEnrollmentTable('reg_no')">Reg # <i class="fas fa-sort ml-1"></i></th><th class="border-b p-3 cursor-pointer" onclick="sortEnrollmentTable('name')">Name <i class="fas fa-sort ml-1"></i></th><th class="border-b p-3 cursor-pointer" onclick="sortEnrollmentTable('semester')">Semester <i class="fas fa-sort ml-1"></i></th><th class="border-b p-3 text-center">Courses</th><th class="border-b p-3 text-center">Cr. Hrs</th><th class="border-b p-3 text-center">Actions</th></tr></thead><tbody id="enrollmentTableBody"><tr><td colspan="6" class="p-4 text-center text-gray-500 italic">Loading...</td></tr></tbody></table></div>
+                <div class="overflow-x-auto max-h-[600px] overflow-y-auto"><table class="w-full text-sm text-left border-collapse border border-gray-200"><thead class="bg-orange-50 text-gray-700 uppercase text-xs sticky top-0"><tr>
+                    <th class="border-b p-3 cursor-pointer" onclick="sortEnrollmentTable('reg_no')">Reg # <i class="fas fa-sort ml-1"></i></th>
+                    <th class="border-b p-3 cursor-pointer" onclick="sortEnrollmentTable('name')">Name <i class="fas fa-sort ml-1"></i></th>
+                    <th class="border-b p-3 cursor-pointer" onclick="sortEnrollmentTable('semester')">Semester <i class="fas fa-sort ml-1"></i></th>
+                    <th class="border-b p-3 text-center">Courses</th><th class="border-b p-3 text-center">Cr. Hrs</th>
+                    <th class="border-b p-3 text-center">Actions</th> <!-- Actions Column -->
+                </tr></thead><tbody id="enrollmentTableBody"><tr><td colspan="6" class="p-4 text-center text-gray-500 italic">Loading...</td></tr></tbody></table></div>
             </div>
             
              <!-- Enrollment Form Modal -->
@@ -269,45 +276,11 @@
                         <input type="file" id="discount_excel_file" accept=".xlsx, .xls" class="hidden" onchange="handleDiscountExcelUpload(event)">
                         <button onclick="document.getElementById('discount_excel_file').click()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm"><i class="fas fa-file-import mr-2"></i> Import Discounts</button>
                         <button onclick="downloadDiscountTemplate()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition flex items-center text-sm"><i class="fas fa-download mr-2"></i> Template</button>
-                        <button onclick="showDiscountForm()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded transition flex items-center text-sm shadow-sm" title="Add Manual"><i class="fas fa-plus"></i></button>
-                        <button onclick="deleteAllDiscounts()" class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded transition flex items-center text-sm shadow-sm" title="Delete All"><i class="fas fa-trash-alt"></i></button>
                     </div>
                 </div>
-                
-                <div class="relative w-full mb-4">
-                    <input type="text" id="discount_list_search" placeholder="Search discounts..." onkeyup="filterDiscounts()" class="border border-gray-300 rounded px-3 py-2 pl-8 w-full text-sm focus:ring-2 focus:ring-purple-500 outline-none shadow-sm">
-                    <i class="fas fa-search absolute left-2.5 top-2.5 text-gray-400 text-xs"></i>
+                <div class="overflow-x-auto max-h-[600px] overflow-y-auto">
+                    <table class="w-full text-sm text-left border-collapse border border-gray-200"><thead class="bg-purple-50 text-gray-700 uppercase text-xs sticky top-0"><tr><th class="border p-3">Reg Number</th><th class="border p-3">Name</th><th class="border p-3">Academic Term</th><th class="border p-3 text-right">Discount %</th></tr></thead><tbody id="discountTableBody"><tr><td colspan="4" class="p-4 text-center text-gray-500 italic">Loading...</td></tr></tbody></table>
                 </div>
-                <div class="mt-2 text-sm font-semibold text-purple-600 bg-purple-50 px-3 py-1 rounded-full inline-block mb-4">Total Records: <span id="total_discounts_count">0</span></div>
-
-                <div class="overflow-x-auto max-h-[600px] overflow-y-auto"><table class="w-full text-sm text-left border-collapse border border-gray-200"><thead class="bg-purple-50 text-gray-700 uppercase text-xs sticky top-0"><tr>
-                    <th class="border-b p-3 cursor-pointer" onclick="sortDiscountTable('reg_no')">Reg # <i class="fas fa-sort ml-1"></i></th>
-                    <th class="border-b p-3 cursor-pointer" onclick="sortDiscountTable('name')">Name <i class="fas fa-sort ml-1"></i></th>
-                    <th class="border-b p-3 cursor-pointer" onclick="sortDiscountTable('term')">Term <i class="fas fa-sort ml-1"></i></th>
-                    <th class="border-b p-3 text-right">Discount %</th>
-                    <th class="border-b p-3 text-center">Actions</th>
-                </tr></thead><tbody id="discountTableBody"><tr><td colspan="5" class="p-4 text-center text-gray-500 italic">Loading...</td></tr></tbody></table></div>
-            </div>
-
-             <!-- Discount Form Modal -->
-            <div id="discount-form-container" class="hidden bg-white rounded-lg shadow-lg p-6 max-w-2xl mx-auto mt-4">
-                <div class="flex justify-between items-center border-b pb-4 mb-4">
-                    <h3 class="text-lg font-bold text-gray-800" id="discount-form-title">Add Discount</h3>
-                    <button onclick="hideDiscountForm()" class="text-gray-500 hover:text-red-500"><i class="fas fa-times"></i></button>
-                </div>
-                <form id="discountForm" onsubmit="saveDiscountList(event)" class="space-y-4">
-                    <input type="hidden" id="discount_edit_id" value="-1"> <!-- ID for editing -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div class="col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Registration Number</label><input type="text" name="reg_no" id="discount_reg_no" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div>
-                        <div class="col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Student Name</label><input type="text" name="name" id="discount_name" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div>
-                        <div><label class="block text-sm font-medium text-gray-700 mb-1">Term (e.g. Fall 2025)</label><input type="text" name="term" id="discount_term" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div>
-                        <div><label class="block text-sm font-medium text-gray-700 mb-1">Discount %</label><input type="number" name="discount" id="discount_val" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div>
-                    </div>
-                    <div class="pt-4 flex gap-2">
-                        <button type="submit" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-lg">Save Record</button>
-                        <button type="button" onclick="hideDiscountForm()" class="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg">Cancel</button>
-                    </div>
-                </form>
             </div>
         </div>
     </div>
@@ -327,7 +300,6 @@
         let sortDir = 1;
         let enrollSortDir = 1;
         let paidSortDir = 1;
-        let discountSortDir = 1;
 
         // --- EDIT HERE TO ADD/REMOVE DEGREES ---
         const DEGREE_PATTERNS = [
@@ -395,7 +367,7 @@
                 g_fees = getStorage('fee_system_records_v6');
                 g_enrollments = getStorage('fee_system_enrollments_v1');
                 g_discounts = getStorage('fee_system_discounts_v1');
-                g_payments = getStorage('fee_system_payments_v1'); 
+                g_payments = getStorage('fee_system_payments_v1'); // Local fallback
             }
             renderStudentTable(); renderFeeDashboard(); renderEnrollmentTable(); renderDiscountTable(); renderPaymentTable();
             const saved = localStorage.getItem('active_student_session');
@@ -437,18 +409,15 @@
                 const res = await fetch(`${API_URL}?action=${act}`, { method: 'POST', body: JSON.stringify(data) });
                 return await res.json();
             } else {
-                if (type === 'student') { 
-                    if(data.reg_no) g_students = g_students.filter(s => s.reg_no !== data.reg_no); // Update logic for local
-                    g_students.push(data); setStorage('fee_system_students_list_v2', g_students); 
-                }
+                if (type === 'student') { g_students.push(data); setStorage('fee_system_students_list_v2', g_students); }
                 else if (type === 'fee') { 
                     if(data.id && data.id !== '-1') g_fees = g_fees.filter(f => f.id != data.id);
                     g_fees.push(data); setStorage('fee_system_records_v6', g_fees); 
                 }
                 else if (type === 'enrollment') { 
-                    if(data.id && data.id !== "-1") g_enrollments = g_enrollments.filter(x=>x.id!=data.id);
-                    // Generate ID for local
-                    if(!data.id || data.id === "-1") data.id = Date.now().toString(); 
+                    // Add ID for local storage if missing
+                    if(!data.id || data.id === "-1") data.id = Date.now().toString();
+                    if(data.id) g_enrollments = g_enrollments.filter(x=>x.id!=data.id);
                     g_enrollments.push(data); setStorage('fee_system_enrollments_v1', g_enrollments); 
                 }
                 else if (type === 'payment') { 
@@ -503,12 +472,14 @@
             if (USE_API) { await fetch(`${API_URL}?action=delete_all_payments`, { method: 'POST' }); await initData(); } 
             else { g_payments = []; setStorage('fee_system_payments_v1', []); renderPaymentTable(); }
         }
+        
+        // NEW DELETE ALL FEES FUNCTION
         async function deleteAllFeesData() {
             if (USE_API) { await fetch(`${API_URL}?action=delete_all_fees`, { method: 'POST' }); await initData(); } 
             else { g_fees = []; setStorage('fee_system_records_v6', []); renderFeeDashboard(); }
         }
-        async function deleteAllDiscountsData() {
-             if (USE_API) { /* Ensure API supports this */ } 
+         async function deleteAllDiscountsData() {
+            if (USE_API) { await fetch(`${API_URL}?action=delete_all_discounts`, { method: 'POST' }); await initData(); } 
             else { g_discounts = []; setStorage('fee_system_discounts_v1', []); renderDiscountTable(); }
         }
 
