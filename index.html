@@ -230,7 +230,9 @@
                         <button onclick="downloadDiscountTemplate()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition flex items-center text-sm"><i class="fas fa-download mr-2"></i> Template</button>
                     </div>
                 </div>
-                <div class="overflow-x-auto max-h-[600px] overflow-y-auto"><table class="w-full text-sm text-left border-collapse border border-gray-200"><thead class="bg-purple-50 text-gray-700 uppercase text-xs sticky top-0"><tr><th class="border p-3">Reg Number</th><th class="border p-3">Name</th><th class="border p-3">Academic Term</th><th class="border p-3 text-right">Discount %</th></tr></thead><tbody id="discountTableBody"><tr><td colspan="4" class="p-4 text-center text-gray-500 italic">Loading...</td></tr></tbody></table></div>
+                <div class="overflow-x-auto max-h-[600px] overflow-y-auto">
+                    <table class="w-full text-sm text-left border-collapse border border-gray-200"><thead class="bg-purple-50 text-gray-700 uppercase text-xs sticky top-0"><tr><th class="border p-3">Reg Number</th><th class="border p-3">Name</th><th class="border p-3">Academic Term</th><th class="border p-3 text-right">Discount %</th></tr></thead><tbody id="discountTableBody"><tr><td colspan="4" class="p-4 text-center text-gray-500 italic">Loading...</td></tr></tbody></table>
+                </div>
             </div>
         </div>
     </div>
@@ -991,8 +993,43 @@
         function normalizeTerm(t) { return t ? t.toString().toLowerCase().replace(/[^a-z0-9]/g, '') : ""; }
         
         // --- OTHER RENDERERS ---
-        function renderFeeDashboard() { const t=document.getElementById('feeDashboardBody'); if(g_fees.length==0) { t.innerHTML='<tr><td colspan="7" class="p-4 text-center italic">No records.</td></tr>'; return; } t.innerHTML=g_fees.slice().reverse().map(r=>`<tr class="hover:bg-gray-50 border-b"><td class="p-2">${r.degree}</td><td class="p-2">${r.batch}</td><td class="p-2 text-right">${num(r.per_cr_fee)}</td><td class="p-2 text-right">${num(r.exam_fee)}</td><td class="p-2 text-right">${num(r.other_fee)}</td><td class="p-2 text-right font-bold">${num(parseFloat(r.tuition_fee)+parseFloat(r.exam_fee)+parseFloat(r.other_fee)+parseFloat(r.reg_fee))}</td><td class="p-2 text-center text-xs">${r.semester} ${r.year}</td></tr>`).join(''); }
-        function renderEnrollmentTable() { const t=document.getElementById('enrollmentTableBody'); if(g_enrollments.length==0) { t.innerHTML='<tr><td colspan="5" class="p-4 text-center italic">No data.</td></tr>'; return; } t.innerHTML=g_enrollments.slice().reverse().map(e=>`<tr class="hover:bg-orange-50 border-b"><td class="p-3">${e.reg_no}</td><td class="p-3">${e.name}</td><td class="p-3 font-bold text-orange-700">${e.semester}</td><td class="p-3 text-center font-bold">${e.courses}</td><td class="p-3 text-center font-bold">${e.cr}</td></tr>`).join(''); }
+        function renderFeeDashboard() { 
+            const t=document.getElementById('feeDashboardBody'); 
+            if(g_fees.length==0) { t.innerHTML='<tr><td colspan="8" class="p-4 text-center italic">No records.</td></tr>'; return; } 
+            t.innerHTML=g_fees.slice().reverse().map(r=>`
+            <tr class="hover:bg-gray-50 border-b">
+                <td class="p-2 font-medium">${r.degree}</td>
+                <td class="p-2">${r.batch}</td>
+                <td class="p-2 text-right text-gray-600">${num(r.per_cr_fee)}</td>
+                <td class="p-2 text-right text-blue-600">${num(r.exam_fee)}</td>
+                <td class="p-2 text-right text-gray-600">${num(r.other_fee)}</td>
+                <td class="p-2 text-right font-bold">${num(parseFloat(r.tuition_fee)+parseFloat(r.exam_fee)+parseFloat(r.other_fee)+parseFloat(r.reg_fee))}</td>
+                <td class="p-2 text-center text-xs text-gray-500">${r.semester} ${r.year}</td>
+                <td class="p-2 text-center space-x-1">
+                    <button onclick="editFeeRecord(${r.id})" class="text-blue-600 hover:text-blue-800" title="Edit"><i class="fas fa-edit"></i></button>
+                    <button onclick="duplicateFeeRecord(${r.id})" class="text-orange-600 hover:text-orange-800" title="Duplicate"><i class="fas fa-copy"></i></button>
+                    <button onclick="deleteFeeRecord(${r.id})" class="text-red-600 hover:text-red-800" title="Delete"><i class="fas fa-trash"></i></button>
+                </td>
+            </tr>`).join(''); 
+        }
+
+        function renderEnrollmentTable(data = g_enrollments) {
+            document.getElementById('total_enrollments_count').textContent = data.length;
+            const t=document.getElementById('enrollmentTableBody'); 
+            if(data.length==0) { t.innerHTML='<tr><td colspan="6" class="p-4 text-center italic">No data.</td></tr>'; return; } 
+            t.innerHTML=data.map((e) => `
+                <tr class="hover:bg-orange-50 border-b">
+                    <td class="p-3">${e.reg_no}</td>
+                    <td class="p-3">${e.name}</td>
+                    <td class="p-3 font-bold text-orange-700">${e.semester}</td>
+                    <td class="p-3 text-center font-bold">${e.courses}</td>
+                    <td class="p-3 text-center font-bold">${e.cr}</td>
+                    <td class="p-3 text-center space-x-1">
+                        <button onclick="editEnrollment('${e.id || ''}')" class="text-blue-600 hover:text-blue-800" title="Edit"><i class="fas fa-edit"></i></button>
+                        <button onclick="deleteEnrollment('${e.id || ''}')" class="text-red-600 hover:text-red-800" title="Delete"><i class="fas fa-trash"></i></button>
+                    </td>
+                </tr>`).join(''); 
+        }
         function renderDiscountTable() { const t=document.getElementById('discountTableBody'); if(g_discounts.length==0) { t.innerHTML='<tr><td colspan="4" class="p-4 text-center italic">No data.</td></tr>'; return; } t.innerHTML=g_discounts.slice().reverse().map(d=>`<tr class="hover:bg-purple-50 border-b"><td class="p-3">${d.reg_no}</td><td class="p-3">${d.name}</td><td class="p-3">${d.term}</td><td class="p-3 text-right font-bold text-green-600">${d.discount}%</td></tr>`).join(''); }
         
         // --- ADD BATCH FEE ---
@@ -1000,14 +1037,88 @@
             e.preventDefault();
             const fd = new FormData(e.target);
             const rec = {
+                id: document.getElementById('fee_edit_id').value, // Use hidden ID
                 degree: fd.get('target_degree'), batch: fd.get('target_batch'), year: fd.get('year'), semester: fd.get('semester'),
                 cr: fd.get('cr'), per_cr_fee: fd.get('per_cr_fee'), tuition_fee: fd.get('tuition_fee'),
                 total_courses: fd.get('total_courses'), exam_fee_per_subject: fd.get('exam_fee_per_subject'), exam_fee: fd.get('exam_fee'),
                 reg_fee: fd.get('reg_fee'), other_fee: fd.get('other_fee'), paid: fd.get('paid'), total_fee: 0 
             };
             const res = await saveData('fee', rec);
-            if(res.status==='success') { if(USE_API) await initData(); else renderFeeDashboard(); alert("Fee record saved!"); e.target.reset(); }
+            if(res.status==='success') { 
+                if(USE_API) await initData(); else renderFeeDashboard(); 
+                alert("Fee record saved!"); 
+                e.target.reset(); 
+                document.getElementById('fee_edit_id').value = "-1";
+                document.getElementById('fee_submit_btn').innerHTML = '<i class="fas fa-plus-circle mr-2"></i> Add Batch Fee Record';
+                document.getElementById('fee_cancel_btn').classList.add('hidden');
+            }
         }
+
+        // New Fee Logic Functions
+        function editFeeRecord(id) {
+            const f = g_fees.find(x => x.id == id);
+            if(!f) return;
+            // Populate form
+            document.getElementById('fee_edit_id').value = f.id;
+            updateFeeDropdowns(); // Ensure options exist
+            document.getElementById('fee_degree_select').value = f.degree;
+            document.getElementById('fee_batch_select').value = f.batch;
+            document.getElementById('fee_year').value = f.year;
+            document.getElementById('fee_sem').value = f.semester;
+            document.getElementById('cr_input').value = f.cr;
+            document.getElementById('rate_input').value = f.per_cr_fee;
+            document.getElementById('tuition_input').value = f.tuition_fee;
+            document.getElementById('courses_input').value = f.total_courses;
+            document.getElementById('exam_rate_input').value = f.exam_fee_per_subject;
+            document.getElementById('total_exam_input').value = f.exam_fee;
+            document.getElementById('reg_fee_input').value = f.reg_fee;
+            document.getElementById('other_fee_input').value = f.other_fee;
+            document.getElementById('paid_input').value = f.paid;
+            
+            // UI Change
+            document.getElementById('fee_submit_btn').innerHTML = '<i class="fas fa-save mr-2"></i> Update Fee Record';
+            document.getElementById('fee_cancel_btn').classList.remove('hidden');
+            document.documentElement.scrollTop = 0; // Scroll to top
+        }
+
+        function duplicateFeeRecord(id) {
+            const f = g_fees.find(x => x.id == id);
+            if(!f) return;
+            // Populate form but keep ID as -1 (new)
+            document.getElementById('fee_edit_id').value = "-1";
+            updateFeeDropdowns();
+            document.getElementById('fee_degree_select').value = f.degree;
+            document.getElementById('fee_batch_select').value = f.batch;
+            // Maybe shift year/sem automatically? For now just copy
+            document.getElementById('fee_year').value = f.year;
+            document.getElementById('fee_sem').value = f.semester;
+            document.getElementById('cr_input').value = f.cr;
+            document.getElementById('rate_input').value = f.per_cr_fee;
+            document.getElementById('tuition_input').value = f.tuition_fee;
+            document.getElementById('courses_input').value = f.total_courses;
+            document.getElementById('exam_rate_input').value = f.exam_fee_per_subject;
+            document.getElementById('total_exam_input').value = f.exam_fee;
+            document.getElementById('reg_fee_input').value = f.reg_fee;
+            document.getElementById('other_fee_input').value = f.other_fee;
+            document.getElementById('paid_input').value = f.paid;
+            
+            alert("Duplicate loaded! Change Session/Batch and click Save.");
+            document.documentElement.scrollTop = 0;
+        }
+
+        function deleteFeeRecord(id) {
+            if(confirm("Delete this fee structure?")) {
+                deleteFeeData(id);
+            }
+        }
+
+        function cancelFeeEdit() {
+            document.getElementById('feeForm').reset();
+            document.getElementById('fee_edit_id').value = "-1";
+            document.getElementById('fee_submit_btn').innerHTML = '<i class="fas fa-plus-circle mr-2"></i> Add Batch Fee Record';
+            document.getElementById('fee_cancel_btn').classList.add('hidden');
+        }
+
         function calculateTotals() {
             const cr=parseFloat(document.getElementById('cr_input').value)||0, rate=parseFloat(document.getElementById('rate_input').value)||0;
             document.getElementById('tuition_input').value = cr*rate;
@@ -1027,17 +1138,14 @@
             if(!y||!s) { alert("Select session."); e.target.value=''; return; }
             processExcel(e, 'payments', r => ({ reg_no: r.reg, name: r.name, semester: `${s} ${y}`, amount: parseFloat(r.amount||r.paid||0), date: r.date }));
         }
-        function processExcel(e, type, mapFn) {
-            const f=e.target.files[0]; if(!f) return; const r=new FileReader();
-            r.onload=async function(ev) {
-                const wb=XLSX.read(new Uint8Array(ev.target.result), {type:'array'});
-                const json=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-                const data=json.map(row => { const lRow={}; Object.keys(row).forEach(k=>lRow[k.toLowerCase().trim()]=row[k]); const proxy=new Proxy(lRow, {get:(t,k)=>t[Object.keys(t).find(x=>x.includes(k))]}); return mapFn(proxy); });
-                const res=await bulkImport(type, data); if(res.status==='success') alert(`Imported ${data.length}.`);
-            }; r.readAsArrayBuffer(f); e.target.value='';
+        function handleFeeExcelUpload(e) {
+            processExcel(e, 'fees', r => ({
+                degree: r.degree, batch: r.batch, year: parseInt(r.year), semester: r.semester,
+                cr: parseInt(r.cr||0), per_cr_fee: parseFloat(r.per_cr_fee||0), tuition_fee: parseFloat(r.tuition_fee||0),
+                total_courses: parseInt(r.courses||0), exam_fee_per_subject: parseFloat(r.exam_rate||0), exam_fee: parseFloat(r.exam_fee||0),
+                reg_fee: parseFloat(r.reg_fee||0), other_fee: parseFloat(r.other_fee||0), paid: 0, total_fee: 0
+            }));
         }
-        function downloadDiscountTemplate() { XLSX.writeFile(XLSX.utils.book_append_sheet(XLSX.utils.book_new(), XLSX.utils.json_to_sheet([{ "Reg": "123", "Name": "A", "Academic Term": "Fall 2025", "Discount": 50 }]), "D"), "Template.xlsx"); }
-        function downloadEnrollmentTemplate() { XLSX.writeFile(XLSX.utils.book_append_sheet(XLSX.utils.book_new(), XLSX.utils.json_to_sheet([{ "Reg": "123", "Name": "A", "Courses": 5, "Cr": 15 }]), "E"), "Template.xlsx"); }
         function downloadPaidTemplate() { XLSX.writeFile(XLSX.utils.book_append_sheet(XLSX.utils.book_new(), XLSX.utils.json_to_sheet([{ "Reg": "123", "Name": "A", "Amount": 5000, "Date": "2023-01-01" }]), "P"), "Payments_Template.xlsx"); }
         function downloadFeeTemplate() { XLSX.writeFile(XLSX.utils.book_append_sheet(XLSX.utils.book_new(), XLSX.utils.json_to_sheet([{ "Degree": "BSCAF", "Batch": "Fall 2025", "Year": 2025, "Semester": "Fall", "Cr": 15, "Per_Cr_Fee": 5000, "Tuition_Fee": 75000, "Courses": 5, "Exam_Rate": 1000, "Exam_Fee": 5000, "Reg_Fee": 20000, "Other_Fee": 0 }]), "F"), "Fees_Template.xlsx"); }
 
