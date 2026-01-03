@@ -291,7 +291,7 @@
                 try {
                     json = JSON.parse(text);
                 } catch (e) {
-                    throw new Error(`Invalid JSON received: ${text.substring(0, 100)}...`);
+                    throw new Error(`Invalid JSON received. Response start: "${text.substring(0, 150)}..."`); 
                 }
                 
                 if (json.status === 'success') {
@@ -311,11 +311,21 @@
                 // Show Detailed Error in Yellow Box
                 const statusDiv = document.getElementById('conn-status');
                 statusDiv.classList.remove('hidden');
+                
+                // Sanitized error message for display
+                let errorMsg = e.message;
+                if (errorMsg.includes("Invalid JSON")) {
+                    errorMsg += " <br><span class='text-xs text-red-600 font-normal'>Possible causes: Database connection error, PHP errors, or wrong URL. Check console for raw response.</span>";
+                }
+
                 statusDiv.innerHTML = `
-                    <div class="flex justify-between w-full">
-                        <span><strong>Error:</strong> ${e.message}</span>
-                        <span class="text-xs ml-2 opacity-75">(Using Local Storage Mode)</span>
-                        <button onclick="this.parentElement.parentElement.classList.add('hidden')" class="ml-4 font-bold hover:text-red-700">&times;</button>
+                    <div class="flex justify-between w-full items-center">
+                        <div class="flex flex-col">
+                            <span><strong>Connection Failed:</strong> API not responding correctly.</span>
+                            <span class="text-xs mt-1 text-red-700 break-all">${errorMsg}</span>
+                            <span class="text-xs mt-1 opacity-75">(Switched to Local Storage Mode)</span>
+                        </div>
+                        <button onclick="this.parentElement.parentElement.classList.add('hidden')" class="ml-4 font-bold hover:text-red-700 text-xl">&times;</button>
                     </div>
                 `;
 
