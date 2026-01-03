@@ -139,36 +139,72 @@
         <!-- TAB 2: Student Data -->
         <div id="view-student" class="tab-content hidden">
             <div id="student-dashboard" class="bg-white rounded-lg shadow-lg p-6">
-                <div class="flex flex-col xl:flex-row justify-between items-center mb-6 gap-4">
-                    <div><h2 class="text-xl font-bold text-gray-800">Student Directory</h2><p class="text-sm text-gray-500">Manage all student records here</p></div>
+                <!-- Top Toolbar -->
+                <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4">
+                    <div>
+                        <h2 class="text-xl font-bold text-gray-800">Student Directory</h2>
+                        <p class="text-sm text-gray-500">Manage all student records here</p>
+                        <div class="mt-2 text-sm font-semibold text-blue-600 bg-blue-50 px-3 py-1 rounded-full inline-block">
+                            Total Students: <span id="total_students_count">0</span>
+                        </div>
+                    </div>
                     
-                    <!-- Toolbar with Search -->
-                    <div class="flex flex-col sm:flex-row gap-2 flex-wrap items-center">
-                        <div class="relative">
-                            <input type="text" id="student_list_search" placeholder="Search students..." onkeyup="filterStudents()" class="border rounded-lg px-4 py-2 pl-10 w-full sm:w-64 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                    <div class="flex flex-col sm:flex-row gap-3 w-full lg:w-auto items-center">
+                        <!-- Search Bar -->
+                        <div class="relative w-full sm:w-64">
+                            <input type="text" id="student_list_search" placeholder="Search by Reg, Name, Batch..." onkeyup="filterStudents()" class="border border-gray-300 rounded-lg px-4 py-2 pl-10 w-full text-sm focus:ring-2 focus:ring-blue-500 outline-none shadow-sm transition">
                             <i class="fas fa-search absolute left-3 top-3 text-gray-400 text-xs"></i>
                         </div>
-                        <div class="flex gap-2">
+                        
+                        <!-- Action Buttons -->
+                        <div class="flex gap-2 flex-wrap justify-center sm:justify-start">
                             <input type="file" id="student_excel_file" accept=".xlsx, .xls" class="hidden" onchange="handleStudentExcelUpload(event)">
-                            <button onclick="document.getElementById('student_excel_file').click()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-sm">
-                                <i class="fas fa-file-excel mr-2"></i> Import
+                            <button onclick="document.getElementById('student_excel_file').click()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-sm" title="Import Excel">
+                                <i class="fas fa-file-excel mr-1"></i> Import
                             </button>
-                            <button onclick="exportStudentsToExcel()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-sm">
-                                <i class="fas fa-file-export mr-2"></i> Export
+                            <button onclick="exportStudentsToExcel()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-sm" title="Export Excel">
+                                <i class="fas fa-file-export mr-1"></i> Export
                             </button>
-                            <button onclick="showAddForm()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-sm">
-                                <i class="fas fa-plus mr-2"></i> Add
+                            <button onclick="showAddForm()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-sm" title="Add Manual">
+                                <i class="fas fa-plus mr-1"></i> Add
                             </button>
-                            <button onclick="deleteAllStudents()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-sm">
-                                <i class="fas fa-trash-alt mr-2"></i> Del All
+                            <button onclick="deleteAllStudents()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-sm" title="Delete All">
+                                <i class="fas fa-trash-alt mr-1"></i> Del All
                             </button>
                         </div>
                     </div>
                 </div>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-sm text-left border-collapse border border-gray-200">
+
+                <!-- Progress Bar -->
+                <div id="upload-progress-container" class="hidden mb-4">
+                    <div class="flex justify-between text-xs mb-1 text-gray-600">
+                        <span>Processing Upload...</span>
+                        <span id="progress-text">0%</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2.5">
+                        <div id="upload-progress-bar" class="bg-blue-600 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- Students Table -->
+                <div class="overflow-x-auto border rounded-lg">
+                    <table class="w-full text-sm text-left border-collapse border-b border-gray-200">
                         <thead class="bg-gray-50 text-gray-700 uppercase text-xs">
-                            <tr><th class="border p-3">Reg Number</th><th class="border p-3">Name</th><th class="border p-3">Degree</th><th class="border p-3">Batch</th><th class="border p-3 text-center">Actions</th></tr>
+                            <tr>
+                                <th class="border-b p-3 cursor-pointer hover:bg-gray-100 select-none group" onclick="sortStudentTable('reg_no')">
+                                    Reg Number <i class="fas fa-sort ml-1 text-gray-300 group-hover:text-gray-500"></i>
+                                </th>
+                                <th class="border-b p-3 cursor-pointer hover:bg-gray-100 select-none group" onclick="sortStudentTable('name')">
+                                    Name <i class="fas fa-sort ml-1 text-gray-300 group-hover:text-gray-500"></i>
+                                </th>
+                                <th class="border-b p-3 cursor-pointer hover:bg-gray-100 select-none group" onclick="sortStudentTable('degree')">
+                                    Degree <i class="fas fa-sort ml-1 text-gray-300 group-hover:text-gray-500"></i>
+                                </th>
+                                <th class="border-b p-3 cursor-pointer hover:bg-gray-100 select-none group" onclick="sortStudentTable('batch')">
+                                    Batch <i class="fas fa-sort ml-1 text-gray-300 group-hover:text-gray-500"></i>
+                                </th>
+                                <th class="border-b p-3 text-center">Actions</th>
+                            </tr>
                         </thead>
                         <tbody id="studentsTableBody"><tr><td colspan="5" class="p-4 text-center text-gray-500">Loading...</td></tr></tbody>
                     </table>
@@ -298,6 +334,7 @@
         let g_discounts = [];
         let activeStudent = null;
         let lastRawResponse = '';
+        let sortDir = 1;
 
         // --- INIT ---
         document.getElementById('printDate').textContent = new Date().toLocaleString();
@@ -307,7 +344,7 @@
             try {
                 const res = await fetch(`${API_URL}?action=fetch_all`);
                 const text = await res.text();
-                lastRawResponse = text; // Store for debugging
+                lastRawResponse = text; 
 
                 let json;
                 try {
@@ -330,7 +367,6 @@
                 console.warn("API Error:", e);
                 USE_API = false;
                 
-                // Show Detailed Error with "View Raw" button
                 const statusDiv = document.getElementById('conn-status');
                 statusDiv.classList.remove('hidden');
                 statusDiv.innerHTML = `
@@ -487,6 +523,14 @@
         function handleStudentExcelUpload(e) { 
             const f = e.target.files[0];
             if(!f) return;
+            
+            // Show Progress
+            document.getElementById('upload-progress-container').classList.remove('hidden');
+            const pBar = document.getElementById('upload-progress-bar');
+            const pText = document.getElementById('progress-text');
+            pBar.style.width = '30%';
+            pText.textContent = 'Parsing...';
+
             const r = new FileReader();
             r.onload = async function(ev) {
                 try {
@@ -495,6 +539,12 @@
                     
                     let newStudents = [];
                     let duplicates = 0;
+
+                    pBar.style.width = '60%';
+                    pText.textContent = 'Checking Duplicates...';
+
+                    // Simulate slight delay for UI update
+                    await new Promise(r => setTimeout(r, 100));
 
                     json.forEach(row => {
                         const keys = Object.keys(row);
@@ -517,12 +567,32 @@
                     });
 
                     if(newStudents.length > 0) {
+                        pBar.style.width = '90%';
+                        pText.textContent = 'Saving...';
                         const res = await bulkImport('students', newStudents);
-                        if(res.status === 'success') alert(`Imported ${newStudents.length} new students.\nSkipped ${duplicates} duplicates.`);
+                        if(res.status === 'success') {
+                            pBar.style.width = '100%';
+                            pText.textContent = 'Done!';
+                            setTimeout(() => {
+                                alert(`Imported ${newStudents.length} new students.\nSkipped ${duplicates} duplicates.`);
+                                document.getElementById('upload-progress-container').classList.add('hidden');
+                                pBar.style.width = '0%';
+                            }, 500);
+                        }
                     } else {
-                        alert(`No new students found.\nSkipped ${duplicates} duplicates.`);
+                        pBar.style.width = '100%';
+                        pText.textContent = 'Done!';
+                        setTimeout(() => {
+                            alert(`No new students found.\nSkipped ${duplicates} duplicates.`);
+                            document.getElementById('upload-progress-container').classList.add('hidden');
+                            pBar.style.width = '0%';
+                        }, 500);
                     }
-                } catch(err) { console.error(err); alert("Error parsing Excel."); }
+                } catch(err) { 
+                    console.error(err); 
+                    alert("Error parsing Excel."); 
+                    document.getElementById('upload-progress-container').classList.add('hidden');
+                }
             };
             r.readAsArrayBuffer(f);
             e.target.value = '';
@@ -667,6 +737,9 @@
         }
 
         function renderStudentTable(data = g_students) {
+            // Update Total Count
+            document.getElementById('total_students_count').textContent = data.length;
+            
             const tbody = document.getElementById('studentsTableBody');
             if(data.length === 0) { tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-500 italic">No students found.</td></tr>'; return; }
             tbody.innerHTML = data.map((s,i) => `
@@ -690,6 +763,27 @@
                 (s.batch && s.batch.toLowerCase().includes(query))
             );
             renderStudentTable(filtered);
+        }
+        
+        function sortStudentTable(key) {
+            sortDir = -sortDir; // Toggle direction
+            const query = document.getElementById('student_list_search').value.toLowerCase();
+            
+            // Get current list (either full or filtered)
+            let currentList = query ? g_students.filter(s => 
+                (s.reg_no && s.reg_no.toLowerCase().includes(query)) ||
+                (s.name && s.name.toLowerCase().includes(query))
+            ) : [...g_students];
+
+            currentList.sort((a, b) => {
+                const valA = (a[key] || '').toString().toLowerCase();
+                const valB = (b[key] || '').toString().toLowerCase();
+                if (valA < valB) return -1 * sortDir;
+                if (valA > valB) return 1 * sortDir;
+                return 0;
+            });
+            
+            renderStudentTable(currentList);
         }
 
         // --- GENERIC HELPERS ---
