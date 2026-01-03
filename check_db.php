@@ -5,8 +5,8 @@ ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
 $host = "localhost";
-$user = "root";      // Matches your api.php settings
-$pass = "password";  // Matches your api.php settings
+$user = "koolkhan";      // Matches your api.php settings
+$pass = "Mangohair197";  // Matches your api.php settings
 $dbname = "fee_system";
 
 echo "<h2>Database Connection Test</h2>";
