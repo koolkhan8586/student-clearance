@@ -701,6 +701,7 @@
         function downloadDiscountTemplate() { XLSX.writeFile(XLSX.utils.book_append_sheet(XLSX.utils.book_new(), XLSX.utils.json_to_sheet([{ "Reg": "123", "Name": "A", "Academic Term": "Fall 2025", "Discount": 50 }]), "D"), "Template.xlsx"); }
         function downloadEnrollmentTemplate() { XLSX.writeFile(XLSX.utils.book_append_sheet(XLSX.utils.book_new(), XLSX.utils.json_to_sheet([{ "Reg": "123", "Name": "A", "Courses": 5, "Cr": 15 }]), "E"), "Template.xlsx"); }
         function downloadPaidTemplate() { XLSX.writeFile(XLSX.utils.book_append_sheet(XLSX.utils.book_new(), XLSX.utils.json_to_sheet([{ "Reg": "123", "Name": "A", "Amount": 5000, "Date": "2023-01-01" }]), "P"), "Payments_Template.xlsx"); }
+        function downloadFeeTemplate() { XLSX.writeFile(XLSX.utils.book_append_sheet(XLSX.utils.book_new(), XLSX.utils.json_to_sheet([{ "Degree": "BSCAF", "Batch": "Fall 2025", "Year": 2025, "Semester": "Fall", "Cr": 15, "Per_Cr_Fee": 5000, "Tuition_Fee": 75000, "Courses": 5, "Exam_Rate": 1000, "Exam_Fee": 5000, "Reg_Fee": 20000, "Other_Fee": 0 }]), "F"), "Fees_Template.xlsx"); }
 
     </script>
 </body>
