@@ -478,7 +478,7 @@
         }
         function hideAddForm() { document.getElementById('student-dashboard').classList.remove('hidden'); document.getElementById('student-form-container').classList.add('hidden'); }
         
-        // --- NEW AUTO-DEGREE LOGIC ---
+        // Auto-Degree Logic (Helper)
         function extractDegree(reg) {
             if(!reg) return '';
             reg = reg.toString().toUpperCase().trim();
@@ -498,6 +498,12 @@
             }
         }
 
+        // Helper for proper casing
+        function toProperCase(str) {
+            if (!str) return '';
+            return str.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+        }
+
         async function saveStudentList(e) {
             e.preventDefault();
             const fd = new FormData(e.target);
@@ -511,8 +517,9 @@
             }
 
             const student = {
-                reg_no: reg, name: fd.get('name'),
-                degree: fd.get('degree') || extractDegree(reg), // Use field or auto-calc
+                reg_no: reg, 
+                name: toProperCase(fd.get('name')), // Apply Title Case
+                degree: fd.get('degree') || extractDegree(reg), 
                 batch: fd.get('batch'), mobile: fd.get('mobile'), email: fd.get('email')
             };
             
@@ -595,7 +602,7 @@
                                 const extractedDeg = extractDegree(reg.toString());
                                 newStudents.push({
                                     reg_no: reg,
-                                    name: row[getKey('name')] || '',
+                                    name: toProperCase(row[getKey('name')] || ''), // Apply Title Case
                                     // Use degree from excel OR auto-calculate from Reg No
                                     degree: row[getKey('degree')] || row[getKey('prog')] || extractedDeg,
                                     batch: row[getKey('session')] || row[getKey('batch')] || '',
