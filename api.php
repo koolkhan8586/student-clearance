@@ -1,43 +1,40 @@
 <?php
 // api.php
-// 1. Suppress HTML error output (prevents "Invalid JSON" errors)
+// 1. Suppress HTML error output to prevent "Invalid JSON"
 error_reporting(E_ALL);
 ini_set('display_errors', 0); 
 
-// 2. Set JSON headers immediately
+// 2. Set JSON headers
 header("Content-Type: application/json");
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type");
 
-// 3. Handle Preflight Request
+// 3. Handle Preflight
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
     exit;
 }
 
-// 4. Database Config (UPDATE THESE)
+// 4. Database Config
 $host = "localhost";
-$user = "koolkhan";      // CHANGE THIS
-$pass = "Mangohair@197";  // CHANGE THIS
+$user = "root";      // CHANGE THIS IF NEEDED
+$pass = "password";  // CHANGE THIS IF NEEDED
 $dbname = "fee_system";
 
-// 5. Connect with Exception Handling
+// 5. Connect
 try {
-    // Enable exception mode for mysqli
     mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
     $conn = new mysqli($host, $user, $pass, $dbname);
     $conn->set_charset("utf8mb4");
 } catch (Exception $e) {
-    // Return JSON error instead of HTML stack trace
-    echo json_encode(["status" => "error", "message" => "Database Connection Failed: " . $e->getMessage()]);
+    echo json_encode(["status" => "error", "message" => "DB Connection Failed: " . $e->getMessage()]);
     exit;
 }
 
 $action = $_GET['action'] ?? '';
 $input = json_decode(file_get_contents('php://input'), true);
 
-// --- HELPER ---
 function sanitize($conn, $input) {
     if (is_array($input)) {
         return array_map(function($item) use ($conn) { return sanitize($conn, $item); }, $input);
@@ -67,34 +64,62 @@ try {
     }
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        
+        // --- STUDENT ACTIONS ---
         if ($action === 'save_student') {
             $reg = sanitize($conn, $input['reg_no']);
             $name = sanitize($conn, $input['name']);
             $deg = sanitize($conn, $input['degree']);
             $batch = sanitize($conn, $input['batch']);
             $mob = sanitize($conn, $input['mobile']);
-
+            
             $conn->query("INSERT INTO students (reg_no, name, degree, batch, mobile) VALUES ('$reg', '$name', '$deg', '$batch', '$mob') ON DUPLICATE KEY UPDATE name='$name', degree='$deg', batch='$batch', mobile='$mob'");
             echo json_encode(["status" => "success"]);
         }
-        
         elseif ($action === 'delete_student') {
             $reg = sanitize($conn, $input['reg_no']);
             $conn->query("DELETE FROM students WHERE reg_no = '$reg'");
             echo json_encode(["status" => "success"]);
         }
-
         elseif ($action === 'delete_all_students') {
             $conn->query("DELETE FROM students");
             echo json_encode(["status" => "success"]);
         }
 
+        // --- ENROLLMENT ACTIONS (These were missing) ---
+        elseif ($action === 'save_enrollment') {
+            $reg = sanitize($conn, $input['reg_no']);
+            $name = sanitize($conn, $input['name']);
+            $sem = sanitize($conn, $input['semester']);
+            $courses = (int)$input['courses'];
+            $cr = (int)$input['cr'];
+            $id = $input['id'] ?? null;
+
+            if ($id && $id !== "-1" && is_numeric($id)) {
+                $conn->query("UPDATE enrollments SET reg_no='$reg', name='$name', semester='$sem', courses=$courses, cr=$cr WHERE id=$id");
+            } else {
+                $conn->query("INSERT INTO enrollments (reg_no, name, semester, courses, cr) VALUES ('$reg', '$name', '$sem', $courses, $cr)");
+            }
+            echo json_encode(["status" => "success"]);
+        }
+        elseif ($action === 'delete_enrollment') {
+            $id = (int)$input['id'];
+            $conn->query("DELETE FROM enrollments WHERE id = $id");
+            echo json_encode(["status" => "success"]);
+        }
+        elseif ($action === 'delete_all_enrollments') {
+            $conn->query("TRUNCATE TABLE enrollments"); // Using TRUNCATE for cleaner delete all
+            echo json_encode(["status" => "success"]);
+        }
+
+        // --- FEE ACTIONS ---
         elseif ($action === 'save_fee') {
             $d = sanitize($conn, $input);
             $conn->query("INSERT INTO fee_structure (degree, batch, year, semester, cr, per_cr_fee, tuition_fee, total_courses, exam_fee_per_subject, exam_fee, reg_fee, other_fee, paid, total_fee) VALUES ('{$d['degree']}', '{$d['batch']}', '{$d['year']}', '{$d['semester']}', '{$d['cr']}', '{$d['per_cr_fee']}', '{$d['tuition_fee']}', '{$d['total_courses']}', '{$d['exam_fee_per_subject']}', '{$d['exam_fee']}', '{$d['reg_fee']}', '{$d['other_fee']}', '{$d['paid']}', '{$d['total_fee']}')");
             echo json_encode(["status" => "success"]);
         }
 
+        // --- BULK IMPORTS ---
         elseif ($action === 'import_students') {
             $conn->begin_transaction();
             $stmt = $conn->prepare("INSERT INTO students (reg_no, name, degree, batch, mobile) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE name=VALUES(name), degree=VALUES(degree), batch=VALUES(batch), mobile=VALUES(mobile)");
@@ -105,7 +130,6 @@ try {
             $conn->commit();
             echo json_encode(["status" => "success"]);
         }
-
         elseif ($action === 'import_enrollments') {
             $conn->begin_transaction();
             $stmt = $conn->prepare("INSERT INTO enrollments (reg_no, name, semester, courses, cr) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE courses=VALUES(courses), cr=VALUES(cr)");
@@ -116,7 +140,6 @@ try {
             $conn->commit();
             echo json_encode(["status" => "success"]);
         }
-
         elseif ($action === 'import_discounts') {
             $conn->begin_transaction();
             $stmt = $conn->prepare("INSERT INTO discounts (reg_no, name, term, discount) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE discount=VALUES(discount)");
@@ -128,6 +151,7 @@ try {
             echo json_encode(["status" => "success"]);
         }
 
+        // --- SYSTEM RESET ---
         elseif ($action === 'reset') {
             $conn->query("SET FOREIGN_KEY_CHECKS = 0");
             $conn->query("TRUNCATE TABLE students");
