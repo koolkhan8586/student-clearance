@@ -4,7 +4,7 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 0); 
 
-// 2. Set JSON headers
+// 2. Set JSON headers immediately
 header("Content-Type: application/json");
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
@@ -86,7 +86,7 @@ try {
             echo json_encode(["status" => "success"]);
         }
 
-        // --- ENROLLMENT ACTIONS (These were missing) ---
+        // --- ENROLLMENT ACTIONS ---
         elseif ($action === 'save_enrollment') {
             $reg = sanitize($conn, $input['reg_no']);
             $name = sanitize($conn, $input['name']);
@@ -108,14 +108,36 @@ try {
             echo json_encode(["status" => "success"]);
         }
         elseif ($action === 'delete_all_enrollments') {
-            $conn->query("TRUNCATE TABLE enrollments"); // Using TRUNCATE for cleaner delete all
+            $conn->query("TRUNCATE TABLE enrollments"); 
             echo json_encode(["status" => "success"]);
         }
 
         // --- FEE ACTIONS ---
         elseif ($action === 'save_fee') {
             $d = sanitize($conn, $input);
-            $conn->query("INSERT INTO fee_structure (degree, batch, year, semester, cr, per_cr_fee, tuition_fee, total_courses, exam_fee_per_subject, exam_fee, reg_fee, other_fee, paid, total_fee) VALUES ('{$d['degree']}', '{$d['batch']}', '{$d['year']}', '{$d['semester']}', '{$d['cr']}', '{$d['per_cr_fee']}', '{$d['tuition_fee']}', '{$d['total_courses']}', '{$d['exam_fee_per_subject']}', '{$d['exam_fee']}', '{$d['reg_fee']}', '{$d['other_fee']}', '{$d['paid']}', '{$d['total_fee']}')");
+            $id = $input['id'] ?? null;
+
+            if ($id && $id !== "-1" && is_numeric($id)) {
+                // Update
+                $sql = "UPDATE fee_structure SET 
+                        degree='{$d['degree']}', batch='{$d['batch']}', year='{$d['year']}', semester='{$d['semester']}', 
+                        cr='{$d['cr']}', per_cr_fee='{$d['per_cr_fee']}', tuition_fee='{$d['tuition_fee']}', 
+                        total_courses='{$d['total_courses']}', exam_fee_per_subject='{$d['exam_fee_per_subject']}', 
+                        exam_fee='{$d['exam_fee']}', reg_fee='{$d['reg_fee']}', other_fee='{$d['other_fee']}', 
+                        paid='{$d['paid']}', total_fee='{$d['total_fee']}' 
+                        WHERE id=$id";
+                $conn->query($sql);
+            } else {
+                // Insert New
+                $sql = "INSERT INTO fee_structure (degree, batch, year, semester, cr, per_cr_fee, tuition_fee, total_courses, exam_fee_per_subject, exam_fee, reg_fee, other_fee, paid, total_fee) 
+                        VALUES ('{$d['degree']}', '{$d['batch']}', '{$d['year']}', '{$d['semester']}', '{$d['cr']}', '{$d['per_cr_fee']}', '{$d['tuition_fee']}', '{$d['total_courses']}', '{$d['exam_fee_per_subject']}', '{$d['exam_fee']}', '{$d['reg_fee']}', '{$d['other_fee']}', '{$d['paid']}', '{$d['total_fee']}')";
+                $conn->query($sql);
+            }
+            echo json_encode(["status" => "success"]);
+        }
+        elseif ($action === 'delete_fee') {
+            $id = (int)$input['id'];
+            $conn->query("DELETE FROM fee_structure WHERE id = $id");
             echo json_encode(["status" => "success"]);
         }
 
