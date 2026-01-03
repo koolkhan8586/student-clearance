@@ -141,20 +141,28 @@
             <div id="student-dashboard" class="bg-white rounded-lg shadow-lg p-6">
                 <div class="flex flex-col xl:flex-row justify-between items-center mb-6 gap-4">
                     <div><h2 class="text-xl font-bold text-gray-800">Student Directory</h2><p class="text-sm text-gray-500">Manage all student records here</p></div>
-                    <div class="flex gap-2 flex-wrap">
-                        <input type="file" id="student_excel_file" accept=".xlsx, .xls" class="hidden" onchange="handleStudentExcelUpload(event)">
-                        <button onclick="document.getElementById('student_excel_file').click()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-sm">
-                            <i class="fas fa-file-excel mr-2"></i> Import Excel
-                        </button>
-                        <button onclick="exportStudentsToExcel()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-sm">
-                            <i class="fas fa-file-export mr-2"></i> Export Excel
-                        </button>
-                        <button onclick="showAddForm()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-sm">
-                            <i class="fas fa-plus mr-2"></i> Add Manual
-                        </button>
-                        <button onclick="deleteAllStudents()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-sm">
-                            <i class="fas fa-trash-alt mr-2"></i> Delete All
-                        </button>
+                    
+                    <!-- Toolbar with Search -->
+                    <div class="flex flex-col sm:flex-row gap-2 flex-wrap items-center">
+                        <div class="relative">
+                            <input type="text" id="student_list_search" placeholder="Search students..." onkeyup="filterStudents()" class="border rounded-lg px-4 py-2 pl-10 w-full sm:w-64 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                            <i class="fas fa-search absolute left-3 top-3 text-gray-400 text-xs"></i>
+                        </div>
+                        <div class="flex gap-2">
+                            <input type="file" id="student_excel_file" accept=".xlsx, .xls" class="hidden" onchange="handleStudentExcelUpload(event)">
+                            <button onclick="document.getElementById('student_excel_file').click()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-sm">
+                                <i class="fas fa-file-excel mr-2"></i> Import
+                            </button>
+                            <button onclick="exportStudentsToExcel()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-sm">
+                                <i class="fas fa-file-export mr-2"></i> Export
+                            </button>
+                            <button onclick="showAddForm()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-sm">
+                                <i class="fas fa-plus mr-2"></i> Add
+                            </button>
+                            <button onclick="deleteAllStudents()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-sm">
+                                <i class="fas fa-trash-alt mr-2"></i> Del All
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div class="overflow-x-auto">
@@ -494,7 +502,7 @@
                         const reg = row[getKey('reg')] || row[getKey('id')];
                         
                         if (reg) {
-                            if(!g_students.some(s => s.reg_no.toLowerCase() === reg.toString().toLowerCase())) {
+                            if(!g_students.some(s => s.reg_no.trim().toLowerCase() === reg.toString().trim().toLowerCase())) {
                                 newStudents.push({
                                     reg_no: reg,
                                     name: row[getKey('name')] || '',
@@ -658,10 +666,10 @@
             updateSummary(totals.total, totals.fa, totals.paid, totals.bal);
         }
 
-        function renderStudentTable() {
+        function renderStudentTable(data = g_students) {
             const tbody = document.getElementById('studentsTableBody');
-            if(g_students.length === 0) { tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-500 italic">No students found.</td></tr>'; return; }
-            tbody.innerHTML = g_students.map((s,i) => `
+            if(data.length === 0) { tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-500 italic">No students found.</td></tr>'; return; }
+            tbody.innerHTML = data.map((s,i) => `
                 <tr class="hover:bg-gray-50 border-b">
                     <td class="p-3 font-medium">${s.reg_no}</td><td class="p-3">${s.name}</td>
                     <td class="p-3">${s.degree}</td><td class="p-3">${s.batch}</td>
@@ -671,6 +679,17 @@
                         <button onclick="deleteStudent('${s.reg_no}')" class="text-red-600 hover:text-red-800" title="Delete"><i class="fas fa-trash"></i></button>
                     </td>
                 </tr>`).join('');
+        }
+
+        function filterStudents() {
+            const query = document.getElementById('student_list_search').value.toLowerCase();
+            const filtered = g_students.filter(s => 
+                (s.reg_no && s.reg_no.toLowerCase().includes(query)) ||
+                (s.name && s.name.toLowerCase().includes(query)) ||
+                (s.degree && s.degree.toLowerCase().includes(query)) ||
+                (s.batch && s.batch.toLowerCase().includes(query))
+            );
+            renderStudentTable(filtered);
         }
 
         // --- GENERIC HELPERS ---
