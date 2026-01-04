@@ -46,6 +46,7 @@
             </div>
         </div>
 
+        <!-- Connection Status -->
         <div id="conn-status" class="hidden mb-4 px-4 py-3 rounded bg-yellow-100 text-yellow-800 text-sm font-bold no-print border border-yellow-200"></div>
 
         <!-- Debug Modal -->
@@ -150,7 +151,7 @@
                     </div>
                 </div>
                 <div id="upload-progress-container" class="hidden mb-4"><div class="flex justify-between text-xs mb-1 text-gray-600"><span>Processing Upload...</span><span id="progress-text">0%</span></div><div class="w-full bg-gray-200 rounded-full h-2.5"><div id="upload-progress-bar" class="bg-blue-600 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div></div></div>
-                <div class="overflow-x-auto border rounded-lg"><table class="w-full text-sm text-left border-collapse border-b border-gray-200"><thead class="bg-gray-50 text-gray-700 uppercase text-xs"><tr><th class="border-b p-3 cursor-pointer" onclick="sortStudentTable('reg_no')">Reg Number</th><th class="border-b p-3 cursor-pointer" onclick="sortStudentTable('name')">Name</th><th class="border-b p-3 cursor-pointer" onclick="sortStudentTable('degree')">Degree</th><th class="border-b p-3 cursor-pointer" onclick="sortStudentTable('batch')">Batch</th><th class="border-b p-3 text-center">Actions</th></tr></thead><tbody id="studentsTableBody"><tr><td colspan="5" class="p-4 text-center text-gray-500 italic">No records found.</td></tr></tbody></table></div>
+                <div class="overflow-x-auto border rounded-lg"><table class="w-full text-sm text-left border-collapse border-b border-gray-200"><thead class="bg-gray-50 text-gray-700 uppercase text-xs"><tr><th class="border-b p-3 cursor-pointer" onclick="sortStudentTable('reg_no')">Reg Number</th><th class="border-b p-3 cursor-pointer" onclick="sortStudentTable('name')">Name</th><th class="border-b p-3 cursor-pointer" onclick="sortStudentTable('degree')">Degree</th><th class="border-b p-3 cursor-pointer" onclick="sortStudentTable('batch')">Batch</th><th class="border-b p-3 text-center">Actions</th></tr></thead><tbody id="studentsTableBody"><tr><td colspan="5" class="p-4 text-center text-gray-500">No records found.</td></tr></tbody></table></div>
             </div>
             <div id="student-form-container" class="hidden bg-white rounded-lg shadow-lg p-6 max-w-2xl mx-auto mt-4"><div class="flex justify-between items-center border-b pb-4 mb-4"><h3 class="text-lg font-bold text-gray-800" id="form-title">Add New Student</h3><button onclick="hideAddForm()" class="text-gray-500 hover:text-red-500"><i class="fas fa-times"></i></button></div><form id="studentForm" onsubmit="saveStudentList(event)" class="space-y-4"><input type="hidden" id="edit_index" value="-1"><div class="grid grid-cols-1 md:grid-cols-2 gap-4"><div class="col-span-1 md:col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Registration Number</label><input type="text" name="reg_no" id="input_reg_no" oninput="autoFillDegree(this.value)" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div class="col-span-1 md:col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Full Name</label><input type="text" name="name" id="input_name" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div><label class="block text-sm font-medium text-gray-700 mb-1">Degree Program</label><input type="text" name="degree" id="input_degree" class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div><label class="block text-sm font-medium text-gray-700 mb-1">Batch (Session)</label><input type="text" name="batch" id="input_batch" class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div class="col-span-1 md:col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Mobile</label><input type="text" name="mobile" id="input_mobile" class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div class="col-span-1 md:col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Email</label><input type="email" name="email" id="input_email" class="w-full border border-gray-300 rounded-lg px-4 py-2"></div></div><div class="pt-4 flex gap-2"><button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg">Save Student</button><button type="button" onclick="hideAddForm()" class="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg">Cancel</button></div></form></div>
         </div>
@@ -417,7 +418,35 @@
         }
 
         // --- DATA OPS ---
+        // Save (Local First + Server Sync)
         async function saveData(type, data) {
+            // 1. Local Update (Optimistic UI)
+            if (type === 'student') { 
+                if(data.reg_no) g_students = g_students.filter(s => s.reg_no !== data.reg_no);
+                g_students.push(data); setStorage('fee_system_students_list_v2', g_students); 
+            }
+            else if (type === 'fee') { 
+                if(!data.id || data.id === '-1') data.id = Date.now().toString();
+                g_fees = g_fees.filter(f => f.id != data.id);
+                g_fees.push(data); setStorage('fee_system_records_v6', g_fees); 
+            }
+            else if (type === 'enrollment') { 
+                if(!data.id || data.id === "-1") data.id = Date.now().toString(); 
+                g_enrollments = g_enrollments.filter(x=>x.id!=data.id);
+                g_enrollments.push(data); setStorage('fee_system_enrollments_v1', g_enrollments); 
+            }
+            else if (type === 'payment') { 
+                if(!data.id || data.id === "-1") data.id = Date.now().toString();
+                g_payments = g_payments.filter(x=>x.id!=data.id);
+                g_payments.push(data); setStorage('fee_system_payments_v1', g_payments); 
+            }
+            else if (type === 'discount') { 
+                if(!data.id || data.id === "-1") data.id = Date.now().toString();
+                g_discounts = g_discounts.filter(x=>x.id!=data.id);
+                g_discounts.push(data); setStorage('fee_system_discounts_v1', g_discounts); 
+            }
+
+            // 2. Server Sync
             if (USE_API) {
                 let act = '';
                 if(type === 'student') act = 'save_student';
@@ -426,39 +455,22 @@
                 if(type === 'payment') act = 'save_payment';
                 if(type === 'discount') act = 'save_discount';
                 
-                const res = await fetch(`${API_URL}?action=${act}`, { method: 'POST', body: JSON.stringify(data) });
-                return await res.json();
-            } else {
-                // Local Storage Logic
-                if (type === 'student') { 
-                    if(data.reg_no) g_students = g_students.filter(s => s.reg_no !== data.reg_no);
-                    g_students.push(data); setStorage('fee_system_students_list_v2', g_students); 
-                }
-                else if (type === 'fee') { 
-                    if(!data.id || data.id === '-1') data.id = Date.now().toString();
-                    g_fees = g_fees.filter(f => f.id != data.id);
-                    g_fees.push(data); setStorage('fee_system_records_v6', g_fees); 
-                }
-                else if (type === 'enrollment') { 
-                    if(!data.id || data.id === "-1") data.id = Date.now().toString(); 
-                    g_enrollments = g_enrollments.filter(x=>x.id!=data.id);
-                    g_enrollments.push(data); setStorage('fee_system_enrollments_v1', g_enrollments); 
-                }
-                else if (type === 'payment') { 
-                    if(!data.id || data.id === "-1") data.id = Date.now().toString();
-                    g_payments = g_payments.filter(x=>x.id!=data.id);
-                    g_payments.push(data); setStorage('fee_system_payments_v1', g_payments); 
-                }
-                else if (type === 'discount') { 
-                    if(!data.id || data.id === "-1") data.id = Date.now().toString();
-                    g_discounts = g_discounts.filter(x=>x.id!=data.id);
-                    g_discounts.push(data); setStorage('fee_system_discounts_v1', g_discounts); 
-                }
-                return { status: 'success' };
+                try {
+                     await fetch(`${API_URL}?action=${act}`, { method: 'POST', body: JSON.stringify(data) });
+                } catch(e) { console.warn("Sync failed, data saved locally."); }
             }
+            return { status: 'success' };
         }
 
         async function deleteData(type, id) {
+             // 1. Local Update
+             if (type === 'student') { g_students = g_students.filter(s => s.reg_no !== id); setStorage('fee_system_students_list_v2', g_students); renderStudentTable(); } 
+             else if (type === 'fee') { g_fees = g_fees.filter(f => f.id != id); setStorage('fee_system_records_v6', g_fees); renderFeeDashboard(); } 
+             else if (type === 'enrollment') { g_enrollments = g_enrollments.filter(e => e.id !== id); setStorage('fee_system_enrollments_v1', g_enrollments); renderEnrollmentTable(); }
+             else if (type === 'payment') { g_payments = g_payments.filter(e => e.id !== id); setStorage('fee_system_payments_v1', g_payments); renderPaymentTable(); }
+             else if (type === 'discount') { g_discounts = g_discounts.filter(e => e.id !== id); setStorage('fee_system_discounts_v1', g_discounts); renderDiscountTable(); }
+
+             // 2. Server Sync
              if (USE_API) {
                  let act = ''; let body = {};
                  if (type === 'student') { act = 'delete_student'; body = {reg_no: id}; }
@@ -467,15 +479,9 @@
                  else if (type === 'payment') { act = 'delete_payment'; body = {id: id}; }
                  else if (type === 'discount') { act = 'delete_discount'; body = {id: id}; }
                  
-                 await fetch(`${API_URL}?action=${act}`, { method: 'POST', body: JSON.stringify(body) });
-                 await initData();
-             } else {
-                 if (type === 'student') { g_students = g_students.filter(s => s.reg_no !== id); setStorage('fee_system_students_list_v2', g_students); renderStudentTable(); } 
-                 else if (type === 'fee') { g_fees = g_fees.filter(f => f.id != id); setStorage('fee_system_records_v6', g_fees); renderFeeDashboard(); } 
-                 else if (type === 'enrollment') { g_enrollments = g_enrollments.filter(e => e.id !== id); setStorage('fee_system_enrollments_v1', g_enrollments); renderEnrollmentTable(); }
-                 else if (type === 'payment') { g_payments = g_payments.filter(e => e.id !== id); setStorage('fee_system_payments_v1', g_payments); renderPaymentTable(); }
-                 else if (type === 'discount') { g_discounts = g_discounts.filter(e => e.id !== id); setStorage('fee_system_discounts_v1', g_discounts); renderDiscountTable(); }
-             }
+                 try { await fetch(`${API_URL}?action=${act}`, { method: 'POST', body: JSON.stringify(body) }); }
+                 catch(e) { console.warn("Sync delete failed"); }
+             } 
         }
 
         async function deleteStudentData(regNo) { deleteData('student', regNo); }
@@ -485,28 +491,48 @@
         async function deleteDiscountData(id) { deleteData('discount', id); }
 
         async function deleteAllStudentsData() {
-            if (USE_API) { await fetch(`${API_URL}?action=delete_all_students`, { method: 'POST' }); await initData(); } 
-            else { g_students = []; setStorage('fee_system_students_list_v2', []); renderStudentTable(); }
+            g_students = []; setStorage('fee_system_students_list_v2', []); renderStudentTable();
+            if (USE_API) await fetch(`${API_URL}?action=delete_all_students`, { method: 'POST' }); 
         }
         async function deleteAllEnrollmentsData() {
-            if (USE_API) { await fetch(`${API_URL}?action=delete_all_enrollments`, { method: 'POST' }); await initData(); } 
-            else { g_enrollments = []; setStorage('fee_system_enrollments_v1', []); renderEnrollmentTable(); }
+             g_enrollments = []; setStorage('fee_system_enrollments_v1', []); renderEnrollmentTable(); 
+            if (USE_API) await fetch(`${API_URL}?action=delete_all_enrollments`, { method: 'POST' }); 
         }
         async function deleteAllPaymentsData() {
-            if (USE_API) { await fetch(`${API_URL}?action=delete_all_payments`, { method: 'POST' }); await initData(); } 
-            else { g_payments = []; setStorage('fee_system_payments_v1', []); renderPaymentTable(); }
+             g_payments = []; setStorage('fee_system_payments_v1', []); renderPaymentTable(); 
+            if (USE_API) await fetch(`${API_URL}?action=delete_all_payments`, { method: 'POST' }); 
         }
         
         async function deleteAllFeesData() {
-            if (USE_API) { await fetch(`${API_URL}?action=delete_all_fees`, { method: 'POST' }); await initData(); } 
-            else { g_fees = []; setStorage('fee_system_records_v6', []); renderFeeDashboard(); }
+             g_fees = []; setStorage('fee_system_records_v6', []); renderFeeDashboard(); 
+            if (USE_API) await fetch(`${API_URL}?action=delete_all_fees`, { method: 'POST' }); 
         }
          async function deleteAllDiscountsData() {
-            if (USE_API) { await fetch(`${API_URL}?action=delete_all_discounts`, { method: 'POST' }); await initData(); } 
-            else { g_discounts = []; setStorage('fee_system_discounts_v1', []); renderDiscountTable(); }
+             g_discounts = []; setStorage('fee_system_discounts_v1', []); renderDiscountTable(); 
+            if (USE_API) await fetch(`${API_URL}?action=delete_all_discounts`, { method: 'POST' }); 
         }
 
         async function bulkImport(type, arr) {
+            // Local Update
+            if(type==='students') { g_students=[...g_students,...arr]; setStorage('fee_system_students_list_v2', g_students); }
+            if(type==='enrollments') { 
+                const toAdd = arr.map(e => ({...e, id: Date.now() + Math.random()}));
+                g_enrollments=[...g_enrollments,...toAdd]; setStorage('fee_system_enrollments_v1', g_enrollments); 
+            }
+            if(type==='discounts') { 
+                 const toAdd = arr.map(d => ({...d, id: Date.now() + Math.random()}));
+                g_discounts=[...g_discounts,...toAdd]; setStorage('fee_system_discounts_v1', g_discounts); 
+            }
+            if(type==='payments') { 
+                const toAdd = arr.map(p => ({...p, id: Date.now() + Math.random()}));
+                g_payments=[...g_payments,...toAdd]; setStorage('fee_system_payments_v1', g_payments); 
+            }
+            if(type==='fees') { 
+                const toAdd = arr.map(f => ({...f, id: Date.now() + Math.random()}));
+                g_fees=[...g_fees,...toAdd]; setStorage('fee_system_records_v6', g_fees); 
+            }
+            
+            // Server Update
             if (USE_API) {
                 let act = '';
                 if(type==='students') act='import_students';
@@ -515,31 +541,11 @@
                 if(type==='payments') act='import_payments';
                 if(type==='fees') act='import_fees';
 
-                const res = await fetch(`${API_URL}?action=${act}`, { method: 'POST', body: JSON.stringify(arr) });
-                const r = await res.json();
-                if(r.status==='success') await initData();
-                return r;
-            } else {
-                if(type==='students') { g_students=[...g_students,...arr]; setStorage('fee_system_students_list_v2', g_students); }
-                if(type==='enrollments') { 
-                    const toAdd = arr.map(e => ({...e, id: Date.now() + Math.random()}));
-                    g_enrollments=[...g_enrollments,...toAdd]; setStorage('fee_system_enrollments_v1', g_enrollments); 
-                }
-                if(type==='discounts') { 
-                     const toAdd = arr.map(d => ({...d, id: Date.now() + Math.random()}));
-                    g_discounts=[...g_discounts,...toAdd]; setStorage('fee_system_discounts_v1', g_discounts); 
-                }
-                if(type==='payments') { 
-                    const toAdd = arr.map(p => ({...p, id: Date.now() + Math.random()}));
-                    g_payments=[...g_payments,...toAdd]; setStorage('fee_system_payments_v1', g_payments); 
-                }
-                if(type==='fees') { 
-                    const toAdd = arr.map(f => ({...f, id: Date.now() + Math.random()}));
-                    g_fees=[...g_fees,...toAdd]; setStorage('fee_system_records_v6', g_fees); 
-                }
-                renderStudentTable(); renderEnrollmentTable(); renderDiscountTable(); renderPaymentTable(); renderFeeDashboard();
-                return { status: 'success' };
+                await fetch(`${API_URL}?action=${act}`, { method: 'POST', body: JSON.stringify(arr) });
             }
+            
+            renderStudentTable(); renderEnrollmentTable(); renderDiscountTable(); renderPaymentTable(); renderFeeDashboard();
+            return { status: 'success' };
         }
 
         // --- STUDENT UI ---
@@ -553,7 +559,7 @@
             e.preventDefault(); const fd = new FormData(e.target); const reg = fd.get('reg_no').trim();
             if(document.getElementById('edit_index').value === "-1" && g_students.some(s => s.reg_no.toLowerCase() === reg.toLowerCase())) { alert("Duplicate Reg Number!"); return; }
             const student = { reg_no: reg, name: toProperCase(fd.get('name')), degree: fd.get('degree') || extractDegree(reg), batch: fd.get('batch'), mobile: fd.get('mobile'), email: fd.get('email') };
-            const res = await saveData('student', student); if(res.status === 'success') { if(USE_API) await initData(); else renderStudentTable(); hideAddForm(); alert("Student saved!"); }
+            await saveData('student', student); hideAddForm(); alert("Student saved!"); 
         }
 
         function editStudent(reg) { const s = g_students.find(x => x.reg_no === reg); if(!s) return; document.getElementById('input_reg_no').value = s.reg_no; document.getElementById('input_name').value = s.name; document.getElementById('input_degree').value = s.degree; document.getElementById('input_batch').value = s.batch; document.getElementById('input_mobile').value = s.mobile; document.getElementById('input_email').value = s.email || ''; document.getElementById('edit_index').value = "1"; document.getElementById('form-title').textContent = "Edit Student"; document.getElementById('student-dashboard').classList.add('hidden'); document.getElementById('student-form-container').classList.remove('hidden'); }
@@ -561,12 +567,57 @@
         function deleteAllStudents() { if(confirm('WARNING: Delete ALL students?')) deleteAllStudentsData(); }
         function exportStudentsToExcel() { if(g_students.length === 0) { alert("No data."); return; } const ws = XLSX.utils.json_to_sheet(g_students); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Students"); XLSX.writeFile(wb, "All_Students.xlsx"); }
 
-        function handleStudentExcelUpload(e) { /* Logic same as previous, abbreviated */ const f = e.target.files[0]; if(!f) return; document.getElementById('upload-progress-container').classList.remove('hidden'); const pBar = document.getElementById('upload-progress-bar'); const pText = document.getElementById('progress-text'); pBar.style.width = '30%'; pText.textContent = 'Parsing...'; const r = new FileReader(); r.onload = async function(ev) { try { const wb = XLSX.read(new Uint8Array(ev.target.result), {type:'array'}); const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]); let newStudents = []; let duplicates = 0; pBar.style.width = '60%'; pText.textContent = 'Checking Duplicates...'; await new Promise(r => setTimeout(r, 100)); json.forEach(row => { const keys = Object.keys(row); const getKey = (term) => keys.find(k => k.toLowerCase().includes(term)); const reg = row[getKey('reg')] || row[getKey('id')]; if (reg) { if(!g_students.some(s => s.reg_no.trim().toLowerCase() === reg.toString().trim().toLowerCase())) { const extractedDeg = extractDegree(reg.toString()); newStudents.push({ reg_no: reg, name: toProperCase(row[getKey('name')] || ''), degree: row[getKey('degree')] || row[getKey('prog')] || extractedDeg, batch: row[getKey('session')] || row[getKey('batch')] || '', mobile: row[getKey('mobile')] || row[getKey('phone')] || '', email: row[getKey('email')] || '' }); } else { duplicates++; } } }); if(newStudents.length > 0) { pBar.style.width = '90%'; pText.textContent = 'Saving...'; const res = await bulkImport('students', newStudents); if(res.status === 'success') { pBar.style.width = '100%'; pText.textContent = 'Done!'; setTimeout(() => { alert(`Imported ${newStudents.length} new.\nSkipped ${duplicates} duplicates.`); document.getElementById('upload-progress-container').classList.add('hidden'); pBar.style.width = '0%'; }, 500); } } else { pBar.style.width = '100%'; pText.textContent = 'Done!'; setTimeout(() => { alert(`No new students.\nSkipped ${duplicates} duplicates.`); document.getElementById('upload-progress-container').classList.add('hidden'); pBar.style.width = '0%'; }, 500); } } catch(err) { console.error(err); alert("Error parsing Excel."); document.getElementById('upload-progress-container').classList.add('hidden'); } }; r.readAsArrayBuffer(f); e.target.value = ''; }
+        function handleStudentExcelUpload(e) { 
+            const f = e.target.files[0]; if(!f) return; 
+            document.getElementById('upload-progress-container').classList.remove('hidden'); 
+            const pBar = document.getElementById('upload-progress-bar'); pBar.style.width = '30%'; 
+            
+            const r = new FileReader(); 
+            r.onload = async function(ev) { 
+                try { 
+                    const wb = XLSX.read(new Uint8Array(ev.target.result), {type:'array'}); 
+                    const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]); 
+                    let newStudents = []; 
+                    
+                    json.forEach(row => { 
+                         // Normalize Keys
+                        const keys = Object.keys(row);
+                        const kReg = keys.find(k => k.toLowerCase().includes('reg')) || keys[0];
+                        const kName = keys.find(k => k.toLowerCase().includes('name')) || keys[1];
+                        const kDeg = keys.find(k => k.toLowerCase().includes('degree')) || keys.find(k => k.toLowerCase().includes('prog'));
+                        const kBat = keys.find(k => k.toLowerCase().includes('batch')) || keys.find(k => k.toLowerCase().includes('sess'));
+                        
+                        const reg = row[kReg]; 
+                        if (reg) { 
+                             newStudents.push({ 
+                                reg_no: reg, 
+                                name: toProperCase(row[kName] || ''), 
+                                degree: row[kDeg] || extractDegree(reg.toString()), 
+                                batch: row[kBat] || '', 
+                                mobile: row[keys.find(k => k.toLowerCase().includes('mob'))] || '', 
+                                email: row[keys.find(k => k.toLowerCase().includes('mail'))] || '' 
+                            }); 
+                        } 
+                    }); 
+                    
+                    if(newStudents.length > 0) { 
+                        pBar.style.width = '100%'; 
+                        await bulkImport('students', newStudents); 
+                        alert(`Imported ${newStudents.length} students.`);
+                    } else {
+                        alert("No valid rows found. Check column headers.");
+                    }
+                } catch(err) { console.error(err); alert("Error parsing Excel."); } 
+                document.getElementById('upload-progress-container').classList.add('hidden');
+                e.target.value = ''; 
+            }; 
+            r.readAsArrayBuffer(f); 
+        }
 
         // --- ENROLLMENT UI ---
         function showEnrollmentForm() { document.getElementById('enrollmentForm').reset(); document.getElementById('enroll_edit_id').value = "-1"; document.getElementById('enroll-form-title').textContent = "Add Enrollment"; document.getElementById('enrollment-dashboard').classList.add('hidden'); document.getElementById('enrollment-form-container').classList.remove('hidden'); }
         function hideEnrollmentForm() { document.getElementById('enrollment-dashboard').classList.remove('hidden'); document.getElementById('enrollment-form-container').classList.add('hidden'); }
-        async function saveEnrollmentList(e) { e.preventDefault(); const fd = new FormData(e.target); const sess = `${fd.get('semester')} ${fd.get('year')}`; const id = document.getElementById('enroll_edit_id').value; const enrollment = { id: (id === "-1") ? Date.now().toString() : id, reg_no: fd.get('reg_no'), name: toProperCase(fd.get('name')), semester: sess, courses: parseInt(fd.get('courses')), cr: parseInt(fd.get('cr')) }; const res = await saveData('enrollment', enrollment); if(res.status === 'success') { if(USE_API) await initData(); else { if(id !== "-1") g_enrollments = g_enrollments.filter(x => x.id != id); g_enrollments.push(enrollment); setStorage('fee_system_enrollments_v1', g_enrollments); renderEnrollmentTable(); } hideEnrollmentForm(); alert("Enrollment saved!"); } }
+        async function saveEnrollmentList(e) { e.preventDefault(); const fd = new FormData(e.target); const sess = `${fd.get('semester')} ${fd.get('year')}`; const id = document.getElementById('enroll_edit_id').value; const enrollment = { id: (id === "-1") ? Date.now().toString() : id, reg_no: fd.get('reg_no'), name: toProperCase(fd.get('name')), semester: sess, courses: parseInt(fd.get('courses')), cr: parseInt(fd.get('cr')) }; await saveData('enrollment', enrollment); hideEnrollmentForm(); alert("Enrollment saved!"); }
         function editEnrollment(id) { const e = g_enrollments.find(x => x.id == id); if(!e) return; document.getElementById('enroll_reg_no').value = e.reg_no; document.getElementById('enroll_name').value = e.name; document.getElementById('enroll_courses').value = e.courses; document.getElementById('enroll_cr').value = e.cr; const parts = e.semester.split(' '); document.getElementById('enroll_sem').value = parts[0] || 'Fall'; document.getElementById('enroll_year').value = parts[1] || '2023'; document.getElementById('enroll_edit_id').value = e.id || id; document.getElementById('enroll-form-title').textContent = "Edit Enrollment"; document.getElementById('enrollment-dashboard').classList.add('hidden'); document.getElementById('enrollment-form-container').classList.remove('hidden'); }
         function deleteEnrollment(id) { if(confirm("Delete this enrollment?")) deleteEnrollmentData(id); }
         function deleteAllEnrollments() { if(confirm("Delete ALL enrollment data?")) deleteAllEnrollmentsData(); }
@@ -577,7 +628,7 @@
         // --- FEE PAID UI (NEW) ---
         function showPaidForm() { document.getElementById('paidForm').reset(); document.getElementById('paid_edit_id').value = "-1"; document.getElementById('paid-form-title').textContent = "Add Payment"; document.getElementById('paid-dashboard').classList.add('hidden'); document.getElementById('paid-form-container').classList.remove('hidden'); }
         function hidePaidForm() { document.getElementById('paid-dashboard').classList.remove('hidden'); document.getElementById('paid-form-container').classList.add('hidden'); }
-        async function savePaymentList(e) { e.preventDefault(); const fd = new FormData(e.target); const sess = `${fd.get('semester')} ${fd.get('year')}`; const id = document.getElementById('paid_edit_id').value; const payment = { id: (id === "-1") ? Date.now().toString() : id, reg_no: fd.get('reg_no'), name: toProperCase(fd.get('name')), semester: sess, amount: parseFloat(fd.get('amount')), date: fd.get('date') }; const res = await saveData('payment', payment); if(res.status === 'success') { if(USE_API) await initData(); else { if(id !== "-1") g_payments = g_payments.filter(x => x.id != id); g_payments.push(payment); setStorage('fee_system_payments_v1', g_payments); renderPaymentTable(); } hidePaidForm(); alert("Payment saved!"); } }
+        async function savePaymentList(e) { e.preventDefault(); const fd = new FormData(e.target); const sess = `${fd.get('semester')} ${fd.get('year')}`; const id = document.getElementById('paid_edit_id').value; const payment = { id: (id === "-1") ? Date.now().toString() : id, reg_no: fd.get('reg_no'), name: toProperCase(fd.get('name')), semester: sess, amount: parseFloat(fd.get('amount')), date: fd.get('date') }; await saveData('payment', payment); hidePaidForm(); alert("Payment saved!"); }
         function editPayment(id) { const e = g_payments.find(x => x.id == id); if(!e) return; document.getElementById('paid_reg_no').value = e.reg_no; document.getElementById('paid_name').value = e.name; document.getElementById('paid_amount').value = e.amount; document.getElementById('paid_date').value = e.date; const parts = e.semester.split(' '); document.getElementById('paid_sem').value = parts[0] || 'Fall'; document.getElementById('paid_year').value = parts[1] || '2023'; document.getElementById('paid_edit_id').value = e.id || id; document.getElementById('paid-form-title').textContent = "Edit Payment"; document.getElementById('paid-dashboard').classList.add('hidden'); document.getElementById('paid-form-container').classList.remove('hidden'); }
         function deletePayment(id) { if(confirm("Delete this payment?")) deletePaymentData(id); }
         function deleteAllPayments() { if(confirm("Delete ALL payments?")) deleteAllPaymentsData(); }
@@ -626,17 +677,7 @@
                 id: (id === "-1") ? Date.now().toString() : id,
                 reg_no: fd.get('reg_no'), name: toProperCase(fd.get('name')), term: normalizeTerm(fd.get('term')), discount: parseFloat(fd.get('discount'))
             };
-            const res = await saveData('discount', discount); 
-            if(res.status === 'success') { 
-                if(USE_API) await initData(); 
-                else { 
-                    if(id !== "-1") g_discounts = g_discounts.filter(x => x.id != id); 
-                    g_discounts.push(discount); 
-                    setStorage('fee_system_discounts_v1', g_discounts); 
-                    renderDiscountTable(); 
-                } 
-                hideDiscountForm(); alert("Discount saved!"); 
-            }
+            await saveData('discount', discount); hideDiscountForm(); alert("Discount saved!"); 
         }
         
         function editDiscount(id) {
