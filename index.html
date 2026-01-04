@@ -160,6 +160,7 @@
                                 <th class="w-8">Sr</th>
                                 <th>Session</th>
                                 <th class="w-8 text-center">Cr</th>
+                                <th class="w-8 text-center">Subjects</th>
                                 <th class="text-right">Reg Fee</th>
                                 <th class="text-right">Tuition</th>
                                 <th class="text-right">Exam</th>
@@ -173,7 +174,7 @@
                             </tr>
                         </thead>
                         <tbody id="feeTableBody">
-                             <tr><td colspan="13" class="text-center p-8 text-gray-400 italic">Enter Registration Number to generate report.</td></tr>
+                             <tr><td colspan="14" class="text-center p-8 text-gray-400 italic">Enter Registration Number to generate report.</td></tr>
                         </tbody>
                         <tfoot id="tableFooter"></tfoot>
                     </table>
@@ -463,18 +464,21 @@
         document.getElementById('printDate').innerText = new Date().toLocaleString();
         
         // --- NORMALIZER ---
+        // Crucial for matching "BSCAF-01" with "BSCAF01" and "Fall-2023" with "Fall 2023"
         function norm(str) { 
             return str ? str.toString().toLowerCase().replace(/[^a-z0-9]/g, '') : ''; 
         }
 
         // --- INIT ---
         window.onload = async () => {
+            log("Attempting Server Connection...");
             try {
-                if (window.location.protocol === 'file:') { failInit("File Protocol"); return; }
+                if (window.location.protocol === 'file:') { failInit("File Protocol Detected"); return; }
                 const res = await fetch(`${API_URL}?action=fetch_all&t=${Date.now()}`);
                 const text = await res.text();
-                if (text.trim().startsWith('<')) { failInit("Server returned HTML"); return; }
+                if (text.trim().startsWith('<')) { failInit("Invalid Server Response (HTML)"); return; }
                 
+                // Smart Clean JSON
                 let cleanText = text;
                 const jsonStart = text.indexOf('{');
                 if(jsonStart > 0) cleanText = text.substring(jsonStart);
@@ -482,22 +486,35 @@
                 const json = JSON.parse(cleanText);
                 if (json.status === 'success') {
                     db = json.data;
+                    log(`✅ Connected! Loaded: ${db.students.length} Students.`, "green");
                     isOnline = true;
                     document.getElementById('live-indicator').className = "bg-green-100 text-green-600 text-xs px-2 py-0.5 rounded-full font-bold";
                     document.getElementById('live-indicator').innerText = "● Online";
-                    document.getElementById('init-modal').classList.add('hidden'); // Auto hide
+                    document.getElementById('init-spinner').classList.add('hidden');
+                    document.getElementById('init-title').innerText = "System Ready";
+                    document.getElementById('init-success-btn').classList.remove('hidden');
                     refreshUI();
-                } else { failInit(json.message); }
-            } catch (e) { failInit(e.message); }
+                } else {
+                    failInit(json.message);
+                }
+            } catch (e) {
+                failInit(e.message);
+            }
         };
 
+        function log(msg, color="white") {
+            const d = document.getElementById('init-log');
+            d.innerHTML += `<div style="color:${color}">> ${msg}</div>`;
+            d.scrollTop = d.scrollHeight;
+        }
+
         function failInit(reason) {
+            document.getElementById('init-spinner').classList.add('hidden');
             document.getElementById('init-title').innerText = "Connection Failed";
             document.getElementById('init-title').className = "text-xl font-bold text-red-600";
             document.getElementById('init-actions').classList.remove('hidden');
-            document.getElementById('init-spinner').classList.add('hidden');
             const local = localStorage.getItem('fee_system_local');
-            if(local) { db = JSON.parse(local); refreshUI(); }
+            if(local) { db = JSON.parse(local); log("⚠️ Loaded cached local data.", "yellow"); refreshUI(); }
         }
 
         function useDemoMode() {
@@ -550,8 +567,8 @@
                 html = data.filter(p => !f || p.reg_no.toLowerCase().includes(f) || p.name.toLowerCase().includes(f)).map(p => `<tr><td class="p-2 border">${p.reg_no}</td><td class="p-2 border">${p.name}</td><td class="p-2 border">${p.semester}</td><td class="p-2 border text-right">${p.amount}</td><td class="p-2 border text-center">${p.date}</td><td class="p-2 border text-center"><button onclick="editPayment('${p.id}')" class="text-blue-600 mr-2"><i class="fas fa-edit"></i></button><button onclick="deleteItem('payments','${p.id}')" class="text-red-600"><i class="fas fa-trash"></i></button></td></tr>`).join('');
             } else if (type === 'discounts') {
                 tbodyId = 'body-di';
-                const f = document.getElementById('filter_discount') ? document.getElementById('filter_discount').value.toLowerCase() : '';
-                html = data.filter(d => !f || d.reg_no.toLowerCase().includes(f) || d.name.toLowerCase().includes(f)).map(d => `
+                const f = document.getElementById('search_di').value.toLowerCase();
+                html = data.filter(d => !f || d.reg_no.toLowerCase().includes(f)).map(d => `
                     <tr>
                         <td class="p-2 border">${d.reg_no}</td>
                         <td class="p-2 border">${d.name}</td>
@@ -568,6 +585,18 @@
             const el = document.getElementById(tbodyId);
             if(el) el.innerHTML = html || `<tr><td colspan="6" class="p-4 text-center italic text-gray-400">No records found.</td></tr>`;
         }
+        
+        let sortDir = 1;
+        function sortStudentTable(k) { sortDir *= -1; db.students.sort((a,b) => (a[k] > b[k] ? 1 : -1) * sortDir); renderTable('students'); }
+        function sortFeeTable(k) { sortDir *= -1; db.fees.sort((a,b) => (a[k] > b[k] ? 1 : -1) * sortDir); renderTable('fees'); }
+        function sortEnrollmentTable(k) { sortDir *= -1; db.enrollments.sort((a,b) => (a[k] > b[k] ? 1 : -1) * sortDir); renderTable('enrollments'); }
+        function sortPaidTable(k) { sortDir *= -1; db.payments.sort((a,b) => (a[k] > b[k] ? 1 : -1) * sortDir); renderTable('payments'); }
+        function sortDiscountTable(k) { sortDir *= -1; db.discounts.sort((a,b) => (a[k] > b[k] ? 1 : -1) * sortDir); renderTable('discounts'); }
+        
+        function filterDiscounts() { renderTable('discounts'); }
+        function filterEnrollments() { renderTable('enrollments'); }
+        function filterPayments() { renderTable('payments'); }
+
 
         // --- SEARCH CORE LOGIC ---
         function searchStudentByRegNo() {
@@ -591,7 +620,7 @@
             const myEnroll = db.enrollments.filter(e => norm(e.reg_no) === cleanReg);
             
             if(myEnroll.length === 0) {
-                 tbody.innerHTML = `<tr><td colspan="13" class="text-center p-4 text-orange-600 font-bold">Student found, but no enrollment records exist.</td></tr>`;
+                 tbody.innerHTML = `<tr><td colspan="14" class="text-center p-4 text-orange-600 font-bold">Student found, but no enrollment records exist.</td></tr>`;
                  return;
             }
 
@@ -614,25 +643,37 @@
                 // Match Payments
                 const pays = db.payments.filter(p => norm(p.reg_no) === cleanReg && norm(p.semester) === enSem);
                 
-                const tFee = fee ? (parseFloat(fee.tuition_fee||0)+parseFloat(fee.exam_fee||0)+parseFloat(fee.reg_fee||0)+parseFloat(fee.other_fee||0)) : 0;
+                // --- FIXED CALCULATION LOGIC ---
+                // Tuition = (Enrollment Credits) * (Fee Structure Per Credit Rate)
+                const perCrRate = fee ? parseFloat(fee.per_cr_fee||0) : 0;
+                const enrollCr = parseFloat(en.cr||0);
+                const tuition = enrollCr * perCrRate;
+                
+                const exam = fee ? parseFloat(fee.exam_fee||0) : 0;
+                const regFee = fee ? parseFloat(fee.reg_fee||0) : 0;
+                const others = fee ? parseFloat(fee.other_fee||0) : 0;
+                
+                const total = tuition + exam + regFee + others;
+
                 const paid = pays.reduce((a,b) => a + parseFloat(b.amount||0), 0);
                 const dPerc = disc ? parseFloat(disc.discount||0) : 0;
-                const faAmt = (tFee * dPerc) / 100;
-                const net = tFee - faAmt;
+                const faAmt = (total * dPerc) / 100;
+                const net = total - faAmt;
                 const bal = net - paid;
                 
-                gt += tFee; gp += paid; gfa += faAmt;
+                gt += total; gp += paid; gfa += faAmt;
 
                 tbody.innerHTML += `
                     <tr>
                         <td class="text-center">${idx+1}</td>
                         <td class="font-bold px-1">${en.semester}</td>
                         <td class="text-center">${en.cr}</td>
+                        <td class="text-center">${en.courses || '-'}</td> <!-- Added Courses Column -->
                         <td class="text-right px-1">${fee ? num(fee.reg_fee) : '-'}</td>
-                        <td class="text-right px-1">${fee ? num(fee.tuition_fee) : '-'}</td>
+                        <td class="text-right px-1">${num(tuition)}</td>
                         <td class="text-right px-1">${fee ? num(fee.exam_fee) : '-'}</td>
                         <td class="text-right px-1">${fee ? num(fee.other_fee) : '-'}</td>
-                        <td class="text-right px-1 bg-gray-100 font-bold">${num(tFee)}</td>
+                        <td class="text-right px-1 bg-gray-100 font-bold">${num(total)}</td>
                         <td class="text-center">${dPerc}%</td>
                         <td class="text-right px-1">${num(faAmt)}</td>
                         <td class="text-right px-1 font-bold">${num(net)}</td>
@@ -644,7 +685,7 @@
             const gBal = (gt - gfa) - gp;
             document.getElementById('tableFooter').innerHTML = `
                 <tr class="total-row">
-                    <td colspan="7" class="text-right uppercase">Grand Total:</td>
+                    <td colspan="8" class="text-right uppercase">Grand Total:</td>
                     <td class="text-right">${num(gt)}</td>
                     <td colspan="2" class="text-right text-green-700">FA: ${num(gfa)}</td>
                     <td class="text-right">${num(gt-gfa)}</td>
