@@ -1,6 +1,6 @@
-<?php
-// api.php - Final Version
-error_reporting(0); // Disable direct error printing to avoid JSON breakage
+v<?php
+// api.php - Updated for user 'koolkhan'
+error_reporting(0);
 ini_set('display_errors', 0); 
 
 header("Content-Type: application/json");
@@ -17,9 +17,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
+// --- DATABASE CONFIGURATION ---
 $host = "localhost";
-$user = "koolkhan";      // CHECK CREDENTIALS
-$pass = "Mangohair@197";  // CHECK CREDENTIALS
+$user = "koolkhan";  // Updated username
+$pass = "Mangohair@197";          // Enter password here if you have one
 $dbname = "fee_system";
 
 $conn = null;
@@ -31,7 +32,7 @@ try {
     }
     $conn->set_charset("utf8mb4");
 } catch (Exception $e) {
-    ob_end_clean(); // Clear buffer before sending error
+    ob_end_clean();
     echo json_encode(["status" => "error", "message" => "DB Connection Failed: " . $e->getMessage()]);
     exit;
 }
@@ -59,7 +60,7 @@ try {
             ];
             
             foreach($tables as $dbTable => $key) {
-                // Check if table exists to avoid crash
+                // Safely check if table exists
                 $check = $conn->query("SHOW TABLES LIKE '$dbTable'");
                 if($check && $check->num_rows > 0) {
                     $res = $conn->query("SELECT * FROM $dbTable");
@@ -67,7 +68,7 @@ try {
                 }
             }
             
-            ob_end_clean(); // Clear any previous text
+            ob_end_clean(); 
             echo json_encode(['status' => 'success', 'data' => $data]);
         }
     }
@@ -99,10 +100,7 @@ try {
         // --- FEE ACTIONS ---
         elseif ($action === 'save_fee') {
             $d = $input; $id = $input['id'] ?? null;
-            // Handle both array keys if passed differently
-            $deg = $d['degree'] ?? $d['target_degree'];
-            $bat = $d['batch'] ?? $d['target_batch'];
-            
+            $deg = $d['degree'] ?? $d['target_degree']; $bat = $d['batch'] ?? $d['target_batch'];
             $cols = "degree, batch, year, semester, cr, per_cr_fee, tuition_fee, total_courses, exam_fee_per_subject, exam_fee, reg_fee, other_fee, paid, total_fee";
             $vals = "'$deg','$bat',{$d['year']},'{$d['semester']}',{$d['cr']},{$d['per_cr_fee']},{$d['tuition_fee']},{$d['total_courses']},{$d['exam_fee_per_subject']},{$d['exam_fee']},{$d['reg_fee']},{$d['other_fee']},{$d['paid']},{$d['total_fee']}";
             
@@ -172,7 +170,7 @@ try {
             $conn->query("SET FOREIGN_KEY_CHECKS=1");
         }
         
-        ob_end_clean(); // Success! Clean buffer and output JSON
+        ob_end_clean();
         echo json_encode(["status" => "success"]);
     }
 
