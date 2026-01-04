@@ -46,7 +46,6 @@
             </div>
         </div>
 
-        <!-- Connection Status -->
         <div id="conn-status" class="hidden mb-4 px-4 py-3 rounded bg-yellow-100 text-yellow-800 text-sm font-bold no-print border border-yellow-200"></div>
 
         <!-- Debug Modal -->
@@ -320,11 +319,10 @@
         function num(n) { return parseFloat(n).toLocaleString('en-US'); }
         function normalizeTerm(t) { return t ? t.toString().toLowerCase().replace(/[^a-z0-9]/g, '') : ""; }
 
-        // Start initialization immediately
         initData();
 
         async function initData() {
-            // 1. Load Local Data First (Instant UI)
+            // 1. ALWAYS Load Local Data First (Instant UI)
             g_students = getStorage('fee_system_students_list_v2') || [];
             g_fees = getStorage('fee_system_records_v6') || [];
             g_enrollments = getStorage('fee_system_enrollments_v1') || [];
@@ -356,7 +354,6 @@
 
                 // Check for HTML/PHP error dump
                 if (text.trim().startsWith('<')) {
-                     // Server is sending HTML (likely 404 or error page). Stay in Local Mode silently.
                      console.warn("Server returned HTML. Staying in Local Mode.");
                      return; 
                 }
@@ -406,47 +403,27 @@
         function showDebugModal() { document.getElementById('debug-content').textContent = lastRawResponse || "No response recorded."; document.getElementById('debug-modal').classList.remove('hidden'); }
         
         async function syncLocalToServer() {
-            if(!confirm("Upload all local browser data to the server database?")) return;
+            if(!confirm("Upload all local browser data to the server database? This cannot be undone.")) return;
+            // Get local data
+            const s = getStorage('fee_system_students_list_v2');
+            const f = getStorage('fee_system_records_v6');
+            const e = getStorage('fee_system_enrollments_v1');
+            const p = getStorage('fee_system_payments_v1');
+            const d = getStorage('fee_system_discounts_v1');
+            
             // Upload in sequence
-            if(g_students.length) await bulkImport('students', g_students);
-            if(g_fees.length) await bulkImport('fees', g_fees);
-            if(g_enrollments.length) await bulkImport('enrollments', g_enrollments);
-            if(g_payments.length) await bulkImport('payments', g_payments);
-            if(g_discounts.length) await bulkImport('discounts', g_discounts);
+            if(s.length) await bulkImport('students', s);
+            if(f.length) await bulkImport('fees', f);
+            if(e.length) await bulkImport('enrollments', e);
+            if(p.length) await bulkImport('payments', p);
+            if(d.length) await bulkImport('discounts', d);
+            
             alert("Sync Complete! Reloading...");
             location.reload();
         }
 
         // --- DATA OPS ---
-        // Save (Local First + Server Sync)
         async function saveData(type, data) {
-            // 1. Local Update (Optimistic UI)
-            if (type === 'student') { 
-                if(data.reg_no) g_students = g_students.filter(s => s.reg_no !== data.reg_no);
-                g_students.push(data); setStorage('fee_system_students_list_v2', g_students); 
-            }
-            else if (type === 'fee') { 
-                if(!data.id || data.id === '-1') data.id = Date.now().toString();
-                g_fees = g_fees.filter(f => f.id != data.id);
-                g_fees.push(data); setStorage('fee_system_records_v6', g_fees); 
-            }
-            else if (type === 'enrollment') { 
-                if(!data.id || data.id === "-1") data.id = Date.now().toString(); 
-                g_enrollments = g_enrollments.filter(x=>x.id!=data.id);
-                g_enrollments.push(data); setStorage('fee_system_enrollments_v1', g_enrollments); 
-            }
-            else if (type === 'payment') { 
-                if(!data.id || data.id === "-1") data.id = Date.now().toString();
-                g_payments = g_payments.filter(x=>x.id!=data.id);
-                g_payments.push(data); setStorage('fee_system_payments_v1', g_payments); 
-            }
-            else if (type === 'discount') { 
-                if(!data.id || data.id === "-1") data.id = Date.now().toString();
-                g_discounts = g_discounts.filter(x=>x.id!=data.id);
-                g_discounts.push(data); setStorage('fee_system_discounts_v1', g_discounts); 
-            }
-
-            // 2. Server Sync
             if (USE_API) {
                 let act = '';
                 if(type === 'student') act = 'save_student';
@@ -455,22 +432,38 @@
                 if(type === 'payment') act = 'save_payment';
                 if(type === 'discount') act = 'save_discount';
                 
-                try {
-                     await fetch(`${API_URL}?action=${act}`, { method: 'POST', body: JSON.stringify(data) });
-                } catch(e) { console.warn("Sync failed, data saved locally."); }
+                const res = await fetch(`${API_URL}?action=${act}`, { method: 'POST', body: JSON.stringify(data) });
+                return await res.json();
+            } else {
+                if (type === 'student') { 
+                    if(data.reg_no) g_students = g_students.filter(s => s.reg_no !== data.reg_no);
+                    g_students.push(data); setStorage('fee_system_students_list_v2', g_students); 
+                }
+                else if (type === 'fee') { 
+                    if(!data.id || data.id === '-1') data.id = Date.now().toString();
+                    g_fees = g_fees.filter(f => f.id != data.id);
+                    g_fees.push(data); setStorage('fee_system_records_v6', g_fees); 
+                }
+                else if (type === 'enrollment') { 
+                    if(!data.id || data.id === "-1") data.id = Date.now().toString(); 
+                    g_enrollments = g_enrollments.filter(x=>x.id!=data.id);
+                    g_enrollments.push(data); setStorage('fee_system_enrollments_v1', g_enrollments); 
+                }
+                else if (type === 'payment') { 
+                    if(!data.id || data.id === "-1") data.id = Date.now().toString();
+                    g_payments = g_payments.filter(x=>x.id!=data.id);
+                    g_payments.push(data); setStorage('fee_system_payments_v1', g_payments); 
+                }
+                else if (type === 'discount') { 
+                    if(!data.id || data.id === "-1") data.id = Date.now().toString();
+                    g_discounts = g_discounts.filter(x=>x.id!=data.id);
+                    g_discounts.push(data); setStorage('fee_system_discounts_v1', g_discounts); 
+                }
+                return { status: 'success' };
             }
-            return { status: 'success' };
         }
 
         async function deleteData(type, id) {
-             // 1. Local Update
-             if (type === 'student') { g_students = g_students.filter(s => s.reg_no !== id); setStorage('fee_system_students_list_v2', g_students); renderStudentTable(); } 
-             else if (type === 'fee') { g_fees = g_fees.filter(f => f.id != id); setStorage('fee_system_records_v6', g_fees); renderFeeDashboard(); } 
-             else if (type === 'enrollment') { g_enrollments = g_enrollments.filter(e => e.id !== id); setStorage('fee_system_enrollments_v1', g_enrollments); renderEnrollmentTable(); }
-             else if (type === 'payment') { g_payments = g_payments.filter(e => e.id !== id); setStorage('fee_system_payments_v1', g_payments); renderPaymentTable(); }
-             else if (type === 'discount') { g_discounts = g_discounts.filter(e => e.id !== id); setStorage('fee_system_discounts_v1', g_discounts); renderDiscountTable(); }
-
-             // 2. Server Sync
              if (USE_API) {
                  let act = ''; let body = {};
                  if (type === 'student') { act = 'delete_student'; body = {reg_no: id}; }
@@ -479,9 +472,15 @@
                  else if (type === 'payment') { act = 'delete_payment'; body = {id: id}; }
                  else if (type === 'discount') { act = 'delete_discount'; body = {id: id}; }
                  
-                 try { await fetch(`${API_URL}?action=${act}`, { method: 'POST', body: JSON.stringify(body) }); }
-                 catch(e) { console.warn("Sync delete failed"); }
-             } 
+                 await fetch(`${API_URL}?action=${act}`, { method: 'POST', body: JSON.stringify(body) });
+                 await initData();
+             } else {
+                 if (type === 'student') { g_students = g_students.filter(s => s.reg_no !== id); setStorage('fee_system_students_list_v2', g_students); renderStudentTable(); } 
+                 else if (type === 'fee') { g_fees = g_fees.filter(f => f.id != id); setStorage('fee_system_records_v6', g_fees); renderFeeDashboard(); } 
+                 else if (type === 'enrollment') { g_enrollments = g_enrollments.filter(e => e.id !== id); setStorage('fee_system_enrollments_v1', g_enrollments); renderEnrollmentTable(); }
+                 else if (type === 'payment') { g_payments = g_payments.filter(e => e.id !== id); setStorage('fee_system_payments_v1', g_payments); renderPaymentTable(); }
+                 else if (type === 'discount') { g_discounts = g_discounts.filter(e => e.id !== id); setStorage('fee_system_discounts_v1', g_discounts); renderDiscountTable(); }
+             }
         }
 
         async function deleteStudentData(regNo) { deleteData('student', regNo); }
@@ -580,22 +579,29 @@
                     let newStudents = []; 
                     
                     json.forEach(row => { 
-                         // Normalize Keys
+                         // Normalize Keys (Flexible matching)
                         const keys = Object.keys(row);
-                        const kReg = keys.find(k => k.toLowerCase().includes('reg')) || keys[0];
-                        const kName = keys.find(k => k.toLowerCase().includes('name')) || keys[1];
-                        const kDeg = keys.find(k => k.toLowerCase().includes('degree')) || keys.find(k => k.toLowerCase().includes('prog'));
-                        const kBat = keys.find(k => k.toLowerCase().includes('batch')) || keys.find(k => k.toLowerCase().includes('sess'));
+                        
+                        // Helper to find key containing string
+                        const findKey = (search) => keys.find(k => k.toLowerCase().includes(search));
+
+                        const kReg = findKey('reg') || findKey('id'); // e.g. "Reg No", "Registration"
+                        const kName = findKey('name');
+                        const kDeg = findKey('deg') || findKey('prog'); // Degree, Program
+                        const kBat = findKey('batch') || findKey('sess'); // Batch, Session
+                        const kMob = findKey('mob') || findKey('phone');
+                        const kMail = findKey('mail');
                         
                         const reg = row[kReg]; 
+                        
                         if (reg) { 
                              newStudents.push({ 
-                                reg_no: reg, 
-                                name: toProperCase(row[kName] || ''), 
-                                degree: row[kDeg] || extractDegree(reg.toString()), 
-                                batch: row[kBat] || '', 
-                                mobile: row[keys.find(k => k.toLowerCase().includes('mob'))] || '', 
-                                email: row[keys.find(k => k.toLowerCase().includes('mail'))] || '' 
+                                reg_no: reg.toString().trim(), 
+                                name: toProperCase((row[kName] || '').toString()), 
+                                degree: (row[kDeg] || extractDegree(reg.toString())).toString().trim(), 
+                                batch: (row[kBat] || '').toString().trim(), 
+                                mobile: (row[kMob] || '').toString().trim(), 
+                                email: (row[kMail] || '').toString().trim() 
                             }); 
                         } 
                     }); 
@@ -603,11 +609,11 @@
                     if(newStudents.length > 0) { 
                         pBar.style.width = '100%'; 
                         await bulkImport('students', newStudents); 
-                        alert(`Imported ${newStudents.length} students.`);
+                        alert(`Successfully imported ${newStudents.length} students.\n\nColumns Found:\nReg: ${Object.keys(json[0]).find(k=>k.toLowerCase().includes('reg')) || 'Not Found'}\nName: ${Object.keys(json[0]).find(k=>k.toLowerCase().includes('name')) || 'Not Found'}`);
                     } else {
-                        alert("No valid rows found. Check column headers.");
+                        alert(`No valid student records found.\n\nRequired Columns: Reg No, Name\nYour Columns: ${Object.keys(json[0]).join(', ')}`);
                     }
-                } catch(err) { console.error(err); alert("Error parsing Excel."); } 
+                } catch(err) { console.error(err); alert("Error parsing Excel file. Please ensure it is a valid .xlsx file."); } 
                 document.getElementById('upload-progress-container').classList.add('hidden');
                 e.target.value = ''; 
             }; 
