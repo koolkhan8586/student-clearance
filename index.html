@@ -47,7 +47,7 @@
             </div>
         </div>
 
-        <!-- Connection Status & Config -->
+        <!-- Connection Status & Config (Improved Visibility) -->
         <div id="conn-status" class="hidden mb-4 px-4 py-3 rounded text-sm font-bold no-print border flex flex-col sm:flex-row justify-between items-center transition-all duration-300">
             <!-- Content injected by JS -->
         </div>
@@ -56,12 +56,14 @@
         <div id="config-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
             <div class="bg-white rounded-lg shadow-2xl w-full max-w-md p-6 border-2 border-red-500">
                 <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-lg font-bold text-red-700">Connection Settings</h3>
+                    <h3 class="text-lg font-bold text-red-700">⚠️ Connection Diagnostic</h3>
                     <button onclick="document.getElementById('config-modal').classList.add('hidden')" class="text-gray-500 hover:text-black">&times;</button>
                 </div>
-                <p class="text-sm text-gray-600 mb-4">The system needs to know where your <strong>api.php</strong> file is located.</p>
+                <div id="diagnostic-msg" class="text-sm text-gray-700 mb-4 bg-red-50 p-3 rounded border border-red-100 font-mono">
+                    Initializing...
+                </div>
                 
-                <label class="block text-sm font-bold mb-2">API URL</label>
+                <label class="block text-sm font-bold mb-2">API Path / URL</label>
                 <div class="flex gap-2 mb-2">
                     <input type="text" id="api_url_input" class="flex-grow border rounded p-2 font-mono text-sm" value="api.php" placeholder="http://localhost/fee_system/api.php">
                     <button onclick="testApiConnection()" class="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-2 rounded text-sm font-bold">Test</button>
@@ -69,8 +71,8 @@
                 <div id="api-test-result" class="text-xs font-mono p-2 bg-gray-100 rounded mb-4 hidden break-all max-h-32 overflow-auto"></div>
 
                 <div class="flex justify-end gap-2">
-                    <button onclick="document.getElementById('config-modal').classList.add('hidden')" class="px-4 py-2 bg-gray-200 rounded text-sm">Close</button>
-                    <button onclick="saveApiConfig()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-bold">Save & Load</button>
+                    <button onclick="document.getElementById('config-modal').classList.add('hidden')" class="px-4 py-2 bg-gray-200 rounded text-sm">Ignore & Use Local</button>
+                    <button onclick="saveApiConfig()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-bold">Save & Reconnect</button>
                 </div>
             </div>
         </div>
@@ -177,7 +179,7 @@
                     </div>
                 </div>
                 <div id="upload-progress-container" class="hidden mb-4"><div class="flex justify-between text-xs mb-1 text-gray-600"><span>Processing Upload...</span><span id="progress-text">0%</span></div><div class="w-full bg-gray-200 rounded-full h-2.5"><div id="upload-progress-bar" class="bg-blue-600 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div></div></div>
-                <div class="overflow-x-auto border rounded-lg"><table class="w-full text-sm text-left border-collapse border-b border-gray-200"><thead class="bg-gray-50 text-gray-700 uppercase text-xs"><tr><th class="border-b p-3 cursor-pointer" onclick="sortStudentTable('reg_no')">Reg Number</th><th class="border-b p-3 cursor-pointer" onclick="sortStudentTable('name')">Name</th><th class="border-b p-3 cursor-pointer" onclick="sortStudentTable('degree')">Degree</th><th class="border-b p-3 cursor-pointer" onclick="sortStudentTable('batch')">Batch</th><th class="border-b p-3 text-center">Actions</th></tr></thead><tbody id="studentsTableBody"><tr><td colspan="5" class="p-4 text-center text-gray-500">No records found.</td></tr></tbody></table></div>
+                <div class="overflow-x-auto border rounded-lg"><table class="w-full text-sm text-left border-collapse border-b border-gray-200"><thead class="bg-gray-50 text-gray-700 uppercase text-xs"><tr><th class="border-b p-3 cursor-pointer" onclick="sortStudentTable('reg_no')">Reg Number</th><th class="border-b p-3 cursor-pointer" onclick="sortStudentTable('name')">Name</th><th class="border-b p-3 cursor-pointer" onclick="sortStudentTable('degree')">Degree</th><th class="border-b p-3 cursor-pointer" onclick="sortStudentTable('batch')">Batch</th><th class="border-b p-3 text-center">Actions</th></tr></thead><tbody id="studentsTableBody"><tr><td colspan="5" class="p-4 text-center text-gray-500">Loading...</td></tr></tbody></table></div>
             </div>
             <div id="student-form-container" class="hidden bg-white rounded-lg shadow-lg p-6 max-w-2xl mx-auto mt-4"><div class="flex justify-between items-center border-b pb-4 mb-4"><h3 class="text-lg font-bold text-gray-800" id="form-title">Add New Student</h3><button onclick="hideAddForm()" class="text-gray-500 hover:text-red-500"><i class="fas fa-times"></i></button></div><form id="studentForm" onsubmit="saveStudentList(event)" class="space-y-4"><input type="hidden" id="edit_index" value="-1"><div class="grid grid-cols-1 md:grid-cols-2 gap-4"><div class="col-span-1 md:col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Registration Number</label><input type="text" name="reg_no" id="input_reg_no" oninput="autoFillDegree(this.value)" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div class="col-span-1 md:col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Full Name</label><input type="text" name="name" id="input_name" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div><label class="block text-sm font-medium text-gray-700 mb-1">Degree Program</label><input type="text" name="degree" id="input_degree" class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div><label class="block text-sm font-medium text-gray-700 mb-1">Batch (Session)</label><input type="text" name="batch" id="input_batch" class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div class="col-span-1 md:col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Mobile</label><input type="text" name="mobile" id="input_mobile" class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div class="col-span-1 md:col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Email</label><input type="email" name="email" id="input_email" class="w-full border border-gray-300 rounded-lg px-4 py-2"></div></div><div class="pt-4 flex gap-2"><button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg">Save Student</button><button type="button" onclick="hideAddForm()" class="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg">Cancel</button></div></form></div>
         </div>
@@ -455,17 +457,7 @@
                 }
 
                 let json;
-                try { 
-                    // Clean dirty JSON
-                     const firstBrace = text.indexOf('{');
-                    const firstBracket = text.indexOf('[');
-                    let start = -1;
-                    if (firstBrace !== -1 && firstBracket !== -1) start = Math.min(firstBrace, firstBracket);
-                    else if (firstBrace !== -1) start = firstBrace;
-                    else if (firstBracket !== -1) start = firstBracket;
-                    const cleanText = start !== -1 ? text.substring(start) : text;
-                    json = JSON.parse(cleanText); 
-                } catch (e) { throw new Error("Invalid JSON"); }
+                try { json = JSON.parse(text); } catch (e) { throw new Error("Invalid JSON"); }
                 
                 if (json.status === 'success') {
                     USE_API = true;
