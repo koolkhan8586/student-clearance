@@ -58,14 +58,14 @@
                     <h3 class="text-lg font-bold text-red-700">Connection Failed</h3>
                     <button onclick="document.getElementById('config-modal').classList.add('hidden')" class="text-gray-500 hover:text-black">&times;</button>
                 </div>
-                <p class="text-sm text-gray-600 mb-4">The system cannot connect to the database. Please check the API URL.</p>
+                <p class="text-sm text-gray-600 mb-4">The system tried to connect to the database but failed. Please verify the API path and database credentials.</p>
                 
                 <label class="block text-sm font-bold mb-2">API URL</label>
                 <div class="flex gap-2 mb-2">
                     <input type="text" id="api_url_input" class="flex-grow border rounded p-2 font-mono text-sm" value="api.php" placeholder="http://localhost/fee_system/api.php">
                     <button onclick="testApiConnection()" class="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-2 rounded text-sm font-bold">Test</button>
                 </div>
-                <div id="api-test-result" class="text-xs font-mono p-2 bg-gray-100 rounded mb-4 hidden"></div>
+                <div id="api-test-result" class="text-xs font-mono p-2 bg-gray-100 rounded mb-4 hidden break-all max-h-24 overflow-auto"></div>
 
                 <div class="flex justify-end gap-2">
                     <button onclick="document.getElementById('config-modal').classList.add('hidden')" class="px-4 py-2 bg-gray-200 rounded text-sm">Cancel</button>
@@ -446,8 +446,8 @@
                 
                 if (json.status === 'success') {
                     USE_API = true;
+                    // Load server data
                     const sData = json.data.students || [];
-                    
                     if (sData.length > 0) {
                         g_students = sData;
                         g_fees = json.data.fees || []; 
@@ -468,9 +468,22 @@
                     }
                 } 
             } catch (e) {
-                console.warn("Connection failed. Using Local Data.", e);
+                // If API fails (e.g. Access Denied), show error
+                console.warn("API Error:", e);
                 USE_API = false;
                 loadLocalData();
+
+                // Show the specific DB error in the red bar
+                const statusDiv = document.getElementById('conn-status');
+                statusDiv.classList.remove('hidden');
+                statusDiv.innerHTML = `
+                    <div class="flex justify-between w-full items-center">
+                        <span class="text-red-700 font-bold">⚠️ DB Error: ${e.message}</span>
+                        <div class="flex gap-2">
+                             <button onclick="showConfigModal()" class="bg-white text-red-700 border border-red-300 px-3 py-1 rounded hover:bg-red-50 text-xs">Fix</button>
+                             <button onclick="showDebugModal()" class="bg-gray-200 text-gray-700 px-3 py-1 rounded text-xs">Debug</button>
+                        </div>
+                    </div>`;
             } finally {
                 // FORCE RENDER
                 renderStudentTable(); 
