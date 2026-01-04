@@ -293,20 +293,66 @@
             <div id="paid-form-container" class="hidden bg-white rounded-lg shadow-lg p-6 max-w-2xl mx-auto mt-4"><div class="flex justify-between items-center border-b pb-4 mb-4"><h3 class="text-lg font-bold text-gray-800" id="paid-form-title">Add Payment</h3><button onclick="hidePaidForm()" class="text-gray-500 hover:text-red-500"><i class="fas fa-times"></i></button></div><form id="paidForm" onsubmit="savePaymentList(event)" class="space-y-4"><input type="hidden" id="paid_edit_id" value="-1"><div class="grid grid-cols-1 md:grid-cols-2 gap-4"><div class="col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Registration Number</label><input type="text" name="reg_no" id="paid_reg_no" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div class="col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Student Name</label><input type="text" name="name" id="paid_name" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div><label class="block text-sm font-medium text-gray-700 mb-1">Session Year</label><select name="year" id="paid_year" class="w-full border border-gray-300 rounded-lg px-4 py-2"><option>2023</option><option>2024</option><option>2025</option><option>2026</option></select></div><div><label class="block text-sm font-medium text-gray-700 mb-1">Semester</label><select name="semester" id="paid_sem" class="w-full border border-gray-300 rounded-lg px-4 py-2"><option>Winter</option><option>Spring</option><option>Summer</option><option>Fall</option></select></div><div><label class="block text-sm font-medium text-gray-700 mb-1">Amount Paid</label><input type="number" name="amount" id="paid_amount" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div><label class="block text-sm font-medium text-gray-700 mb-1">Date</label><input type="date" name="date" id="paid_date" class="w-full border border-gray-300 rounded-lg px-4 py-2"></div></div><div class="pt-4 flex gap-2"><button type="submit" class="flex-1 bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-4 rounded-lg">Save Payment</button><button type="button" onclick="hidePaidForm()" class="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg">Cancel</button></div></form></div>
         </div>
 
-        <!-- TAB 6: Discounts -->
+        <!-- TAB 6: Discounts (Updated with Toolbar & Modal) -->
         <div id="view-discount" class="tab-content hidden">
             <div class="bg-white rounded-lg shadow-lg p-6">
-                <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b pb-4">
-                    <div><h2 class="text-xl font-bold text-gray-800">Discount Registry</h2><p class="text-sm text-gray-500">Upload Excel with Reg Number, Name, Academic Term, Student Discount</p></div>
-                    <div class="flex gap-2">
-                        <input type="file" id="discount_excel_file" accept=".xlsx, .xls" class="hidden" onchange="handleDiscountExcelUpload(event)">
-                        <button onclick="document.getElementById('discount_excel_file').click()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm"><i class="fas fa-file-import mr-1"></i> Import Discounts</button>
-                        <button onclick="downloadDiscountTemplate()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition flex items-center text-sm"><i class="fas fa-download mr-2"></i> Template</button>
+                <!-- Toolbar -->
+                <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4">
+                    <div>
+                        <h2 class="text-xl font-bold text-gray-800">Discount Registry</h2>
+                        <p class="text-sm text-gray-500">Manage student discounts</p>
+                        <div class="mt-2 text-sm font-semibold text-purple-600 bg-purple-50 px-3 py-1 rounded-full inline-block">Total: <span id="total_discounts_count">0</span></div>
+                    </div>
+                    <div class="flex flex-col gap-3 w-full lg:w-auto">
+                        <div class="flex gap-2">
+                             <input type="file" id="discount_excel_file" accept=".xlsx, .xls" class="hidden" onchange="handleDiscountExcelUpload(event)">
+                            <button onclick="document.getElementById('discount_excel_file').click()" class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded transition flex items-center text-xs shadow-sm ml-auto"><i class="fas fa-file-import mr-1"></i> Import</button>
+                            <button onclick="downloadDiscountTemplate()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition flex items-center text-sm"><i class="fas fa-download mr-2"></i> Template</button>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="showDiscountForm()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded transition flex items-center text-sm shadow-sm" title="Add Manual"><i class="fas fa-plus"></i> Add Manual</button>
+                            <button onclick="exportDiscountsToExcel()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded transition flex items-center text-sm shadow-sm"><i class="fas fa-file-export mr-1"></i> Export</button>
+                            <button onclick="deleteAllDiscounts()" class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded transition flex items-center text-sm shadow-sm" title="Delete All"><i class="fas fa-trash-alt"></i> Delete All</button>
+                        </div>
                     </div>
                 </div>
-                <div class="overflow-x-auto max-h-[600px] overflow-y-auto">
-                    <table class="w-full text-sm text-left border-collapse border border-gray-200"><thead class="bg-purple-50 text-gray-700 uppercase text-xs sticky top-0"><tr><th class="border p-3">Reg Number</th><th class="border p-3">Name</th><th class="border p-3">Academic Term</th><th class="border p-3 text-right">Discount %</th></tr></thead><tbody id="discountTableBody"><tr><td colspan="4" class="p-4 text-center text-gray-500 italic">No records found.</td></tr></tbody></table>
+
+                <!-- Search -->
+                <div class="relative w-full mb-4">
+                    <input type="text" id="discount_list_search" placeholder="Search discounts..." onkeyup="filterDiscounts()" class="border border-gray-300 rounded px-3 py-2 pl-8 w-full text-sm focus:ring-2 focus:ring-purple-500 outline-none shadow-sm">
+                    <i class="fas fa-search absolute left-2.5 top-2.5 text-gray-400 text-xs"></i>
                 </div>
+
+                <div class="overflow-x-auto max-h-[600px] overflow-y-auto">
+                    <table class="w-full text-sm text-left border-collapse border border-gray-200"><thead class="bg-purple-50 text-gray-700 uppercase text-xs sticky top-0"><tr>
+                        <th class="border p-3 cursor-pointer" onclick="sortDiscountTable('reg_no')">Reg # <i class="fas fa-sort ml-1"></i></th>
+                        <th class="border p-3 cursor-pointer" onclick="sortDiscountTable('name')">Name <i class="fas fa-sort ml-1"></i></th>
+                        <th class="border p-3 cursor-pointer" onclick="sortDiscountTable('term')">Term <i class="fas fa-sort ml-1"></i></th>
+                        <th class="border p-3 text-right">Discount %</th>
+                        <th class="border p-3 text-center">Actions</th>
+                    </tr></thead><tbody id="discountTableBody"><tr><td colspan="5" class="p-4 text-center text-gray-500 italic">No records found.</td></tr></tbody></table>
+                </div>
+            </div>
+
+            <!-- Discount Form Modal -->
+            <div id="discount-form-container" class="hidden bg-white rounded-lg shadow-lg p-6 max-w-2xl mx-auto mt-4">
+                <div class="flex justify-between items-center border-b pb-4 mb-4">
+                    <h3 class="text-lg font-bold text-gray-800" id="discount-form-title">Add Discount</h3>
+                    <button onclick="hideDiscountForm()" class="text-gray-500 hover:text-red-500"><i class="fas fa-times"></i></button>
+                </div>
+                <form id="discountForm" onsubmit="saveDiscountList(event)" class="space-y-4">
+                    <input type="hidden" id="discount_edit_id" value="-1">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Registration Number</label><input type="text" name="reg_no" id="discount_reg_no" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div>
+                        <div class="col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Student Name</label><input type="text" name="name" id="discount_name" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div>
+                        <div><label class="block text-sm font-medium text-gray-700 mb-1">Term (e.g. Fall 2025)</label><input type="text" name="term" id="discount_term" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div>
+                        <div><label class="block text-sm font-medium text-gray-700 mb-1">Discount %</label><input type="number" name="discount" id="discount_val" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div>
+                    </div>
+                    <div class="pt-4 flex gap-2">
+                        <button type="submit" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-lg">Save Record</button>
+                        <button type="button" onclick="hideDiscountForm()" class="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg">Cancel</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -395,18 +441,32 @@
                         
                         // Re-render with server data
                         renderAll();
-                    } else {
-                         // Server is empty. Keep local data if exists.
+                    } else if(getStorage('fee_system_students_list_v2').length > 0) {
+                         // Fallback to local if server empty
                          document.getElementById('conn-status').classList.remove('hidden');
                          document.getElementById('conn-status').innerHTML = `
                             <span class="text-orange-700"><strong>Server DB Connected but Empty.</strong> Showing Local Data.</span>
                             <button onclick="syncLocalToServer()" class="ml-2 bg-blue-600 text-white px-2 py-1 rounded text-xs">Sync Now</button>`;
+                         loadLocalData();
                     }
                 } 
             } catch (e) {
                 console.warn("Connection failed. Using Local Data.", e);
                 USE_API = false;
-                // UI already rendered with local data
+                loadLocalData();
+            } finally {
+                // FORCE RENDER
+                renderStudentTable(); 
+                renderFeeDashboard(); 
+                renderEnrollmentTable(); 
+                renderDiscountTable(); 
+                renderPaymentTable();
+                
+                const saved = localStorage.getItem('active_student_session');
+                if (saved) { 
+                    try { activeStudent = JSON.parse(saved); loadActiveStudentUI(); renderClearanceTable(); } 
+                    catch(e) { console.error("Active student load error", e); }
+                }
             }
         }
 
