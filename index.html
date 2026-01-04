@@ -320,6 +320,9 @@
         function normalizeTerm(t) { return t ? t.toString().toLowerCase().replace(/[^a-z0-9]/g, '') : ""; }
 
         initData();
+        
+        // Render Immediately to clear loading state
+        renderStudentTable(); renderFeeDashboard(); renderEnrollmentTable(); renderDiscountTable(); renderPaymentTable();
 
         async function initData() {
             try {
@@ -329,11 +332,13 @@
 
                 // Check for HTML/PHP error dump
                 if (text.trim().startsWith('<')) {
-                     throw new Error("Server returned HTML instead of JSON. Check api.php configuration.");
+                     // Assume error, fallback silently
+                     console.warn("Server returned HTML, falling back to local storage");
+                     throw new Error("Invalid Server Response");
                 }
 
                 let json;
-                try { json = JSON.parse(text); } catch (e) { throw new Error(`Invalid JSON received. Response start: "${text.substring(0, 150)}..."`); }
+                try { json = JSON.parse(text); } catch (e) { throw new Error("Invalid JSON"); }
                 
                 if (json.status === 'success') {
                     USE_API = true;
@@ -377,41 +382,37 @@
 
                 } else { throw new Error(json.message || 'Unknown API error'); }
             } catch (e) {
-                console.warn("API Error:", e);
+                console.warn("API Error (Using Local Storage):", e);
                 USE_API = false;
-                const statusDiv = document.getElementById('conn-status');
-                statusDiv.classList.remove('hidden');
-                statusDiv.innerHTML = `
-                    <div class="flex justify-between w-full items-center">
-                        <div class="flex flex-col"><span class="text-red-700"><strong>Connection Error:</strong> ${e.message}</span><span class="text-xs mt-1 opacity-75">(Switched to Local Storage Mode)</span></div>
-                        <div class="flex gap-2"><button onclick="showDebugModal()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1 rounded text-xs">View Raw Error</button><button onclick="this.parentElement.parentElement.parentElement.classList.add('hidden')" class="font-bold hover:text-red-700 text-xl">&times;</button></div>
-                    </div>`;
-
                 // If API fails, initialize empty arrays if local storage is empty to prevent undefined errors
                 g_students = getStorage('fee_system_students_list_v2') || [];
                 g_fees = getStorage('fee_system_records_v6') || [];
                 g_enrollments = getStorage('fee_system_enrollments_v1') || [];
                 g_discounts = getStorage('fee_system_discounts_v1') || [];
                 g_payments = getStorage('fee_system_payments_v1') || []; 
-            }
-            
-            // Clean nulls & filter invalid rows that crash render
-            try {
-                g_students = Array.isArray(g_students) ? g_students.filter(x => x && x.reg_no) : [];
-                g_fees = Array.isArray(g_fees) ? g_fees : [];
-                g_enrollments = Array.isArray(g_enrollments) ? g_enrollments : [];
-            } catch(err) {
-                 console.error("Data cleaning error", err);
-                 g_students = []; g_fees = []; g_enrollments = [];
-            }
-            
-            // Render UI safely
-            renderStudentTable(); renderFeeDashboard(); renderEnrollmentTable(); renderDiscountTable(); renderPaymentTable();
-            
-            const saved = localStorage.getItem('active_student_session');
-            if (saved) { 
-                try { activeStudent = JSON.parse(saved); loadActiveStudentUI(); renderClearanceTable(); } 
-                catch(e) { console.error("Active student load error", e); }
+            } finally {
+                // Clean nulls & filter invalid rows that crash render
+                try {
+                    g_students = Array.isArray(g_students) ? g_students.filter(x => x && x.reg_no) : [];
+                    g_fees = Array.isArray(g_fees) ? g_fees : [];
+                    g_enrollments = Array.isArray(g_enrollments) ? g_enrollments : [];
+                } catch(err) {
+                     console.error("Data cleaning error", err);
+                     g_students = []; g_fees = []; g_enrollments = [];
+                }
+                
+                // Render UI safely - THIS MUST RUN
+                renderStudentTable(); 
+                renderFeeDashboard(); 
+                renderEnrollmentTable(); 
+                renderDiscountTable(); 
+                renderPaymentTable();
+                
+                const saved = localStorage.getItem('active_student_session');
+                if (saved) { 
+                    try { activeStudent = JSON.parse(saved); loadActiveStudentUI(); renderClearanceTable(); } 
+                    catch(e) { console.error("Active student load error", e); }
+                }
             }
         }
 
