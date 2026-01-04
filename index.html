@@ -19,7 +19,7 @@
 
         .modal { background-color: rgba(0,0,0,0.7); }
         
-        /* Report Table Styling */
+        /* Report Table Styling (Mimic Excel/PDF) */
         .report-tbl { 
             width: 100%; 
             border-collapse: collapse; 
@@ -30,7 +30,7 @@
         .report-tbl th { 
             border: 1px solid #4b5563; 
             padding: 6px 4px; 
-            background-color: #e5e7eb; 
+            background-color: #e5e7eb; /* Gray-200 */
             text-transform: uppercase; 
             font-weight: 800; 
             text-align: center;
@@ -231,14 +231,14 @@
                     <h3 class="font-bold text-gray-700 mb-2">Add New Fee Record</h3>
                     <input type="hidden" name="fee_edit_id" id="fee_edit_id" value="-1">
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                        <input type="text" name="target_degree" placeholder="Degree (e.g. BSCAF)" class="border p-2 rounded" required>
-                        <input type="text" name="target_batch" placeholder="Batch (e.g. 2023-2027)" class="border p-2 rounded" required>
-                        <select name="year" class="border p-2 rounded"><option>2023</option><option>2024</option><option>2025</option><option>2026</option></select>
-                        <select name="semester" class="border p-2 rounded"><option>Fall</option><option>Spring</option><option>Summer</option></select>
-                        <input type="number" name="tuition_fee" placeholder="Tuition Fee" class="border p-2 rounded">
-                        <input type="number" name="exam_fee" placeholder="Exam Fee" class="border p-2 rounded">
-                        <input type="number" name="reg_fee" placeholder="Reg Fee" class="border p-2 rounded">
-                        <input type="number" name="other_fee" placeholder="Other" class="border p-2 rounded">
+                        <input type="text" name="target_degree" id="fee_degree" placeholder="Degree (e.g. BSCAF)" class="border p-2 rounded" required>
+                        <input type="text" name="target_batch" id="fee_batch" placeholder="Batch (e.g. 2023-2027)" class="border p-2 rounded" required>
+                        <select name="year" id="fee_year" class="border p-2 rounded"><option>2023</option><option>2024</option><option>2025</option><option>2026</option></select>
+                        <select name="semester" id="fee_sem" class="border p-2 rounded"><option>Fall</option><option>Spring</option><option>Summer</option></select>
+                        <input type="number" name="tuition_fee" id="fee_tuition" placeholder="Tuition Fee" class="border p-2 rounded">
+                        <input type="number" name="exam_fee" id="fee_exam" placeholder="Exam Fee" class="border p-2 rounded">
+                        <input type="number" name="reg_fee" id="fee_reg" placeholder="Reg Fee" class="border p-2 rounded">
+                        <input type="number" name="other_fee" id="fee_other" placeholder="Other" class="border p-2 rounded">
                     </div>
                     <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded w-full hover:bg-green-700 font-bold">Add / Update Fee Record</button>
                 </form>
@@ -287,7 +287,7 @@
                     <table class="w-full text-sm text-left"><thead class="bg-gray-100 sticky top-0"><tr><th class="p-2 border">Reg #</th><th class="p-2 border">Name</th><th class="p-2 border">Session</th><th class="p-2 border text-right">Amount</th><th class="p-2 border text-center">Actions</th></tr></thead><tbody id="body-pa"></tbody></table>
                 </div>
             </div>
-            <div id="paid-form-container" class="hidden bg-white rounded-lg shadow-lg p-6 max-w-2xl mx-auto mt-4"><div class="flex justify-between items-center border-b pb-4 mb-4"><h3 class="text-lg font-bold">Add Payment</h3><button onclick="hidePaidForm()" class="text-red-500">x</button></div><form id="paidForm" onsubmit="savePaymentList(event)" class="space-y-4"><input type="hidden" id="paid_edit_id" value="-1"><div class="grid grid-cols-2 gap-4"><input type="text" name="reg_no" id="paid_reg_no" placeholder="Reg No" class="border p-2 rounded" required><input type="number" name="amount" id="paid_amount" placeholder="Amount" class="border p-2 rounded" required><input type="text" name="semester" id="paid_sem" placeholder="Semester (e.g. Fall 2023)" class="border p-2 rounded"><input type="date" name="date" id="paid_date" class="border p-2 rounded"></div><button type="submit" class="w-full bg-blue-600 text-white py-2 rounded">Save</button></form></div>
+            <div id="paid-form-container" class="hidden bg-white rounded-lg shadow-lg p-6 max-w-2xl mx-auto mt-4"><div class="flex justify-between items-center border-b pb-4 mb-4"><h3 class="text-lg font-bold">Add Payment</h3><button onclick="hidePaidForm()" class="text-red-500">x</button></div><form id="paidForm" onsubmit="savePaymentList(event)" class="space-y-4"><input type="hidden" id="paid_edit_id" value="-1"><div class="grid grid-cols-2 gap-4"><input type="text" name="reg_no" id="paid_reg_no" placeholder="Reg No" class="border p-2 rounded" required><input type="number" name="amount" id="paid_amount" placeholder="Amount" class="border p-2 rounded" required></div><button type="submit" class="w-full bg-blue-600 text-white py-2 rounded">Save</button></form></div>
         </div>
 
         <!-- TAB 6: Discounts -->
@@ -439,18 +439,18 @@
             if (type === 'students') {
                 tbodyId = 'body-st';
                 const f = document.getElementById('filter_student') ? document.getElementById('filter_student').value.toLowerCase() : '';
-                html = data.filter(s => !f || s.reg_no.toLowerCase().includes(f) || s.name.toLowerCase().includes(f)).slice(0,100).map(s => `<tr><td class="p-2 border">${s.reg_no}</td><td class="p-2 border">${s.name}</td><td class="p-2 border">${s.degree}</td><td class="p-2 border text-center"><button onclick="deleteItem('students','${s.reg_no}')" class="text-red-600"><i class="fas fa-trash"></i></button></td></tr>`).join('');
+                html = data.filter(s => !f || s.reg_no.toLowerCase().includes(f) || s.name.toLowerCase().includes(f)).map(s => `<tr><td class="p-2 border">${s.reg_no}</td><td class="p-2 border">${s.name}</td><td class="p-2 border">${s.degree}</td><td class="p-2 border text-center"><button onclick="editStudent('${s.reg_no}')" class="text-blue-600 mr-2"><i class="fas fa-edit"></i></button><button onclick="deleteItem('students','${s.reg_no}')" class="text-red-600"><i class="fas fa-trash"></i></button></td></tr>`).join('');
             } else if (type === 'fees') {
                 tbodyId = 'body-fe';
-                html = data.map(f => `<tr><td class="p-2 border">${f.degree}</td><td class="p-2 border">${f.batch}</td><td class="p-2 border text-right">${parseFloat(f.total_fee||0) || (parseFloat(f.tuition_fee)+parseFloat(f.exam_fee))}</td><td class="p-2 border text-center"><button onclick="deleteItem('fees','${f.id}')" class="text-red-600"><i class="fas fa-trash"></i></button></td></tr>`).join('');
+                html = data.map(f => `<tr><td class="p-2 border">${f.degree}</td><td class="p-2 border">${f.batch}</td><td class="p-2 border text-right">${parseFloat(f.total_fee||0) || (parseFloat(f.tuition_fee)+parseFloat(f.exam_fee))}</td><td class="p-2 border text-center"><button onclick="editFeeRecord('${f.id}')" class="text-blue-600 mr-2"><i class="fas fa-edit"></i></button><button onclick="deleteItem('fees','${f.id}')" class="text-red-600"><i class="fas fa-trash"></i></button></td></tr>`).join('');
             } else if (type === 'enrollments') {
                 tbodyId = 'body-en';
                 const f = document.getElementById('enrollment_list_search') ? document.getElementById('enrollment_list_search').value.toLowerCase() : '';
-                html = data.filter(e => !f || e.reg_no.toLowerCase().includes(f)).slice(0,100).map(e => `<tr><td class="p-2 border">${e.reg_no}</td><td class="p-2 border">${e.name}</td><td class="p-2 border">${e.semester}</td><td class="p-2 border text-center">${e.cr}</td><td class="p-2 border text-center"><button onclick="deleteItem('enrollments','${e.id}')" class="text-red-600"><i class="fas fa-trash"></i></button></td></tr>`).join('');
+                html = data.filter(e => !f || e.reg_no.toLowerCase().includes(f)).map(e => `<tr><td class="p-2 border">${e.reg_no}</td><td class="p-2 border">${e.name}</td><td class="p-2 border">${e.semester}</td><td class="p-2 border text-center">${e.cr}</td><td class="p-2 border text-center"><button onclick="editEnrollment('${e.id}')" class="text-blue-600 mr-2"><i class="fas fa-edit"></i></button><button onclick="deleteItem('enrollments','${e.id}')" class="text-red-600"><i class="fas fa-trash"></i></button></td></tr>`).join('');
             } else if (type === 'payments') {
                 tbodyId = 'body-pa';
                 const f = document.getElementById('paid_list_search') ? document.getElementById('paid_list_search').value.toLowerCase() : '';
-                html = data.filter(p => !f || p.reg_no.toLowerCase().includes(f)).slice(0,100).map(p => `<tr><td class="p-2 border">${p.reg_no}</td><td class="p-2 border">${p.name}</td><td class="p-2 border">${p.semester}</td><td class="p-2 border text-right">${p.amount}</td><td class="p-2 border text-center"><button onclick="deleteItem('payments','${p.id}')" class="text-red-600"><i class="fas fa-trash"></i></button></td></tr>`).join('');
+                html = data.filter(p => !f || p.reg_no.toLowerCase().includes(f)).map(p => `<tr><td class="p-2 border">${p.reg_no}</td><td class="p-2 border">${p.name}</td><td class="p-2 border">${p.semester}</td><td class="p-2 border text-right">${p.amount}</td><td class="p-2 border text-center"><button onclick="editPayment('${p.id}')" class="text-blue-600 mr-2"><i class="fas fa-edit"></i></button><button onclick="deleteItem('payments','${p.id}')" class="text-red-600"><i class="fas fa-trash"></i></button></td></tr>`).join('');
             } else if (type === 'discounts') {
                 tbodyId = 'body-di';
                 const f = document.getElementById('search_di').value.toLowerCase();
@@ -565,12 +565,19 @@
         async function addRecord(e) { // FEE
             e.preventDefault(); const fd = new FormData(e.target);
             const data = Object.fromEntries(fd.entries());
-            // Calculations
             data.tuition_fee = data.tuition_fee || (parseFloat(data.cr||0) * parseFloat(data.per_cr_fee||0));
             data.exam_fee = data.exam_fee || (parseFloat(data.total_courses||0) * parseFloat(data.exam_fee_per_subject||0));
             data.total_fee = parseFloat(data.tuition_fee) + parseFloat(data.exam_fee) + parseFloat(data.reg_fee||0) + parseFloat(data.other_fee||0);
             
-            db.fees.push(data);
+            // Local update or insert
+            if(data.fee_edit_id && data.fee_edit_id != '-1') {
+                const idx = db.fees.findIndex(f => f.id == data.fee_edit_id);
+                if(idx > -1) db.fees[idx] = { ...db.fees[idx], ...data };
+            } else {
+                 data.id = Date.now();
+                 db.fees.push(data);
+            }
+            
             if(isOnline) await fetch(`${API_URL}?action=save_fee`, {method:'POST', body:JSON.stringify(data)});
             else localStorage.setItem('fee_system_local', JSON.stringify(db));
             
@@ -589,9 +596,11 @@
                 discount: document.getElementById('md_val').value,
                 id: document.getElementById('md_id').value || Date.now()
             };
+            
             // Update Local
-            db.discounts = db.discounts.filter(d => d.id != data.id);
-            db.discounts.push(data);
+            const idx = db.discounts.findIndex(d => d.id == data.id);
+            if(idx > -1) db.discounts[idx] = data;
+            else db.discounts.push(data);
             
             // Update Server
             if(isOnline) await fetch(`${API_URL}?action=save_discount`, {method:'POST', body:JSON.stringify(data)});
@@ -610,12 +619,66 @@
             document.getElementById('md_val').value = val;
         }
 
+        // --- NEW EDIT FUNCTIONS FOR OTHER TABS ---
+        function editStudent(reg) {
+            const s = db.students.find(x => x.reg_no == reg);
+            if(!s) return;
+            document.getElementById('input_reg_no').value = s.reg_no;
+            document.getElementById('input_name').value = s.name;
+            document.getElementById('input_degree').value = s.degree;
+            document.getElementById('input_batch').value = s.batch;
+            document.getElementById('input_mobile').value = s.mobile;
+            document.getElementById('input_email').value = s.email;
+            document.getElementById('edit_index').value = "1"; // flag for edit
+            showAddForm();
+            document.getElementById('student-form-container').scrollIntoView();
+        }
+
+        function editFeeRecord(id) {
+            const f = db.fees.find(x => x.id == id);
+            if(!f) return;
+            document.getElementById('fee_edit_id').value = f.id;
+            document.getElementById('fee_degree').value = f.degree;
+            document.getElementById('fee_batch').value = f.batch;
+            document.getElementById('fee_year').value = f.year;
+            document.getElementById('fee_sem').value = f.semester;
+            document.getElementById('fee_tuition').value = f.tuition_fee;
+            document.getElementById('fee_exam').value = f.exam_fee;
+            document.getElementById('fee_reg').value = f.reg_fee;
+            document.getElementById('fee_other').value = f.other_fee;
+            document.getElementById('feeForm').scrollIntoView();
+        }
+
+        function editEnrollment(id) {
+            const e = db.enrollments.find(x => x.id == id);
+            if(!e) return;
+            document.getElementById('enroll_edit_id').value = e.id;
+            document.getElementById('enroll_reg_no').value = e.reg_no;
+            document.getElementById('enroll_name').value = e.name;
+            document.getElementById('enroll_courses').value = e.courses;
+            document.getElementById('enroll_cr').value = e.cr;
+            document.getElementById('enroll_sem').value = e.semester;
+            showEnrollmentForm();
+            document.getElementById('enrollment-form-container').scrollIntoView();
+        }
+
+        function editPayment(id) {
+            const p = db.payments.find(x => x.id == id);
+            if(!p) return;
+            document.getElementById('paid_edit_id').value = p.id;
+            document.getElementById('paid_reg_no').value = p.reg_no;
+            document.getElementById('paid_name').value = p.name;
+            document.getElementById('paid_amount').value = p.amount;
+            document.getElementById('paid_date').value = p.date;
+            showPaidForm();
+            document.getElementById('paid-form-container').scrollIntoView();
+        }
+
         async function deleteItem(type, id) {
             if(!confirm("Delete this item?")) return;
             // Map types to IDs usually found in DB
-            // Students use reg_no, others use id
             if(type === 'students') db[type] = db[type].filter(x => x.reg_no != id);
-            else db[type] = db[type].filter(x => x.id != id && x.reg_no != id);
+            else db[type] = db[type].filter(x => x.id != id);
             
             // Server Sync
             if(isOnline) {
