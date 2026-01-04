@@ -19,6 +19,7 @@
             #search-container { display: none !important; }
         }
         #debug-modal { background-color: rgba(0,0,0,0.5); }
+        #config-modal { background-color: rgba(0,0,0,0.5); }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen p-4 md:p-8 font-sans">
@@ -46,13 +47,13 @@
             </div>
         </div>
 
-        <!-- Connection Status & Config (Improved Visibility) -->
+        <!-- Connection Status & Config -->
         <div id="conn-status" class="hidden mb-4 px-4 py-3 rounded text-sm font-bold no-print border flex flex-col sm:flex-row justify-between items-center transition-all duration-300">
             <!-- Content injected by JS -->
         </div>
 
         <!-- Config Modal -->
-        <div id="config-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+        <div id="config-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
             <div class="bg-white rounded-lg shadow-2xl w-full max-w-md p-6 border-2 border-red-500">
                 <div class="flex justify-between items-center mb-4">
                     <h3 class="text-lg font-bold text-red-700">Connection Failed</h3>
@@ -409,7 +410,7 @@
                     return;
                 }
 
-                // Attempt to clean dirty JSON (e.g., stray characters before the actual JSON)
+                // Attempt to clean dirty JSON
                 const firstBrace = text.indexOf('{');
                 const firstBracket = text.indexOf('[');
                 let start = -1;
@@ -465,14 +466,13 @@
 
                 let json;
                 try { 
-                    // Attempt to clean dirty JSON
-                    const firstBrace = text.indexOf('{');
+                    // Clean dirty JSON
+                     const firstBrace = text.indexOf('{');
                     const firstBracket = text.indexOf('[');
                     let start = -1;
                     if (firstBrace !== -1 && firstBracket !== -1) start = Math.min(firstBrace, firstBracket);
                     else if (firstBrace !== -1) start = firstBrace;
                     else if (firstBracket !== -1) start = firstBracket;
-
                     const cleanText = start !== -1 ? text.substring(start) : text;
                     json = JSON.parse(cleanText); 
                 } catch (e) { throw new Error("Invalid JSON"); }
@@ -513,7 +513,7 @@
                     <div class="flex justify-between w-full items-center">
                         <span class="text-red-700 font-bold">⚠️ DB Error: ${e.message}</span>
                         <div class="flex gap-2">
-                             <button onclick="showConfigModal()" class="bg-white text-red-700 border border-red-300 px-3 py-1 rounded hover:bg-red-50 text-xs">Fix</button>
+                             <button onclick="showConfigModal()" class="bg-white text-red-700 border border-red-300 px-3 py-1 rounded hover:bg-red-50 text-xs">Config</button>
                              <button onclick="showDebugModal()" class="bg-gray-200 text-gray-700 px-3 py-1 rounded text-xs">Debug</button>
                         </div>
                     </div>`;
@@ -552,10 +552,8 @@
             }
             
             // Update Counts
-            document.getElementById('count-students').textContent = g_students.length;
-            document.getElementById('count-fees').textContent = g_fees.length;
-            document.getElementById('count-enroll').textContent = g_enrollments.length;
-            document.getElementById('count-disc').textContent = g_discounts.length;
+            document.getElementById('total_discounts_count').textContent = g_discounts.length;
+            // No IDs for other counts, add if needed or remove
         }
 
         function showDebugModal() { document.getElementById('debug-content').textContent = lastRawResponse || "No response recorded."; document.getElementById('debug-modal').classList.remove('hidden'); }
