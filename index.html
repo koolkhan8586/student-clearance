@@ -46,7 +46,6 @@
             </div>
         </div>
 
-        <!-- Connection Status Indicator -->
         <div id="conn-status" class="hidden mb-4 px-4 py-3 rounded bg-yellow-100 text-yellow-800 text-sm font-bold no-print border border-yellow-200"></div>
 
         <!-- Debug Modal -->
@@ -218,7 +217,7 @@
                     <th class="border-b p-3 cursor-pointer" onclick="sortEnrollmentTable('name')">Name <i class="fas fa-sort ml-1"></i></th>
                     <th class="border-b p-3 cursor-pointer" onclick="sortEnrollmentTable('semester')">Semester <i class="fas fa-sort ml-1"></i></th>
                     <th class="border-b p-3 text-center">Courses</th><th class="border-b p-3 text-center">Cr. Hrs</th>
-                    <th class="border-b p-3 text-center">Actions</th>
+                    <th class="border-b p-3 text-center">Actions</th> <!-- Actions Column -->
                 </tr></thead><tbody id="enrollmentTableBody"><tr><td colspan="6" class="p-4 text-center text-gray-500 italic">Loading...</td></tr></tbody></table></div>
             </div>
             
@@ -386,11 +385,12 @@
                         <div class="flex gap-2"><button onclick="showDebugModal()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1 rounded text-xs">View Raw Error</button><button onclick="this.parentElement.parentElement.parentElement.classList.add('hidden')" class="font-bold hover:text-red-700 text-xl">&times;</button></div>
                     </div>`;
 
-                g_students = getStorage('fee_system_students_list_v2');
-                g_fees = getStorage('fee_system_records_v6');
-                g_enrollments = getStorage('fee_system_enrollments_v1');
-                g_discounts = getStorage('fee_system_discounts_v1');
-                g_payments = getStorage('fee_system_payments_v1'); // Local fallback
+                // If API fails, initialize empty arrays if local storage is empty to prevent undefined errors
+                g_students = getStorage('fee_system_students_list_v2') || [];
+                g_fees = getStorage('fee_system_records_v6') || [];
+                g_enrollments = getStorage('fee_system_enrollments_v1') || [];
+                g_discounts = getStorage('fee_system_discounts_v1') || [];
+                g_payments = getStorage('fee_system_payments_v1') || []; // Local fallback
             }
             renderStudentTable(); renderFeeDashboard(); renderEnrollmentTable(); renderDiscountTable(); renderPaymentTable();
             const saved = localStorage.getItem('active_student_session');
