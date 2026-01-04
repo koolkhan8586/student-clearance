@@ -47,6 +47,9 @@
             border-top: 2px solid #000; 
             font-size: 12px;
         }
+        
+        /* Sortable Header Cursor */
+        th.cursor-pointer:hover { background-color: #d1d5db; }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen p-4 md:p-8 font-sans">
@@ -206,9 +209,20 @@
                         <button onclick="deleteAll('students')" class="bg-red-600 text-white px-3 rounded text-sm">Clear</button>
                     </div>
                 </div>
-                <input type="text" id="filter_student" onkeyup="renderTable('students')" placeholder="Filter..." class="w-full border p-2 mb-2 rounded">
+                <input type="text" id="filter_student" onkeyup="renderTable('students')" placeholder="Filter by Name, Reg, Degree..." class="w-full border p-2 mb-2 rounded">
                 <div class="h-96 overflow-y-auto border rounded">
-                    <table class="w-full text-sm text-left"><thead class="bg-gray-100 sticky top-0"><tr><th class="p-2 border">Reg #</th><th class="p-2 border">Name</th><th class="p-2 border">Degree</th><th class="p-2 border text-center">Actions</th></tr></thead><tbody id="body-st"></tbody></table>
+                    <table class="w-full text-sm text-left border-collapse border-b border-gray-200">
+                        <thead class="bg-gray-50 text-gray-700 uppercase text-xs sticky top-0">
+                            <tr>
+                                <th class="p-3 border cursor-pointer" onclick="sortStudentTable('reg_no')">Reg # <i class="fas fa-sort ml-1"></i></th>
+                                <th class="p-3 border cursor-pointer" onclick="sortStudentTable('name')">Name <i class="fas fa-sort ml-1"></i></th>
+                                <th class="p-3 border cursor-pointer" onclick="sortStudentTable('degree')">Degree <i class="fas fa-sort ml-1"></i></th>
+                                <th class="p-3 border cursor-pointer" onclick="sortStudentTable('batch')">Batch <i class="fas fa-sort ml-1"></i></th>
+                                <th class="p-3 border text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="body-st"></tbody>
+                    </table>
                 </div>
             </div>
              <!-- Student Form -->
@@ -244,7 +258,15 @@
                 </form>
 
                 <div class="h-96 overflow-y-auto border rounded">
-                    <table class="w-full text-sm text-left"><thead class="bg-gray-100 sticky top-0"><tr><th class="p-2 border">Degree</th><th class="p-2 border">Batch</th><th class="p-2 border">Session</th><th class="p-2 border text-right">Total Fee</th><th class="p-2 border text-center">Actions</th></tr></thead><tbody id="body-fe"></tbody></table>
+                    <table class="w-full text-sm text-left"><thead class="bg-gray-100 sticky top-0">
+                        <tr>
+                            <th class="p-2 border cursor-pointer" onclick="sortFeeTable('degree')">Degree <i class="fas fa-sort ml-1"></i></th>
+                            <th class="p-2 border cursor-pointer" onclick="sortFeeTable('batch')">Batch <i class="fas fa-sort ml-1"></i></th>
+                            <th class="p-2 border cursor-pointer" onclick="sortFeeTable('semester')">Session <i class="fas fa-sort ml-1"></i></th>
+                            <th class="p-2 border text-right cursor-pointer" onclick="sortFeeTable('total_fee')">Total Fee <i class="fas fa-sort ml-1"></i></th>
+                            <th class="p-2 border text-center">Actions</th>
+                        </tr>
+                    </thead><tbody id="body-fe"></tbody></table>
                 </div>
             </div>
         </div>
@@ -261,9 +283,18 @@
                         <button onclick="deleteAll('enrollments')" class="bg-red-600 text-white px-3 rounded text-sm">Clear</button>
                     </div>
                 </div>
-                <input type="text" id="filter_enrollment" onkeyup="renderTable('enrollments')" placeholder="Search..." class="w-full border p-2 mb-2 rounded">
+                <input type="text" id="filter_enrollment" onkeyup="renderTable('enrollments')" placeholder="Filter records..." class="w-full border p-2 mb-2 rounded">
                 <div class="h-96 overflow-y-auto border rounded">
-                    <table class="w-full text-sm text-left"><thead class="bg-gray-100 sticky top-0"><tr><th class="p-2 border">Reg #</th><th class="p-2 border">Name</th><th class="p-2 border">Semester</th><th class="p-2 border text-center">Cr</th><th class="p-2 border text-center">Actions</th></tr></thead><tbody id="body-en"></tbody></table>
+                    <table class="w-full text-sm text-left"><thead class="bg-gray-100 sticky top-0">
+                        <tr>
+                            <th class="p-2 border cursor-pointer" onclick="sortEnrollmentTable('reg_no')">Reg # <i class="fas fa-sort ml-1"></i></th>
+                            <th class="p-2 border cursor-pointer" onclick="sortEnrollmentTable('name')">Name <i class="fas fa-sort ml-1"></i></th>
+                            <th class="p-2 border cursor-pointer" onclick="sortEnrollmentTable('semester')">Semester <i class="fas fa-sort ml-1"></i></th>
+                            <th class="p-2 border text-center cursor-pointer" onclick="sortEnrollmentTable('courses')">Courses <i class="fas fa-sort ml-1"></i></th>
+                            <th class="p-2 border text-center cursor-pointer" onclick="sortEnrollmentTable('cr')">Cr <i class="fas fa-sort ml-1"></i></th>
+                            <th class="p-2 border text-center">Actions</th>
+                        </tr>
+                    </thead><tbody id="body-en"></tbody></table>
                 </div>
             </div>
             <!-- Enroll Form -->
@@ -282,9 +313,18 @@
                         <button onclick="deleteAll('payments')" class="bg-red-600 text-white px-3 rounded text-sm">Clear</button>
                     </div>
                 </div>
-                <input type="text" id="filter_payment" onkeyup="renderTable('payments')" placeholder="Search..." class="w-full border p-2 mb-2 rounded">
+                <input type="text" id="filter_payment" onkeyup="renderTable('payments')" placeholder="Filter payments..." class="w-full border p-2 mb-2 rounded">
                 <div class="h-96 overflow-y-auto border rounded">
-                    <table class="w-full text-sm text-left"><thead class="bg-gray-100 sticky top-0"><tr><th class="p-2 border">Reg #</th><th class="p-2 border">Name</th><th class="p-2 border">Session</th><th class="p-2 border text-right">Amount</th><th class="p-2 border text-center">Actions</th></tr></thead><tbody id="body-pa"></tbody></table>
+                    <table class="w-full text-sm text-left"><thead class="bg-gray-100 sticky top-0">
+                        <tr>
+                            <th class="p-2 border cursor-pointer" onclick="sortPaidTable('reg_no')">Reg # <i class="fas fa-sort ml-1"></i></th>
+                            <th class="p-2 border cursor-pointer" onclick="sortPaidTable('name')">Name <i class="fas fa-sort ml-1"></i></th>
+                            <th class="p-2 border cursor-pointer" onclick="sortPaidTable('semester')">Session <i class="fas fa-sort ml-1"></i></th>
+                            <th class="p-2 border text-right cursor-pointer" onclick="sortPaidTable('amount')">Amount <i class="fas fa-sort ml-1"></i></th>
+                            <th class="p-2 border text-center cursor-pointer" onclick="sortPaidTable('date')">Date <i class="fas fa-sort ml-1"></i></th>
+                            <th class="p-2 border text-center">Actions</th>
+                        </tr>
+                    </thead><tbody id="body-pa"></tbody></table>
                 </div>
             </div>
             <div id="paid-form-container" class="hidden bg-white rounded-lg shadow-lg p-6 max-w-2xl mx-auto mt-4"><div class="flex justify-between items-center border-b pb-4 mb-4"><h3 class="text-lg font-bold">Add Payment</h3><button onclick="hidePaidForm()" class="text-red-500">x</button></div><form id="paidForm" onsubmit="savePaymentList(event)" class="space-y-4"><input type="hidden" id="paid_edit_id" value="-1"><div class="grid grid-cols-2 gap-4"><input type="text" name="reg_no" id="paid_reg_no" placeholder="Reg No" class="border p-2 rounded" required><input type="number" name="amount" id="paid_amount" placeholder="Amount" class="border p-2 rounded" required></div><button type="submit" class="w-full bg-blue-600 text-white py-2 rounded">Save</button></form></div>
@@ -303,9 +343,17 @@
                         <button onclick="deleteAll('discounts')" class="bg-red-600 text-white px-3 py-1 rounded text-sm"><i class="fas fa-trash"></i> Clear</button>
                     </div>
                 </div>
-                <input type="text" id="search_di" onkeyup="renderTable('discounts')" placeholder="Search..." class="w-full border p-2 mb-4 rounded">
+                <input type="text" id="filter_discount" onkeyup="renderTable('discounts')" placeholder="Filter discounts..." class="w-full border p-2 mb-4 rounded">
                 <div class="h-96 overflow-y-auto border rounded">
-                    <table class="w-full text-sm text-left"><thead class="bg-purple-50 sticky top-0"><tr><th class="p-2 border cursor-pointer">Reg #</th><th class="p-2 border">Name</th><th class="p-2 border">Term</th><th class="p-2 border text-right">Disc %</th><th class="p-2 border text-center">Act</th></tr></thead><tbody id="body-di"></tbody></table>
+                    <table class="w-full text-sm text-left"><thead class="bg-purple-50 sticky top-0">
+                        <tr>
+                            <th class="p-2 border cursor-pointer" onclick="sortDiscountTable('reg_no')">Reg # <i class="fas fa-sort ml-1"></i></th>
+                            <th class="p-2 border cursor-pointer" onclick="sortDiscountTable('name')">Name <i class="fas fa-sort ml-1"></i></th>
+                            <th class="p-2 border cursor-pointer" onclick="sortDiscountTable('term')">Term <i class="fas fa-sort ml-1"></i></th>
+                            <th class="p-2 border text-right cursor-pointer" onclick="sortDiscountTable('discount')">Disc % <i class="fas fa-sort ml-1"></i></th>
+                            <th class="p-2 border text-center">Act</th>
+                        </tr>
+                    </thead><tbody id="body-di"></tbody></table>
                 </div>
             </div>
              <!-- Discount Modal -->
@@ -442,19 +490,19 @@
                 html = data.filter(s => !f || s.reg_no.toLowerCase().includes(f) || s.name.toLowerCase().includes(f)).map(s => `<tr><td class="p-2 border">${s.reg_no}</td><td class="p-2 border">${s.name}</td><td class="p-2 border">${s.degree}</td><td class="p-2 border text-center"><button onclick="editStudent('${s.reg_no}')" class="text-blue-600 mr-2"><i class="fas fa-edit"></i></button><button onclick="deleteItem('students','${s.reg_no}')" class="text-red-600"><i class="fas fa-trash"></i></button></td></tr>`).join('');
             } else if (type === 'fees') {
                 tbodyId = 'body-fe';
-                html = data.map(f => `<tr><td class="p-2 border">${f.degree}</td><td class="p-2 border">${f.batch}</td><td class="p-2 border text-right">${parseFloat(f.total_fee||0) || (parseFloat(f.tuition_fee)+parseFloat(f.exam_fee))}</td><td class="p-2 border text-center"><button onclick="editFeeRecord('${f.id}')" class="text-blue-600 mr-2"><i class="fas fa-edit"></i></button><button onclick="deleteItem('fees','${f.id}')" class="text-red-600"><i class="fas fa-trash"></i></button></td></tr>`).join('');
+                html = data.map(f => `<tr><td class="p-2 border">${f.degree}</td><td class="p-2 border">${f.batch}</td><td class="p-2 border">${f.semester} ${f.year}</td><td class="p-2 border text-right">${parseFloat(f.total_fee||0) || (parseFloat(f.tuition_fee)+parseFloat(f.exam_fee))}</td><td class="p-2 border text-center"><button onclick="editFeeRecord('${f.id}')" class="text-blue-600 mr-2"><i class="fas fa-edit"></i></button><button onclick="deleteItem('fees','${f.id}')" class="text-red-600"><i class="fas fa-trash"></i></button></td></tr>`).join('');
             } else if (type === 'enrollments') {
                 tbodyId = 'body-en';
                 const f = document.getElementById('enrollment_list_search') ? document.getElementById('enrollment_list_search').value.toLowerCase() : '';
-                html = data.filter(e => !f || e.reg_no.toLowerCase().includes(f)).map(e => `<tr><td class="p-2 border">${e.reg_no}</td><td class="p-2 border">${e.name}</td><td class="p-2 border">${e.semester}</td><td class="p-2 border text-center">${e.cr}</td><td class="p-2 border text-center"><button onclick="editEnrollment('${e.id}')" class="text-blue-600 mr-2"><i class="fas fa-edit"></i></button><button onclick="deleteItem('enrollments','${e.id}')" class="text-red-600"><i class="fas fa-trash"></i></button></td></tr>`).join('');
+                html = data.filter(e => !f || e.reg_no.toLowerCase().includes(f) || e.name.toLowerCase().includes(f)).map(e => `<tr><td class="p-2 border">${e.reg_no}</td><td class="p-2 border">${e.name}</td><td class="p-2 border">${e.semester}</td><td class="p-2 border text-center">${e.courses}</td><td class="p-2 border text-center">${e.cr}</td><td class="p-2 border text-center"><button onclick="editEnrollment('${e.id}')" class="text-blue-600 mr-2"><i class="fas fa-edit"></i></button><button onclick="deleteItem('enrollments','${e.id}')" class="text-red-600"><i class="fas fa-trash"></i></button></td></tr>`).join('');
             } else if (type === 'payments') {
                 tbodyId = 'body-pa';
                 const f = document.getElementById('paid_list_search') ? document.getElementById('paid_list_search').value.toLowerCase() : '';
-                html = data.filter(p => !f || p.reg_no.toLowerCase().includes(f)).map(p => `<tr><td class="p-2 border">${p.reg_no}</td><td class="p-2 border">${p.name}</td><td class="p-2 border">${p.semester}</td><td class="p-2 border text-right">${p.amount}</td><td class="p-2 border text-center"><button onclick="editPayment('${p.id}')" class="text-blue-600 mr-2"><i class="fas fa-edit"></i></button><button onclick="deleteItem('payments','${p.id}')" class="text-red-600"><i class="fas fa-trash"></i></button></td></tr>`).join('');
+                html = data.filter(p => !f || p.reg_no.toLowerCase().includes(f) || p.name.toLowerCase().includes(f)).map(p => `<tr><td class="p-2 border">${p.reg_no}</td><td class="p-2 border">${p.name}</td><td class="p-2 border">${p.semester}</td><td class="p-2 border text-right">${p.amount}</td><td class="p-2 border text-center">${p.date}</td><td class="p-2 border text-center"><button onclick="editPayment('${p.id}')" class="text-blue-600 mr-2"><i class="fas fa-edit"></i></button><button onclick="deleteItem('payments','${p.id}')" class="text-red-600"><i class="fas fa-trash"></i></button></td></tr>`).join('');
             } else if (type === 'discounts') {
                 tbodyId = 'body-di';
-                const f = document.getElementById('search_di').value.toLowerCase();
-                html = data.filter(d => !f || d.reg_no.toLowerCase().includes(f)).map(d => `
+                const f = document.getElementById('filter_discount') ? document.getElementById('filter_discount').value.toLowerCase() : '';
+                html = data.filter(d => !f || d.reg_no.toLowerCase().includes(f) || d.name.toLowerCase().includes(f)).map(d => `
                     <tr>
                         <td class="p-2 border">${d.reg_no}</td>
                         <td class="p-2 border">${d.name}</td>
@@ -471,6 +519,18 @@
             const el = document.getElementById(tbodyId);
             if(el) el.innerHTML = html || `<tr><td colspan="6" class="p-4 text-center italic text-gray-400">No records found.</td></tr>`;
         }
+        
+        let sortDir = 1;
+        function sortStudentTable(k) { sortDir *= -1; db.students.sort((a,b) => (a[k] > b[k] ? 1 : -1) * sortDir); renderTable('students'); }
+        function sortFeeTable(k) { sortDir *= -1; db.fees.sort((a,b) => (a[k] > b[k] ? 1 : -1) * sortDir); renderTable('fees'); }
+        function sortEnrollmentTable(k) { sortDir *= -1; db.enrollments.sort((a,b) => (a[k] > b[k] ? 1 : -1) * sortDir); renderTable('enrollments'); }
+        function sortPaidTable(k) { sortDir *= -1; db.payments.sort((a,b) => (a[k] > b[k] ? 1 : -1) * sortDir); renderTable('payments'); }
+        function sortDiscountTable(k) { sortDir *= -1; db.discounts.sort((a,b) => (a[k] > b[k] ? 1 : -1) * sortDir); renderTable('discounts'); }
+        
+        function filterDiscounts() { renderTable('discounts'); }
+        function filterEnrollments() { renderTable('enrollments'); }
+        function filterPayments() { renderTable('payments'); }
+
 
         // --- SEARCH CORE LOGIC ---
         function searchStudentByRegNo() {
