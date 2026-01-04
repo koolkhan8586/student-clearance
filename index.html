@@ -46,7 +46,7 @@
             </div>
         </div>
 
-        <div id="conn-status" class="hidden mb-4 px-4 py-2 rounded bg-yellow-100 text-yellow-800 text-sm font-bold no-print flex flex-col justify-center items-center border border-yellow-200"></div>
+        <div id="conn-status" class="hidden mb-4 px-4 py-3 rounded bg-yellow-100 text-yellow-800 text-sm font-bold no-print flex flex-col justify-center items-center border border-yellow-200"></div>
 
         <!-- Debug Modal -->
         <div id="debug-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -278,9 +278,7 @@
                         <button onclick="downloadDiscountTemplate()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition flex items-center text-sm"><i class="fas fa-download mr-2"></i> Template</button>
                     </div>
                 </div>
-                <div class="overflow-x-auto max-h-[600px] overflow-y-auto">
-                    <table class="w-full text-sm text-left border-collapse border border-gray-200"><thead class="bg-purple-50 text-gray-700 uppercase text-xs sticky top-0"><tr><th class="border p-3">Reg Number</th><th class="border p-3">Name</th><th class="border p-3">Academic Term</th><th class="border p-3 text-right">Discount %</th></tr></thead><tbody id="discountTableBody"><tr><td colspan="4" class="p-4 text-center text-gray-500 italic">Loading...</td></tr></tbody></table>
-                </div>
+                <div class="overflow-x-auto max-h-[600px] overflow-y-auto"><table class="w-full text-sm text-left border-collapse border border-gray-200"><thead class="bg-purple-50 text-gray-700 uppercase text-xs sticky top-0"><tr><th class="border p-3">Reg Number</th><th class="border p-3">Name</th><th class="border p-3">Academic Term</th><th class="border p-3 text-right">Discount %</th></tr></thead><tbody id="discountTableBody"><tr><td colspan="4" class="p-4 text-center text-gray-500 italic">Loading...</td></tr></tbody></table></div>
             </div>
         </div>
     </div>
@@ -323,7 +321,7 @@
 
         async function initData() {
             try {
-                const res = await fetch(`${API_URL}?action=fetch_all`);
+                const res = await fetch(`${API_URL}?action=fetch_all&t=${new Date().getTime()}`);
                 const text = await res.text();
                 lastRawResponse = text; 
 
@@ -332,23 +330,46 @@
                 
                 if (json.status === 'success') {
                     USE_API = true;
-                    g_students = json.data.students || [];
-                    g_fees = json.data.fees || [];
-                    g_enrollments = json.data.enrollments || [];
-                    g_discounts = json.data.discounts || [];
-                    g_payments = json.data.payments || []; 
-                    
-                    // Check migration
+                    // Load server data
+                    const serverStudents = json.data.students || [];
+                    const serverFees = json.data.fees || []; // Note key mismatch check: api.php returns 'fees' for 'fee_structure'
+                    const serverEnrollments = json.data.enrollments || [];
+                    const serverDiscounts = json.data.discounts || [];
+                    const serverPayments = json.data.payments || [];
+
+                    // Check if Server is empty but Local has data
                     const localStudents = getStorage('fee_system_students_list_v2');
-                    if (g_students.length === 0 && localStudents.length > 0) {
+                    
+                    if (serverStudents.length === 0 && localStudents.length > 0) {
+                        // HYBRID MODE: Server is empty, User has local data. 
+                        // Show Local Data but prompt to Sync.
+                        console.warn("Server empty, loading local data for view.");
+                        g_students = localStudents;
+                        g_fees = getStorage('fee_system_records_v6');
+                        g_enrollments = getStorage('fee_system_enrollments_v1');
+                        g_discounts = getStorage('fee_system_discounts_v1');
+                        g_payments = getStorage('fee_system_payments_v1');
+                        
                         document.getElementById('conn-status').classList.remove('hidden');
                         document.getElementById('conn-status').innerHTML = `
-                             <div class="flex justify-between w-full items-center">
-                                <div class="flex flex-col"><span class="text-green-700"><strong>Connected to Database (Empty)</strong>. Local data found.</span></div>
-                                <div class="flex gap-2"><button onclick="syncLocalToServer()" class="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 transition shadow-sm"><i class="fas fa-cloud-upload-alt mr-1"></i> Sync Local to Server</button></div>
+                             <div class="flex flex-col sm:flex-row justify-between w-full items-center gap-2">
+                                <div class="flex flex-col"><span class="text-orange-700"><strong>⚠️ database is empty</strong>. Viewing local data.</span></div>
+                                <div class="flex gap-2">
+                                    <button onclick="syncLocalToServer()" class="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 transition shadow-sm font-bold animate-pulse"><i class="fas fa-cloud-upload-alt mr-1"></i> Sync Data to Server</button>
+                                </div>
                             </div>
                         `;
+                        // Important: Set USE_API to false temporarily so edits update the local view until synced? 
+                        // No, let's keep USE_API true but warn them. Actually, if they add a student now, it goes to server (ID 1), while local has IDs... complex.
+                        // Simplest: Force them to sync or stay in local mode.
+                        USE_API = false; // Stay local until synced
                     } else {
+                        // Normal Server Mode
+                        g_students = serverStudents;
+                        g_fees = serverFees;
+                        g_enrollments = serverEnrollments;
+                        g_discounts = serverDiscounts;
+                        g_payments = serverPayments;
                         document.getElementById('conn-status').classList.add('hidden');
                     }
 
@@ -368,7 +389,7 @@
                 g_fees = getStorage('fee_system_records_v6');
                 g_enrollments = getStorage('fee_system_enrollments_v1');
                 g_discounts = getStorage('fee_system_discounts_v1');
-                g_payments = getStorage('fee_system_payments_v1'); // Local fallback
+                g_payments = getStorage('fee_system_payments_v1');
             }
             renderStudentTable(); renderFeeDashboard(); renderEnrollmentTable(); renderDiscountTable(); renderPaymentTable();
             const saved = localStorage.getItem('active_student_session');
@@ -421,8 +442,16 @@
                     if(data.id) g_enrollments = g_enrollments.filter(x=>x.id!=data.id);
                     g_enrollments.push(data); setStorage('fee_system_enrollments_v1', g_enrollments); 
                 }
-                else if (type === 'payment') { if(data.id) g_payments = g_payments.filter(x=>x.id!=data.id); g_payments.push(data); setStorage('fee_system_payments_v1', g_payments); }
-                else if (type === 'discount') { if(data.id) g_discounts = g_discounts.filter(x=>x.id!=data.id); g_discounts.push(data); setStorage('fee_system_discounts_v1', g_discounts); }
+                else if (type === 'payment') { 
+                    if(data.id && data.id !== "-1") g_payments = g_payments.filter(x=>x.id!=data.id);
+                    if(!data.id || data.id === "-1") data.id = Date.now().toString();
+                    g_payments.push(data); setStorage('fee_system_payments_v1', g_payments); 
+                }
+                else if (type === 'discount') { 
+                    if(data.id && data.id !== "-1") g_discounts = g_discounts.filter(x=>x.id!=data.id);
+                    if(!data.id || data.id === "-1") data.id = Date.now().toString();
+                    g_discounts.push(data); setStorage('fee_system_discounts_v1', g_discounts); 
+                }
                 return { status: 'success' };
             }
         }
@@ -465,8 +494,6 @@
             if (USE_API) { await fetch(`${API_URL}?action=delete_all_payments`, { method: 'POST' }); await initData(); } 
             else { g_payments = []; setStorage('fee_system_payments_v1', []); renderPaymentTable(); }
         }
-        
-        // NEW DELETE ALL FEES FUNCTION
         async function deleteAllFeesData() {
             if (USE_API) { await fetch(`${API_URL}?action=delete_all_fees`, { method: 'POST' }); await initData(); } 
             else { g_fees = []; setStorage('fee_system_records_v6', []); renderFeeDashboard(); }
