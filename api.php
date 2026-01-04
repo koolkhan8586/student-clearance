@@ -1,6 +1,6 @@
-v<?php
+<?php
 // api.php - Updated for user 'koolkhan'
-error_reporting(0);
+error_reporting(0); // Disable unwanted warnings
 ini_set('display_errors', 0); 
 
 header("Content-Type: application/json");
@@ -8,8 +8,7 @@ header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type");
 
-// Start output buffering to catch any stray PHP warnings/text
-ob_start();
+ob_start(); // Buffer output to catch errors
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     ob_end_clean();
@@ -17,10 +16,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
-// --- DATABASE CONFIGURATION ---
+// --- DATABASE CREDENTIALS ---
 $host = "localhost";
-$user = "koolkhan";  // Updated username
-$pass = "Mangohair@197";          // Enter password here if you have one
+$user = "koolkhan";  // username set to 'koolkhan'
+$pass = "Mangohair@197";          // <--- TYPE YOUR PASSWORD HERE inside the quotes
 $dbname = "fee_system";
 
 $conn = null;
@@ -33,7 +32,8 @@ try {
     $conn->set_charset("utf8mb4");
 } catch (Exception $e) {
     ob_end_clean();
-    echo json_encode(["status" => "error", "message" => "DB Connection Failed: " . $e->getMessage()]);
+    // Return connection error as JSON
+    echo json_encode(["status" => "error", "message" => "DB Error: " . $e->getMessage()]);
     exit;
 }
 
@@ -60,7 +60,7 @@ try {
             ];
             
             foreach($tables as $dbTable => $key) {
-                // Safely check if table exists
+                // Check if table exists
                 $check = $conn->query("SHOW TABLES LIKE '$dbTable'");
                 if($check && $check->num_rows > 0) {
                     $res = $conn->query("SELECT * FROM $dbTable");
@@ -103,7 +103,6 @@ try {
             $deg = $d['degree'] ?? $d['target_degree']; $bat = $d['batch'] ?? $d['target_batch'];
             $cols = "degree, batch, year, semester, cr, per_cr_fee, tuition_fee, total_courses, exam_fee_per_subject, exam_fee, reg_fee, other_fee, paid, total_fee";
             $vals = "'$deg','$bat',{$d['year']},'{$d['semester']}',{$d['cr']},{$d['per_cr_fee']},{$d['tuition_fee']},{$d['total_courses']},{$d['exam_fee_per_subject']},{$d['exam_fee']},{$d['reg_fee']},{$d['other_fee']},{$d['paid']},{$d['total_fee']}";
-            
             if($id && $id != '-1') {
                 $conn->query("UPDATE fee_structure SET degree='$deg', batch='$bat', year={$d['year']}, semester='{$d['semester']}', cr={$d['cr']}, per_cr_fee={$d['per_cr_fee']}, tuition_fee={$d['tuition_fee']}, total_courses={$d['total_courses']}, exam_fee_per_subject={$d['exam_fee_per_subject']}, exam_fee={$d['exam_fee']}, reg_fee={$d['reg_fee']}, other_fee={$d['other_fee']}, paid={$d['paid']}, total_fee={$d['total_fee']} WHERE id=$id");
             } else {
@@ -162,7 +161,6 @@ try {
             }
             $conn->commit();
         }
-
         elseif ($action === 'reset') {
             $conn->query("SET FOREIGN_KEY_CHECKS=0");
             $tables = ['students', 'fee_structure', 'enrollments', 'discounts', 'payments'];
@@ -173,7 +171,6 @@ try {
         ob_end_clean();
         echo json_encode(["status" => "success"]);
     }
-
 } catch (Exception $e) {
     ob_end_clean();
     echo json_encode(["status" => "error", "message" => $e->getMessage()]);
