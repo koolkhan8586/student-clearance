@@ -47,9 +47,6 @@
             border-top: 2px solid #000; 
             font-size: 12px;
         }
-        
-        /* Sortable Header Cursor */
-        th.cursor-pointer:hover { background-color: #d1d5db; }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen p-4 md:p-8 font-sans">
@@ -241,19 +238,80 @@
                     </div>
                 </div>
                 
-                 <form id="feeForm" onsubmit="addRecord(event)" class="mb-8 p-4 bg-gray-50 border rounded shadow-sm">
-                    <h3 class="font-bold text-gray-700 mb-2">Add New Fee Record</h3>
+                 <form id="feeForm" onsubmit="addRecord(event)" class="mb-8 p-4 bg-gray-50 border rounded shadow-sm space-y-4">
+                    <h3 class="font-bold text-gray-700 border-b pb-2">Add New Fee Record</h3>
                     <input type="hidden" name="fee_edit_id" id="fee_edit_id" value="-1">
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                        <input type="text" name="target_degree" id="fee_degree" placeholder="Degree (e.g. BSCAF)" class="border p-2 rounded" required>
-                        <input type="text" name="target_batch" id="fee_batch" placeholder="Batch (e.g. 2023-2027)" class="border p-2 rounded" required>
-                        <select name="year" id="fee_year" class="border p-2 rounded"><option>2023</option><option>2024</option><option>2025</option><option>2026</option></select>
-                        <select name="semester" id="fee_sem" class="border p-2 rounded"><option>Fall</option><option>Spring</option><option>Summer</option></select>
-                        <input type="number" name="tuition_fee" id="fee_tuition" placeholder="Tuition Fee" class="border p-2 rounded">
-                        <input type="number" name="exam_fee" id="fee_exam" placeholder="Exam Fee" class="border p-2 rounded">
-                        <input type="number" name="reg_fee" id="fee_reg" placeholder="Reg Fee" class="border p-2 rounded">
-                        <input type="number" name="other_fee" id="fee_other" placeholder="Other" class="border p-2 rounded">
+                    
+                    <!-- Cohort -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase">Degree Program</label>
+                            <input type="text" list="degree_list" name="target_degree" id="fee_degree" class="w-full border p-2 rounded bg-white" placeholder="Select or Type..." required>
+                            <datalist id="degree_list"></datalist>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase">Batch (Session)</label>
+                            <input type="text" list="batch_list" name="target_batch" id="fee_batch" class="w-full border p-2 rounded bg-white" placeholder="Select or Type..." required>
+                            <datalist id="batch_list"></datalist>
+                        </div>
                     </div>
+
+                    <!-- Session -->
+                    <div class="grid grid-cols-2 gap-4">
+                         <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase">Year</label>
+                            <select name="year" id="fee_year" class="w-full border p-2 rounded bg-white"><option>2023</option><option>2024</option><option>2025</option><option>2026</option></select>
+                        </div>
+                         <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase">Semester</label>
+                            <select name="semester" id="fee_sem" class="w-full border p-2 rounded bg-white"><option>Fall</option><option>Spring</option><option>Summer</option></select>
+                        </div>
+                    </div>
+
+                    <!-- Tuition Calc -->
+                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase">Total Credit Hrs</label>
+                            <input type="number" name="cr" id="cr_input" oninput="calculateTotals()" class="w-full border p-2 rounded" placeholder="0">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase text-green-700">Cost Per Cr. Hour</label>
+                            <input type="number" name="per_cr_fee" id="rate_input" oninput="calculateTotals()" class="w-full border border-green-300 bg-green-50 p-2 rounded" placeholder="0">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase">Tuition Fee</label>
+                            <input type="number" name="tuition_fee" id="fee_tuition" class="w-full border p-2 rounded bg-gray-100 font-bold" placeholder="0" readonly>
+                        </div>
+                    </div>
+
+                    <!-- Exam Calc -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase">Total Courses</label>
+                            <input type="number" name="total_courses" id="courses_input" oninput="calculateTotals()" class="w-full border p-2 rounded" placeholder="0">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase text-blue-700">Exam Fee (Per Subject)</label>
+                            <input type="number" name="exam_fee_per_subject" id="exam_rate_input" oninput="calculateTotals()" class="w-full border border-blue-300 bg-blue-50 p-2 rounded" placeholder="0">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase">Total Exam Fee</label>
+                            <input type="number" name="exam_fee" id="fee_exam" class="w-full border p-2 rounded bg-gray-100 font-bold" placeholder="0" readonly>
+                        </div>
+                    </div>
+
+                    <!-- Others -->
+                    <div class="grid grid-cols-2 gap-4">
+                         <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase">Registration Fee</label>
+                            <input type="number" name="reg_fee" id="fee_reg" class="w-full border p-2 rounded" placeholder="0">
+                        </div>
+                         <div>
+                            <label class="block text-xs font-bold text-gray-500 uppercase">Other Charges</label>
+                            <input type="number" name="other_fee" id="fee_other" class="w-full border p-2 rounded" placeholder="0">
+                        </div>
+                    </div>
+
                     <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded w-full hover:bg-green-700 font-bold">Add / Update Fee Record</button>
                 </form>
 
@@ -405,21 +463,18 @@
         document.getElementById('printDate').innerText = new Date().toLocaleString();
         
         // --- NORMALIZER ---
-        // Crucial for matching "BSCAF-01" with "BSCAF01" and "Fall-2023" with "Fall 2023"
         function norm(str) { 
             return str ? str.toString().toLowerCase().replace(/[^a-z0-9]/g, '') : ''; 
         }
 
         // --- INIT ---
         window.onload = async () => {
-            log("Attempting Server Connection...");
             try {
-                if (window.location.protocol === 'file:') { failInit("File Protocol Detected"); return; }
+                if (window.location.protocol === 'file:') { failInit("File Protocol"); return; }
                 const res = await fetch(`${API_URL}?action=fetch_all&t=${Date.now()}`);
                 const text = await res.text();
-                if (text.trim().startsWith('<')) { failInit("Invalid Server Response (HTML)"); return; }
+                if (text.trim().startsWith('<')) { failInit("Server returned HTML"); return; }
                 
-                // Smart Clean JSON
                 let cleanText = text;
                 const jsonStart = text.indexOf('{');
                 if(jsonStart > 0) cleanText = text.substring(jsonStart);
@@ -427,35 +482,22 @@
                 const json = JSON.parse(cleanText);
                 if (json.status === 'success') {
                     db = json.data;
-                    log(`✅ Connected! Loaded: ${db.students.length} Students.`, "green");
                     isOnline = true;
                     document.getElementById('live-indicator').className = "bg-green-100 text-green-600 text-xs px-2 py-0.5 rounded-full font-bold";
                     document.getElementById('live-indicator').innerText = "● Online";
-                    document.getElementById('init-spinner').classList.add('hidden');
-                    document.getElementById('init-title').innerText = "System Ready";
-                    document.getElementById('init-success-btn').classList.remove('hidden');
+                    document.getElementById('init-modal').classList.add('hidden'); // Auto hide
                     refreshUI();
-                } else {
-                    failInit(json.message);
-                }
-            } catch (e) {
-                failInit(e.message);
-            }
+                } else { failInit(json.message); }
+            } catch (e) { failInit(e.message); }
         };
 
-        function log(msg, color="white") {
-            const d = document.getElementById('init-log');
-            d.innerHTML += `<div style="color:${color}">> ${msg}</div>`;
-            d.scrollTop = d.scrollHeight;
-        }
-
         function failInit(reason) {
-            document.getElementById('init-spinner').classList.add('hidden');
             document.getElementById('init-title').innerText = "Connection Failed";
             document.getElementById('init-title').className = "text-xl font-bold text-red-600";
             document.getElementById('init-actions').classList.remove('hidden');
+            document.getElementById('init-spinner').classList.add('hidden');
             const local = localStorage.getItem('fee_system_local');
-            if(local) { db = JSON.parse(local); log("⚠️ Loaded cached local data.", "yellow"); refreshUI(); }
+            if(local) { db = JSON.parse(local); refreshUI(); }
         }
 
         function useDemoMode() {
@@ -477,6 +519,13 @@
             document.getElementById('count-en').innerText = db.enrollments.length;
             document.getElementById('count-pa').innerText = db.payments.length;
             document.getElementById('count-di').innerText = db.discounts.length;
+            
+            // Populate Datalists for Fee Form
+            const degs = [...new Set(db.students.map(s=>s.degree))].sort();
+            const bats = [...new Set(db.students.map(s=>s.batch))].sort();
+            document.getElementById('degree_list').innerHTML = degs.map(d=>`<option value="${d}">`).join('');
+            document.getElementById('batch_list').innerHTML = bats.map(b=>`<option value="${b}">`).join('');
+
             localStorage.setItem('fee_system_local', JSON.stringify(db));
         }
 
@@ -493,11 +542,11 @@
                 html = data.map(f => `<tr><td class="p-2 border">${f.degree}</td><td class="p-2 border">${f.batch}</td><td class="p-2 border">${f.semester} ${f.year}</td><td class="p-2 border text-right">${parseFloat(f.total_fee||0) || (parseFloat(f.tuition_fee)+parseFloat(f.exam_fee))}</td><td class="p-2 border text-center"><button onclick="editFeeRecord('${f.id}')" class="text-blue-600 mr-2"><i class="fas fa-edit"></i></button><button onclick="deleteItem('fees','${f.id}')" class="text-red-600"><i class="fas fa-trash"></i></button></td></tr>`).join('');
             } else if (type === 'enrollments') {
                 tbodyId = 'body-en';
-                const f = document.getElementById('enrollment_list_search') ? document.getElementById('enrollment_list_search').value.toLowerCase() : '';
+                const f = document.getElementById('filter_enrollment') ? document.getElementById('filter_enrollment').value.toLowerCase() : '';
                 html = data.filter(e => !f || e.reg_no.toLowerCase().includes(f) || e.name.toLowerCase().includes(f)).map(e => `<tr><td class="p-2 border">${e.reg_no}</td><td class="p-2 border">${e.name}</td><td class="p-2 border">${e.semester}</td><td class="p-2 border text-center">${e.courses}</td><td class="p-2 border text-center">${e.cr}</td><td class="p-2 border text-center"><button onclick="editEnrollment('${e.id}')" class="text-blue-600 mr-2"><i class="fas fa-edit"></i></button><button onclick="deleteItem('enrollments','${e.id}')" class="text-red-600"><i class="fas fa-trash"></i></button></td></tr>`).join('');
             } else if (type === 'payments') {
                 tbodyId = 'body-pa';
-                const f = document.getElementById('paid_list_search') ? document.getElementById('paid_list_search').value.toLowerCase() : '';
+                const f = document.getElementById('filter_payment') ? document.getElementById('filter_payment').value.toLowerCase() : '';
                 html = data.filter(p => !f || p.reg_no.toLowerCase().includes(f) || p.name.toLowerCase().includes(f)).map(p => `<tr><td class="p-2 border">${p.reg_no}</td><td class="p-2 border">${p.name}</td><td class="p-2 border">${p.semester}</td><td class="p-2 border text-right">${p.amount}</td><td class="p-2 border text-center">${p.date}</td><td class="p-2 border text-center"><button onclick="editPayment('${p.id}')" class="text-blue-600 mr-2"><i class="fas fa-edit"></i></button><button onclick="deleteItem('payments','${p.id}')" class="text-red-600"><i class="fas fa-trash"></i></button></td></tr>`).join('');
             } else if (type === 'discounts') {
                 tbodyId = 'body-di';
@@ -622,14 +671,24 @@
         }
 
         // --- CRUD LOGIC ---
+        
+        function calculateTotals() {
+            const cr = parseFloat(document.getElementById('cr_input').value) || 0;
+            const rate = parseFloat(document.getElementById('rate_input').value) || 0;
+            document.getElementById('fee_tuition').value = cr * rate;
+
+            const courses = parseFloat(document.getElementById('courses_input').value) || 0;
+            const examRate = parseFloat(document.getElementById('exam_rate_input').value) || 0;
+            document.getElementById('fee_exam').value = courses * examRate;
+        }
+
         async function addRecord(e) { // FEE
             e.preventDefault(); const fd = new FormData(e.target);
             const data = Object.fromEntries(fd.entries());
-            data.tuition_fee = data.tuition_fee || (parseFloat(data.cr||0) * parseFloat(data.per_cr_fee||0));
-            data.exam_fee = data.exam_fee || (parseFloat(data.total_courses||0) * parseFloat(data.exam_fee_per_subject||0));
-            data.total_fee = parseFloat(data.tuition_fee) + parseFloat(data.exam_fee) + parseFloat(data.reg_fee||0) + parseFloat(data.other_fee||0);
+            data.tuition_fee = parseFloat(data.tuition_fee) || 0;
+            data.exam_fee = parseFloat(data.exam_fee) || 0;
+            data.total_fee = data.tuition_fee + data.exam_fee + parseFloat(data.reg_fee||0) + parseFloat(data.other_fee||0);
             
-            // Local update or insert
             if(data.fee_edit_id && data.fee_edit_id != '-1') {
                 const idx = db.fees.findIndex(f => f.id == data.fee_edit_id);
                 if(idx > -1) db.fees[idx] = { ...db.fees[idx], ...data };
@@ -657,12 +716,10 @@
                 id: document.getElementById('md_id').value || Date.now()
             };
             
-            // Update Local
             const idx = db.discounts.findIndex(d => d.id == data.id);
             if(idx > -1) db.discounts[idx] = data;
             else db.discounts.push(data);
             
-            // Update Server
             if(isOnline) await fetch(`${API_URL}?action=save_discount`, {method:'POST', body:JSON.stringify(data)});
             else localStorage.setItem('fee_system_local', JSON.stringify(db));
 
@@ -702,6 +759,12 @@
             document.getElementById('fee_batch').value = f.batch;
             document.getElementById('fee_year').value = f.year;
             document.getElementById('fee_sem').value = f.semester;
+            
+            document.getElementById('cr_input').value = f.cr;
+            document.getElementById('rate_input').value = f.per_cr_fee;
+            document.getElementById('courses_input').value = f.total_courses;
+            document.getElementById('exam_rate_input').value = f.exam_fee_per_subject;
+            
             document.getElementById('fee_tuition').value = f.tuition_fee;
             document.getElementById('fee_exam').value = f.exam_fee;
             document.getElementById('fee_reg').value = f.reg_fee;
@@ -736,11 +799,9 @@
 
         async function deleteItem(type, id) {
             if(!confirm("Delete this item?")) return;
-            // Map types to IDs usually found in DB
             if(type === 'students') db[type] = db[type].filter(x => x.reg_no != id);
             else db[type] = db[type].filter(x => x.id != id);
             
-            // Server Sync
             if(isOnline) {
                  const act = type === 'students' ? 'delete_student' : (type === 'fees' ? 'delete_fee' : (type === 'enrollments' ? 'delete_enrollment' : (type === 'payments' ? 'delete_payment' : 'delete_discount')));
                  const payload = type === 'students' ? {reg_no: id} : {id: id};
