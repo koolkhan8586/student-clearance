@@ -19,7 +19,7 @@
             #search-container { display: none !important; }
         }
         #debug-modal { background-color: rgba(0,0,0,0.5); }
-        #config-modal { background-color: rgba(0,0,0,0.5); }
+        #config-modal { background-color: rgba(0,0,0,0.8); }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen p-4 md:p-8 font-sans">
@@ -56,21 +56,23 @@
         <div id="config-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
             <div class="bg-white rounded-lg shadow-2xl w-full max-w-md p-6 border-2 border-red-500">
                 <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-lg font-bold text-red-700">Connection Failed</h3>
+                    <h3 class="text-lg font-bold text-red-700">⚠️ Connection Diagnostic</h3>
                     <button onclick="document.getElementById('config-modal').classList.add('hidden')" class="text-gray-500 hover:text-black">&times;</button>
                 </div>
-                <p class="text-sm text-gray-600 mb-4">The system tried to connect to the database but failed. Please verify the API path and database credentials.</p>
+                <div id="diagnostic-msg" class="text-sm text-gray-700 mb-4 bg-red-50 p-3 rounded border border-red-100">
+                    Checking connection...
+                </div>
                 
-                <label class="block text-sm font-bold mb-2">API URL</label>
+                <label class="block text-sm font-bold mb-2">API Path / URL</label>
                 <div class="flex gap-2 mb-2">
                     <input type="text" id="api_url_input" class="flex-grow border rounded p-2 font-mono text-sm" value="api.php" placeholder="http://localhost/fee_system/api.php">
                     <button onclick="testApiConnection()" class="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-2 rounded text-sm font-bold">Test</button>
                 </div>
-                <div id="api-test-result" class="text-xs font-mono p-2 bg-gray-100 rounded mb-4 hidden break-all max-h-24 overflow-auto"></div>
+                <div id="api-test-result" class="text-xs font-mono p-2 bg-gray-100 rounded mb-4 hidden break-all max-h-32 overflow-auto"></div>
 
                 <div class="flex justify-end gap-2">
-                    <button onclick="document.getElementById('config-modal').classList.add('hidden')" class="px-4 py-2 bg-gray-200 rounded text-sm">Cancel</button>
-                    <button onclick="saveApiConfig()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-bold">Save & Retry</button>
+                    <button onclick="document.getElementById('config-modal').classList.add('hidden')" class="px-4 py-2 bg-gray-200 rounded text-sm">Ignore & Use Local</button>
+                    <button onclick="saveApiConfig()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-bold">Save & Reconnect</button>
                 </div>
             </div>
         </div>
@@ -441,6 +443,21 @@
             
             // Now attempt server connection
             try {
+                // Check if running via file://
+                if (window.location.protocol === 'file:') {
+                    const statusDiv = document.getElementById('conn-status');
+                    statusDiv.classList.remove('hidden');
+                    statusDiv.classList.remove('bg-red-100', 'text-red-800', 'border-red-200');
+                    statusDiv.classList.add('bg-yellow-100', 'text-yellow-800', 'border-yellow-200');
+                    
+                    statusDiv.innerHTML = `
+                    <div class="flex justify-between w-full items-center">
+                        <span class="font-bold">⚠️ Running in File Mode. PHP/Database features will not work. Use a server (http://localhost).</span>
+                         <button onclick="document.getElementById('conn-status').classList.add('hidden')" class="text-gray-500 hover:text-black font-bold">&times;</button>
+                    </div>`;
+                    return;
+                }
+
                 const res = await fetch(`${API_URL}?action=fetch_all&t=${new Date().getTime()}`);
                 const text = await res.text();
                 lastRawResponse = text; 
@@ -457,7 +474,7 @@
                         <div class="flex justify-between w-full items-center">
                             <span class="text-red-700 font-bold">⚠️ Connection Error: ${err}</span>
                             <div class="flex gap-2">
-                                <button onclick="showConfigModal()" class="bg-white text-red-700 border border-red-300 px-3 py-1 rounded hover:bg-red-50 text-xs">Fix Path</button>
+                                <button onclick="showConfigModal()" class="bg-white text-red-700 border border-red-300 px-3 py-1 rounded hover:bg-red-50 text-xs">Config</button>
                                 <button onclick="showDebugModal()" class="bg-gray-200 text-gray-700 px-3 py-1 rounded text-xs">Debug</button>
                             </div>
                         </div>`;
@@ -552,7 +569,7 @@
             }
             
             // Update Counts
-            document.getElementById('total_students_count').textContent = g_students.length;
+            document.getElementById('total_discounts_count').textContent = g_discounts.length;
             // No IDs for other counts, add if needed or remove
         }
 
