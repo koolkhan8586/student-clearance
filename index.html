@@ -410,17 +410,7 @@
                     return;
                 }
 
-                // Attempt to clean dirty JSON
-                const firstBrace = text.indexOf('{');
-                const firstBracket = text.indexOf('[');
-                let start = -1;
-                if (firstBrace !== -1 && firstBracket !== -1) start = Math.min(firstBrace, firstBracket);
-                else if (firstBrace !== -1) start = firstBrace;
-                else if (firstBracket !== -1) start = firstBracket;
-
-                const cleanText = start !== -1 ? text.substring(start) : text;
-
-                JSON.parse(cleanText);
+                JSON.parse(text);
                 resDiv.textContent = "Success! JSON received.";
                 resDiv.classList.remove('text-red-700');
                 resDiv.classList.add('text-green-700');
@@ -552,7 +542,7 @@
             }
             
             // Update Counts
-            document.getElementById('total_discounts_count').textContent = g_discounts.length;
+            document.getElementById('total_students_count').textContent = g_students.length;
             // No IDs for other counts, add if needed or remove
         }
 
