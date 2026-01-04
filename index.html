@@ -278,7 +278,9 @@
                         <button onclick="downloadDiscountTemplate()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition flex items-center text-sm"><i class="fas fa-download mr-2"></i> Template</button>
                     </div>
                 </div>
-                <div class="overflow-x-auto max-h-[600px] overflow-y-auto"><table class="w-full text-sm text-left border-collapse border border-gray-200"><thead class="bg-purple-50 text-gray-700 uppercase text-xs sticky top-0"><tr><th class="border p-3">Reg Number</th><th class="border p-3">Name</th><th class="border p-3">Academic Term</th><th class="border p-3 text-right">Discount %</th></tr></thead><tbody id="discountTableBody"><tr><td colspan="4" class="p-4 text-center text-gray-500 italic">Loading...</td></tr></tbody></table></div>
+                <div class="overflow-x-auto max-h-[600px] overflow-y-auto">
+                    <table class="w-full text-sm text-left border-collapse border border-gray-200"><thead class="bg-purple-50 text-gray-700 uppercase text-xs sticky top-0"><tr><th class="border p-3">Reg Number</th><th class="border p-3">Name</th><th class="border p-3">Academic Term</th><th class="border p-3 text-right">Discount %</th></tr></thead><tbody id="discountTableBody"><tr><td colspan="4" class="p-4 text-center text-gray-500 italic">Loading...</td></tr></tbody></table>
+                </div>
             </div>
         </div>
     </div>
@@ -324,6 +326,11 @@
                 const res = await fetch(`${API_URL}?action=fetch_all&t=${new Date().getTime()}`);
                 const text = await res.text();
                 lastRawResponse = text; 
+
+                // Check for HTML/PHP error dump
+                if (text.trim().startsWith('<')) {
+                     throw new Error("Server returned HTML instead of JSON. Check api.php configuration.");
+                }
 
                 let json;
                 try { json = JSON.parse(text); } catch (e) { throw new Error(`Invalid JSON received. Response start: "${text.substring(0, 150)}..."`); }
@@ -388,8 +395,15 @@
                 g_payments = getStorage('fee_system_payments_v1') || []; 
             }
             
-            // Clean nulls
-            g_students = g_students.filter(x => x && x.reg_no);
+            // Clean nulls & filter invalid rows that crash render
+            try {
+                g_students = Array.isArray(g_students) ? g_students.filter(x => x && x.reg_no) : [];
+                g_fees = Array.isArray(g_fees) ? g_fees : [];
+                g_enrollments = Array.isArray(g_enrollments) ? g_enrollments : [];
+            } catch(err) {
+                 console.error("Data cleaning error", err);
+                 g_students = []; g_fees = []; g_enrollments = [];
+            }
             
             // Render UI safely
             renderStudentTable(); renderFeeDashboard(); renderEnrollmentTable(); renderDiscountTable(); renderPaymentTable();
