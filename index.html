@@ -46,7 +46,8 @@
             </div>
         </div>
 
-        <div id="conn-status" class="hidden mb-4 px-4 py-3 rounded bg-yellow-100 text-yellow-800 text-sm font-bold no-print flex flex-col justify-center items-center border border-yellow-200"></div>
+        <!-- Connection Status Indicator -->
+        <div id="conn-status" class="hidden mb-4 px-4 py-3 rounded bg-yellow-100 text-yellow-800 text-sm font-bold no-print border border-yellow-200"></div>
 
         <!-- Debug Modal -->
         <div id="debug-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -217,7 +218,7 @@
                     <th class="border-b p-3 cursor-pointer" onclick="sortEnrollmentTable('name')">Name <i class="fas fa-sort ml-1"></i></th>
                     <th class="border-b p-3 cursor-pointer" onclick="sortEnrollmentTable('semester')">Semester <i class="fas fa-sort ml-1"></i></th>
                     <th class="border-b p-3 text-center">Courses</th><th class="border-b p-3 text-center">Cr. Hrs</th>
-                    <th class="border-b p-3 text-center">Actions</th> <!-- Actions Column -->
+                    <th class="border-b p-3 text-center">Actions</th>
                 </tr></thead><tbody id="enrollmentTableBody"><tr><td colspan="6" class="p-4 text-center text-gray-500 italic">Loading...</td></tr></tbody></table></div>
             </div>
             
@@ -389,7 +390,7 @@
                 g_fees = getStorage('fee_system_records_v6');
                 g_enrollments = getStorage('fee_system_enrollments_v1');
                 g_discounts = getStorage('fee_system_discounts_v1');
-                g_payments = getStorage('fee_system_payments_v1');
+                g_payments = getStorage('fee_system_payments_v1'); // Local fallback
             }
             renderStudentTable(); renderFeeDashboard(); renderEnrollmentTable(); renderDiscountTable(); renderPaymentTable();
             const saved = localStorage.getItem('active_student_session');
@@ -442,16 +443,8 @@
                     if(data.id) g_enrollments = g_enrollments.filter(x=>x.id!=data.id);
                     g_enrollments.push(data); setStorage('fee_system_enrollments_v1', g_enrollments); 
                 }
-                else if (type === 'payment') { 
-                    if(data.id && data.id !== "-1") g_payments = g_payments.filter(x=>x.id!=data.id);
-                    if(!data.id || data.id === "-1") data.id = Date.now().toString();
-                    g_payments.push(data); setStorage('fee_system_payments_v1', g_payments); 
-                }
-                else if (type === 'discount') { 
-                    if(data.id && data.id !== "-1") g_discounts = g_discounts.filter(x=>x.id!=data.id);
-                    if(!data.id || data.id === "-1") data.id = Date.now().toString();
-                    g_discounts.push(data); setStorage('fee_system_discounts_v1', g_discounts); 
-                }
+                else if (type === 'payment') { if(data.id) g_payments = g_payments.filter(x=>x.id!=data.id); g_payments.push(data); setStorage('fee_system_payments_v1', g_payments); }
+                else if (type === 'discount') { if(data.id) g_discounts = g_discounts.filter(x=>x.id!=data.id); g_discounts.push(data); setStorage('fee_system_discounts_v1', g_discounts); }
                 return { status: 'success' };
             }
         }
@@ -494,6 +487,8 @@
             if (USE_API) { await fetch(`${API_URL}?action=delete_all_payments`, { method: 'POST' }); await initData(); } 
             else { g_payments = []; setStorage('fee_system_payments_v1', []); renderPaymentTable(); }
         }
+        
+        // NEW DELETE ALL FEES FUNCTION
         async function deleteAllFeesData() {
             if (USE_API) { await fetch(`${API_URL}?action=delete_all_fees`, { method: 'POST' }); await initData(); } 
             else { g_fees = []; setStorage('fee_system_records_v6', []); renderFeeDashboard(); }
