@@ -401,7 +401,7 @@
                         <button onclick="deleteAll('discounts')" class="bg-red-600 text-white px-3 py-1 rounded text-sm"><i class="fas fa-trash"></i> Clear</button>
                     </div>
                 </div>
-                <input type="text" id="filter_discount" onkeyup="renderTable('discounts')" placeholder="Filter discounts..." class="w-full border p-2 mb-4 rounded">
+                <input type="text" id="search_di" onkeyup="renderTable('discounts')" placeholder="Filter discounts..." class="w-full border p-2 mb-4 rounded">
                 <div class="h-96 overflow-y-auto border rounded">
                     <table class="w-full text-sm text-left"><thead class="bg-purple-50 sticky top-0">
                         <tr>
@@ -536,7 +536,7 @@
             if (type === 'students') {
                 tbodyId = 'body-st';
                 const f = document.getElementById('filter_student') ? document.getElementById('filter_student').value.toLowerCase() : '';
-                html = data.filter(s => !f || s.reg_no.toLowerCase().includes(f) || s.name.toLowerCase().includes(f)).map(s => `<tr><td class="p-2 border">${s.reg_no}</td><td class="p-2 border">${s.name}</td><td class="p-2 border">${s.degree}</td><td class="p-2 border text-center"><button onclick="editStudent('${s.reg_no}')" class="text-blue-600 mr-2"><i class="fas fa-edit"></i></button><button onclick="deleteItem('students','${s.reg_no}')" class="text-red-600"><i class="fas fa-trash"></i></button></td></tr>`).join('');
+                html = data.filter(s => !f || s.reg_no.toLowerCase().includes(f) || s.name.toLowerCase().includes(f)).slice(0,100).map(s => `<tr><td class="p-2 border">${s.reg_no}</td><td class="p-2 border">${s.name}</td><td class="p-2 border">${s.degree}</td><td class="p-2 border text-center"><button onclick="editStudent('${s.reg_no}')" class="text-blue-600 mr-2"><i class="fas fa-edit"></i></button><button onclick="deleteItem('students','${s.reg_no}')" class="text-red-600"><i class="fas fa-trash"></i></button></td></tr>`).join('');
             } else if (type === 'fees') {
                 tbodyId = 'body-fe';
                 html = data.map(f => `<tr><td class="p-2 border">${f.degree}</td><td class="p-2 border">${f.batch}</td><td class="p-2 border">${f.semester} ${f.year}</td><td class="p-2 border text-right">${parseFloat(f.total_fee||0) || (parseFloat(f.tuition_fee)+parseFloat(f.exam_fee))}</td><td class="p-2 border text-center"><button onclick="editFeeRecord('${f.id}')" class="text-blue-600 mr-2"><i class="fas fa-edit"></i></button><button onclick="deleteItem('fees','${f.id}')" class="text-red-600"><i class="fas fa-trash"></i></button></td></tr>`).join('');
@@ -568,18 +568,6 @@
             const el = document.getElementById(tbodyId);
             if(el) el.innerHTML = html || `<tr><td colspan="6" class="p-4 text-center italic text-gray-400">No records found.</td></tr>`;
         }
-        
-        let sortDir = 1;
-        function sortStudentTable(k) { sortDir *= -1; db.students.sort((a,b) => (a[k] > b[k] ? 1 : -1) * sortDir); renderTable('students'); }
-        function sortFeeTable(k) { sortDir *= -1; db.fees.sort((a,b) => (a[k] > b[k] ? 1 : -1) * sortDir); renderTable('fees'); }
-        function sortEnrollmentTable(k) { sortDir *= -1; db.enrollments.sort((a,b) => (a[k] > b[k] ? 1 : -1) * sortDir); renderTable('enrollments'); }
-        function sortPaidTable(k) { sortDir *= -1; db.payments.sort((a,b) => (a[k] > b[k] ? 1 : -1) * sortDir); renderTable('payments'); }
-        function sortDiscountTable(k) { sortDir *= -1; db.discounts.sort((a,b) => (a[k] > b[k] ? 1 : -1) * sortDir); renderTable('discounts'); }
-        
-        function filterDiscounts() { renderTable('discounts'); }
-        function filterEnrollments() { renderTable('enrollments'); }
-        function filterPayments() { renderTable('payments'); }
-
 
         // --- SEARCH CORE LOGIC ---
         function searchStudentByRegNo() {
@@ -685,8 +673,13 @@
         async function addRecord(e) { // FEE
             e.preventDefault(); const fd = new FormData(e.target);
             const data = Object.fromEntries(fd.entries());
-            data.tuition_fee = parseFloat(data.tuition_fee) || 0;
-            data.exam_fee = parseFloat(data.exam_fee) || 0;
+            
+            // Fix keys for consistency
+            data.degree = data.target_degree;
+            data.batch = data.target_batch;
+            
+            data.tuition_fee = parseFloat(data.tuition_fee) || (parseFloat(data.cr||0) * parseFloat(data.per_cr_fee||0));
+            data.exam_fee = parseFloat(data.exam_fee) || (parseFloat(data.total_courses||0) * parseFloat(data.exam_fee_per_subject||0));
             data.total_fee = data.tuition_fee + data.exam_fee + parseFloat(data.reg_fee||0) + parseFloat(data.other_fee||0);
             
             if(data.fee_edit_id && data.fee_edit_id != '-1') {
@@ -799,9 +792,11 @@
 
         async function deleteItem(type, id) {
             if(!confirm("Delete this item?")) return;
+            // Map types to IDs usually found in DB
             if(type === 'students') db[type] = db[type].filter(x => x.reg_no != id);
             else db[type] = db[type].filter(x => x.id != id);
             
+            // Server Sync
             if(isOnline) {
                  const act = type === 'students' ? 'delete_student' : (type === 'fees' ? 'delete_fee' : (type === 'enrollments' ? 'delete_enrollment' : (type === 'payments' ? 'delete_payment' : 'delete_discount')));
                  const payload = type === 'students' ? {reg_no: id} : {id: id};
