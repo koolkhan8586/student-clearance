@@ -150,7 +150,7 @@
                     </div>
                 </div>
                 <div id="upload-progress-container" class="hidden mb-4"><div class="flex justify-between text-xs mb-1 text-gray-600"><span>Processing Upload...</span><span id="progress-text">0%</span></div><div class="w-full bg-gray-200 rounded-full h-2.5"><div id="upload-progress-bar" class="bg-blue-600 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div></div></div>
-                <div class="overflow-x-auto border rounded-lg"><table class="w-full text-sm text-left border-collapse border-b border-gray-200"><thead class="bg-gray-50 text-gray-700 uppercase text-xs"><tr><th class="border-b p-3 cursor-pointer" onclick="sortStudentTable('reg_no')">Reg Number</th><th class="border-b p-3 cursor-pointer" onclick="sortStudentTable('name')">Name</th><th class="border-b p-3 cursor-pointer" onclick="sortStudentTable('degree')">Degree</th><th class="border-b p-3 cursor-pointer" onclick="sortStudentTable('batch')">Batch</th><th class="border-b p-3 text-center">Actions</th></tr></thead><tbody id="studentsTableBody"><tr><td colspan="5" class="p-4 text-center text-gray-500">Loading...</td></tr></tbody></table></div>
+                <div class="overflow-x-auto border rounded-lg"><table class="w-full text-sm text-left border-collapse border-b border-gray-200"><thead class="bg-gray-50 text-gray-700 uppercase text-xs"><tr><th class="border-b p-3 cursor-pointer" onclick="sortStudentTable('reg_no')">Reg Number</th><th class="border-b p-3 cursor-pointer" onclick="sortStudentTable('name')">Name</th><th class="border-b p-3 cursor-pointer" onclick="sortStudentTable('degree')">Degree</th><th class="border-b p-3 cursor-pointer" onclick="sortStudentTable('batch')">Batch</th><th class="border-b p-3 text-center">Actions</th></tr></thead><tbody id="studentsTableBody"><tr><td colspan="5" class="p-4 text-center text-gray-500">No records found.</td></tr></tbody></table></div>
             </div>
             <div id="student-form-container" class="hidden bg-white rounded-lg shadow-lg p-6 max-w-2xl mx-auto mt-4"><div class="flex justify-between items-center border-b pb-4 mb-4"><h3 class="text-lg font-bold text-gray-800" id="form-title">Add New Student</h3><button onclick="hideAddForm()" class="text-gray-500 hover:text-red-500"><i class="fas fa-times"></i></button></div><form id="studentForm" onsubmit="saveStudentList(event)" class="space-y-4"><input type="hidden" id="edit_index" value="-1"><div class="grid grid-cols-1 md:grid-cols-2 gap-4"><div class="col-span-1 md:col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Registration Number</label><input type="text" name="reg_no" id="input_reg_no" oninput="autoFillDegree(this.value)" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div class="col-span-1 md:col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Full Name</label><input type="text" name="name" id="input_name" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div><label class="block text-sm font-medium text-gray-700 mb-1">Degree Program</label><input type="text" name="degree" id="input_degree" class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div><label class="block text-sm font-medium text-gray-700 mb-1">Batch (Session)</label><input type="text" name="batch" id="input_batch" class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div class="col-span-1 md:col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Mobile</label><input type="text" name="mobile" id="input_mobile" class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div class="col-span-1 md:col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Email</label><input type="email" name="email" id="input_email" class="w-full border border-gray-300 rounded-lg px-4 py-2"></div></div><div class="pt-4 flex gap-2"><button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg">Save Student</button><button type="button" onclick="hideAddForm()" class="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg">Cancel</button></div></form></div>
         </div>
@@ -187,7 +187,7 @@
                     <button type="submit" id="fee_submit_btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition shadow-md"><i class="fas fa-plus-circle mr-2"></i> Add Batch Fee Record</button>
                     <button type="button" onclick="cancelFeeEdit()" id="fee_cancel_btn" class="hidden w-full bg-gray-400 hover:bg-gray-500 text-white font-bold py-3 px-4 rounded-lg transition shadow-md mt-2">Cancel</button>
                 </form>
-                <div class="mt-8 border-t pt-4"><h4 class="text-gray-700 text-lg font-bold mb-4">Fee Record Dashboard</h4><div class="overflow-x-auto"><table class="w-full text-sm text-left border-collapse border border-gray-200"><thead class="bg-gray-100 text-gray-700 uppercase text-xs"><tr><th class="border p-2">Degree Program</th><th class="border p-2">Batch</th><th class="border p-2 text-right">Per Cr. Fee</th><th class="border p-2 text-right">Total Exam Fee</th><th class="border p-2 text-right">Others</th><th class="border p-2 text-right">Total Semester Fee</th><th class="border p-2 text-center">Session</th><th class="border p-2 text-center">Actions</th></tr></thead><tbody id="feeDashboardBody"><tr><td colspan="8" class="p-4 text-center text-gray-500 italic">Loading...</td></tr></tbody></table></div></div>
+                <div class="mt-8 border-t pt-4"><h4 class="text-gray-700 text-lg font-bold mb-4">Fee Record Dashboard</h4><div class="overflow-x-auto"><table class="w-full text-sm text-left border-collapse border border-gray-200"><thead class="bg-gray-100 text-gray-700 uppercase text-xs"><tr><th class="border p-2">Degree Program</th><th class="border p-2">Batch</th><th class="border p-2 text-right">Per Cr. Fee</th><th class="border p-2 text-right">Total Exam Fee</th><th class="border p-2 text-right">Others</th><th class="border p-2 text-right">Total Semester Fee</th><th class="border p-2 text-center">Session</th><th class="border p-2 text-center">Actions</th></tr></thead><tbody id="feeDashboardBody"><tr><td colspan="8" class="p-4 text-center text-gray-500 italic">No records found.</td></tr></tbody></table></div></div>
             </div>
         </div>
 
@@ -267,20 +267,66 @@
             <div id="paid-form-container" class="hidden bg-white rounded-lg shadow-lg p-6 max-w-2xl mx-auto mt-4"><div class="flex justify-between items-center border-b pb-4 mb-4"><h3 class="text-lg font-bold text-gray-800" id="paid-form-title">Add Payment</h3><button onclick="hidePaidForm()" class="text-gray-500 hover:text-red-500"><i class="fas fa-times"></i></button></div><form id="paidForm" onsubmit="savePaymentList(event)" class="space-y-4"><input type="hidden" id="paid_edit_id" value="-1"><div class="grid grid-cols-1 md:grid-cols-2 gap-4"><div class="col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Registration Number</label><input type="text" name="reg_no" id="paid_reg_no" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div class="col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Student Name</label><input type="text" name="name" id="paid_name" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div><label class="block text-sm font-medium text-gray-700 mb-1">Session Year</label><select name="year" id="paid_year" class="w-full border border-gray-300 rounded-lg px-4 py-2"><option>2023</option><option>2024</option><option>2025</option><option>2026</option></select></div><div><label class="block text-sm font-medium text-gray-700 mb-1">Semester</label><select name="semester" id="paid_sem" class="w-full border border-gray-300 rounded-lg px-4 py-2"><option>Winter</option><option>Spring</option><option>Summer</option><option>Fall</option></select></div><div><label class="block text-sm font-medium text-gray-700 mb-1">Amount Paid</label><input type="number" name="amount" id="paid_amount" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div><label class="block text-sm font-medium text-gray-700 mb-1">Date</label><input type="date" name="date" id="paid_date" class="w-full border border-gray-300 rounded-lg px-4 py-2"></div></div><div class="pt-4 flex gap-2"><button type="submit" class="flex-1 bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-4 rounded-lg">Save Payment</button><button type="button" onclick="hidePaidForm()" class="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg">Cancel</button></div></form></div>
         </div>
 
-        <!-- TAB 6: Discounts -->
+        <!-- TAB 6: Discounts (Updated with Toolbar & Modal) -->
         <div id="view-discount" class="tab-content hidden">
             <div class="bg-white rounded-lg shadow-lg p-6">
-                <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b pb-4">
-                    <div><h2 class="text-xl font-bold text-gray-800">Discount Registry</h2><p class="text-sm text-gray-500">Upload Excel with Reg Number, Name, Academic Term, Student Discount</p></div>
-                    <div class="flex gap-2">
-                        <input type="file" id="discount_excel_file" accept=".xlsx, .xls" class="hidden" onchange="handleDiscountExcelUpload(event)">
-                        <button onclick="document.getElementById('discount_excel_file').click()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm"><i class="fas fa-file-import mr-1"></i> Import Discounts</button>
-                        <button onclick="downloadDiscountTemplate()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition flex items-center text-sm"><i class="fas fa-download mr-2"></i> Template</button>
+                <!-- Toolbar -->
+                <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4">
+                    <div>
+                        <h2 class="text-xl font-bold text-gray-800">Discount Registry</h2>
+                        <p class="text-sm text-gray-500">Manage student discounts</p>
+                        <div class="mt-2 text-sm font-semibold text-purple-600 bg-purple-50 px-3 py-1 rounded-full inline-block">Total: <span id="total_discounts_count">0</span></div>
+                    </div>
+                    <div class="flex flex-col gap-3 w-full lg:w-auto">
+                        <div class="flex gap-2">
+                             <input type="file" id="discount_excel_file" accept=".xlsx, .xls" class="hidden" onchange="handleDiscountExcelUpload(event)">
+                            <button onclick="document.getElementById('discount_excel_file').click()" class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded transition flex items-center text-xs shadow-sm ml-auto"><i class="fas fa-file-import mr-1"></i> Import</button>
+                            <button onclick="downloadDiscountTemplate()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition flex items-center text-sm"><i class="fas fa-download mr-2"></i> Template</button>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="showDiscountForm()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded transition flex items-center text-sm shadow-sm" title="Add Manual"><i class="fas fa-plus"></i> Add Manual</button>
+                            <button onclick="exportDiscountsToExcel()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded transition flex items-center text-sm shadow-sm"><i class="fas fa-file-export mr-1"></i> Export</button>
+                            <button onclick="deleteAllDiscounts()" class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded transition flex items-center text-sm shadow-sm" title="Delete All"><i class="fas fa-trash-alt"></i> Delete All</button>
+                        </div>
                     </div>
                 </div>
-                <div class="overflow-x-auto max-h-[600px] overflow-y-auto">
-                    <table class="w-full text-sm text-left border-collapse border border-gray-200"><thead class="bg-purple-50 text-gray-700 uppercase text-xs sticky top-0"><tr><th class="border p-3">Reg Number</th><th class="border p-3">Name</th><th class="border p-3">Academic Term</th><th class="border p-3 text-right">Discount %</th></tr></thead><tbody id="discountTableBody"><tr><td colspan="4" class="p-4 text-center text-gray-500 italic">No records found.</td></tr></tbody></table>
+
+                <!-- Search -->
+                <div class="relative w-full mb-4">
+                    <input type="text" id="discount_list_search" placeholder="Search discounts..." onkeyup="filterDiscounts()" class="border border-gray-300 rounded px-3 py-2 pl-8 w-full text-sm focus:ring-2 focus:ring-purple-500 outline-none shadow-sm">
+                    <i class="fas fa-search absolute left-2.5 top-2.5 text-gray-400 text-xs"></i>
                 </div>
+
+                <div class="overflow-x-auto max-h-[600px] overflow-y-auto">
+                    <table class="w-full text-sm text-left border-collapse border border-gray-200"><thead class="bg-purple-50 text-gray-700 uppercase text-xs sticky top-0"><tr>
+                        <th class="border p-3 cursor-pointer" onclick="sortDiscountTable('reg_no')">Reg # <i class="fas fa-sort ml-1"></i></th>
+                        <th class="border p-3 cursor-pointer" onclick="sortDiscountTable('name')">Name <i class="fas fa-sort ml-1"></i></th>
+                        <th class="border p-3 cursor-pointer" onclick="sortDiscountTable('term')">Term <i class="fas fa-sort ml-1"></i></th>
+                        <th class="border p-3 text-right">Discount %</th>
+                        <th class="border p-3 text-center">Actions</th>
+                    </tr></thead><tbody id="discountTableBody"><tr><td colspan="5" class="p-4 text-center text-gray-500 italic">No records found.</td></tr></tbody></table>
+                </div>
+            </div>
+
+            <!-- Discount Form Modal -->
+            <div id="discount-form-container" class="hidden bg-white rounded-lg shadow-lg p-6 max-w-2xl mx-auto mt-4">
+                <div class="flex justify-between items-center border-b pb-4 mb-4">
+                    <h3 class="text-lg font-bold text-gray-800" id="discount-form-title">Add Discount</h3>
+                    <button onclick="hideDiscountForm()" class="text-gray-500 hover:text-red-500"><i class="fas fa-times"></i></button>
+                </div>
+                <form id="discountForm" onsubmit="saveDiscountList(event)" class="space-y-4">
+                    <input type="hidden" id="discount_edit_id" value="-1">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Registration Number</label><input type="text" name="reg_no" id="discount_reg_no" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div>
+                        <div class="col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Student Name</label><input type="text" name="name" id="discount_name" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div>
+                        <div><label class="block text-sm font-medium text-gray-700 mb-1">Term (e.g. Fall 2025)</label><input type="text" name="term" id="discount_term" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div>
+                        <div><label class="block text-sm font-medium text-gray-700 mb-1">Discount %</label><input type="number" name="discount" id="discount_val" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div>
+                    </div>
+                    <div class="pt-4 flex gap-2">
+                        <button type="submit" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-lg">Save Record</button>
+                        <button type="button" onclick="hideDiscountForm()" class="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg">Cancel</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -288,7 +334,7 @@
     <script>
         // --- API & DATA CONFIG ---
         const API_URL = 'api.php'; 
-        let USE_API = false; 
+        let USE_API = false; // Default to local
 
         let g_students = [];
         let g_fees = [];
@@ -322,10 +368,19 @@
                 // 1. Try to fetch from Server
                 const res = await fetch(`${API_URL}?action=fetch_all&t=${new Date().getTime()}`);
                 const text = await res.text();
-                
-                // 2. Validate JSON
+                lastRawResponse = text; 
+
+                // Check for HTML/PHP error dump
+                if (text.trim().startsWith('<')) {
+                     console.warn("Server returned HTML. Staying in Local Mode.");
+                     return; 
+                }
+
                 let json;
-                try { json = JSON.parse(text); } catch (e) { throw new Error("Invalid JSON"); }
+                try { json = JSON.parse(text); } catch (e) { 
+                    console.warn("Invalid JSON from server. Staying in Local Mode."); 
+                    return; 
+                }
                 
                 if (json.status === 'success') {
                     USE_API = true;
@@ -350,25 +405,19 @@
                 
                 // Show Warning if needed
                 const statusDiv = document.getElementById('conn-status');
-                // Only show if we actually have local data to differentiate
                 if (g_students.length > 0) {
                      statusDiv.classList.remove('hidden');
                      statusDiv.innerHTML = `<span class="text-orange-700"><strong>Offline Mode:</strong> Using local browser data. Server not connected.</span>`;
                 }
             } finally {
-                // FORCE RENDER IN FINALLY BLOCK TO ENSURE LOADING IS CLEARED
-                // Clean data to avoid crashes
                 try {
                     g_students = Array.isArray(g_students) ? g_students.filter(x => x && x.reg_no) : [];
                     g_fees = Array.isArray(g_fees) ? g_fees : [];
                     g_enrollments = Array.isArray(g_enrollments) ? g_enrollments : [];
                 } catch(err) { console.error("Data cleaning error", err); g_students = []; }
                 
-                // Alert specifically for the user's issue:
                 if (USE_API) {
-                     // Check if server returned 1582 students
-                     // console.log("Loaded " + g_students.length + " students from server.");
-                     // alert("Loaded " + g_students.length + " students from database."); // DEBUG LINE
+                     // alert("Loaded " + g_students.length + " students from database."); 
                 }
 
                 renderStudentTable(); 
@@ -382,11 +431,9 @@
         function showDebugModal() { document.getElementById('debug-content').textContent = lastRawResponse || "No response recorded."; document.getElementById('debug-modal').classList.remove('hidden'); }
         
         async function syncLocalToServer() {
-            // Not needed if server is primary now, but kept for manual push
             if(!confirm("Upload all local browser data to the server database?")) return;
             const s = getStorage('fee_system_students_list_v2');
             if(s.length) await bulkImport('students', s);
-            // ... (other syncs)
             alert("Sync Complete! Reloading...");
             location.reload();
         }
@@ -397,15 +444,41 @@
             if (type === 'student') { 
                 if(data.reg_no) g_students = g_students.filter(s => s.reg_no !== data.reg_no);
                 g_students.push(data); setStorage('fee_system_students_list_v2', g_students); 
-                renderStudentTable(); // Instant Render
+                renderStudentTable(); 
             }
-            // ... (similar for other types) ...
+            else if (type === 'fee') { 
+                if(!data.id || data.id === '-1') data.id = Date.now().toString();
+                g_fees = g_fees.filter(f => f.id != data.id);
+                g_fees.push(data); setStorage('fee_system_records_v6', g_fees); 
+                renderFeeDashboard();
+            }
+            else if (type === 'enrollment') { 
+                if(!data.id || data.id === "-1") data.id = Date.now().toString(); 
+                g_enrollments = g_enrollments.filter(x=>x.id!=data.id);
+                g_enrollments.push(data); setStorage('fee_system_enrollments_v1', g_enrollments); 
+                renderEnrollmentTable();
+            }
+            else if (type === 'payment') { 
+                if(!data.id || data.id === "-1") data.id = Date.now().toString();
+                g_payments = g_payments.filter(x=>x.id!=data.id);
+                g_payments.push(data); setStorage('fee_system_payments_v1', g_payments); 
+                renderPaymentTable();
+            }
+            else if (type === 'discount') { 
+                if(!data.id || data.id === "-1") data.id = Date.now().toString();
+                g_discounts = g_discounts.filter(x=>x.id!=data.id);
+                g_discounts.push(data); setStorage('fee_system_discounts_v1', g_discounts); 
+                renderDiscountTable();
+            }
 
             // Then try Server
             if (USE_API) {
                 let act = '';
                 if(type === 'student') act = 'save_student';
-                // ...
+                if(type === 'fee') act = 'save_fee';
+                if(type === 'enrollment') act = 'save_enrollment';
+                if(type === 'payment') act = 'save_payment';
+                if(type === 'discount') act = 'save_discount';
                 try {
                      await fetch(`${API_URL}?action=${act}`, { method: 'POST', body: JSON.stringify(data) });
                 } catch(e) { console.warn("Sync failed, data saved locally."); }
@@ -413,101 +486,247 @@
             return { status: 'success' };
         }
 
-        // ... (Rest of logic remains consistent)
+        async function deleteData(type, id) {
+             // 1. Local Update
+             if (type === 'student') { g_students = g_students.filter(s => s.reg_no !== id); setStorage('fee_system_students_list_v2', g_students); renderStudentTable(); } 
+             else if (type === 'fee') { g_fees = g_fees.filter(f => f.id != id); setStorage('fee_system_records_v6', g_fees); renderFeeDashboard(); } 
+             else if (type === 'enrollment') { g_enrollments = g_enrollments.filter(e => e.id !== id); setStorage('fee_system_enrollments_v1', g_enrollments); renderEnrollmentTable(); }
+             else if (type === 'payment') { g_payments = g_payments.filter(e => e.id !== id); setStorage('fee_system_payments_v1', g_payments); renderPaymentTable(); }
+             else if (type === 'discount') { g_discounts = g_discounts.filter(e => e.id !== id); setStorage('fee_system_discounts_v1', g_discounts); renderDiscountTable(); }
 
-        // --- RENDERERS ---
-        function renderStudentTable(data = g_students) {
-            document.getElementById('total_students_count').textContent = data.length;
-            const tbody = document.getElementById('studentsTableBody');
-            if(data.length === 0) { tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-500 italic">No records found.</td></tr>'; return; }
-            tbody.innerHTML = data.map((s,i) => `
-                <tr class="hover:bg-gray-50 border-b">
-                    <td class="p-3 font-medium">${s.reg_no}</td><td class="p-3">${s.name}</td>
-                    <td class="p-3">${s.degree}</td><td class="p-3">${s.batch}</td>
-                    <td class="p-3 text-center space-x-1">
-                        <button onclick="loadStudentForSearch('${s.reg_no}')" class="text-green-600 hover:text-green-800" title="Clearance"><i class="fas fa-file-invoice"></i></button>
-                        <button onclick="editStudent('${s.reg_no}')" class="text-blue-600 hover:text-blue-800" title="Edit"><i class="fas fa-edit"></i></button>
-                        <button onclick="deleteStudent('${s.reg_no}')" class="text-red-600 hover:text-red-800" title="Delete"><i class="fas fa-trash"></i></button>
-                    </td>
-                </tr>`).join('');
+             // 2. Server Sync
+             if (USE_API) {
+                 let act = ''; let body = {};
+                 if (type === 'student') { act = 'delete_student'; body = {reg_no: id}; }
+                 else if (type === 'fee') { act = 'delete_fee'; body = {id: id}; }
+                 else if (type === 'enrollment') { act = 'delete_enrollment'; body = {id: id}; }
+                 else if (type === 'payment') { act = 'delete_payment'; body = {id: id}; }
+                 else if (type === 'discount') { act = 'delete_discount'; body = {id: id}; }
+                 
+                 try { await fetch(`${API_URL}?action=${act}`, { method: 'POST', body: JSON.stringify(body) }); }
+                 catch(e) { console.warn("Sync delete failed"); }
+             } 
+        }
+
+        async function deleteStudentData(regNo) { deleteData('student', regNo); }
+        async function deleteFeeData(id) { deleteData('fee', id); }
+        async function deleteEnrollmentData(id) { deleteData('enrollment', id); }
+        async function deletePaymentData(id) { deleteData('payment', id); }
+        async function deleteDiscountData(id) { deleteData('discount', id); }
+
+        async function deleteAllStudentsData() {
+            g_students = []; setStorage('fee_system_students_list_v2', []); renderStudentTable();
+            if (USE_API) await fetch(`${API_URL}?action=delete_all_students`, { method: 'POST' }); 
+        }
+        async function deleteAllEnrollmentsData() {
+             g_enrollments = []; setStorage('fee_system_enrollments_v1', []); renderEnrollmentTable(); 
+            if (USE_API) await fetch(`${API_URL}?action=delete_all_enrollments`, { method: 'POST' }); 
+        }
+        async function deleteAllPaymentsData() {
+             g_payments = []; setStorage('fee_system_payments_v1', []); renderPaymentTable(); 
+            if (USE_API) await fetch(`${API_URL}?action=delete_all_payments`, { method: 'POST' }); 
         }
         
-        // ... (Other renderers)
+        async function deleteAllFeesData() {
+             g_fees = []; setStorage('fee_system_records_v6', []); renderFeeDashboard(); 
+            if (USE_API) await fetch(`${API_URL}?action=delete_all_fees`, { method: 'POST' }); 
+        }
+         async function deleteAllDiscountsData() {
+             g_discounts = []; setStorage('fee_system_discounts_v1', []); renderDiscountTable(); 
+            if (USE_API) await fetch(`${API_URL}?action=delete_all_discounts`, { method: 'POST' }); 
+        }
 
-        // ... (Event Handlers)
-        // ... (Helpers)
+        async function bulkImport(type, arr) {
+            // Local Update
+            if(type==='students') { g_students=[...g_students,...arr]; setStorage('fee_system_students_list_v2', g_students); }
+            if(type==='enrollments') { 
+                const toAdd = arr.map(e => ({...e, id: Date.now() + Math.random()}));
+                g_enrollments=[...g_enrollments,...toAdd]; setStorage('fee_system_enrollments_v1', g_enrollments); 
+            }
+            if(type==='discounts') { 
+                 const toAdd = arr.map(d => ({...d, id: Date.now() + Math.random()}));
+                g_discounts=[...g_discounts,...toAdd]; setStorage('fee_system_discounts_v1', g_discounts); 
+            }
+            if(type==='payments') { 
+                const toAdd = arr.map(p => ({...p, id: Date.now() + Math.random()}));
+                g_payments=[...g_payments,...toAdd]; setStorage('fee_system_payments_v1', g_payments); 
+            }
+            if(type==='fees') { 
+                const toAdd = arr.map(f => ({...f, id: Date.now() + Math.random()}));
+                g_fees=[...g_fees,...toAdd]; setStorage('fee_system_records_v6', g_fees); 
+            }
+            
+            // Server Update
+            if (USE_API) {
+                let act = '';
+                if(type==='students') act='import_students';
+                if(type==='enrollments') act='import_enrollments';
+                if(type==='discounts') act='import_discounts';
+                if(type==='payments') act='import_payments';
+                if(type==='fees') act='import_fees';
 
-        // ... (Shortened for brevity, full code logic maintained from previous step)
-        
-        // RE-INCLUDING FULL FUNCTIONS FOR CONTEXT:
+                await fetch(`${API_URL}?action=${act}`, { method: 'POST', body: JSON.stringify(arr) });
+            }
+            
+            renderStudentTable(); renderEnrollmentTable(); renderDiscountTable(); renderPaymentTable(); renderFeeDashboard();
+            return { status: 'success' };
+        }
+
+        // --- STUDENT UI ---
+        function showAddForm() { document.getElementById('studentForm').reset(); document.getElementById('edit_index').value = "-1"; document.getElementById('form-title').textContent = "Add New Student"; document.getElementById('student-dashboard').classList.add('hidden'); document.getElementById('student-form-container').classList.remove('hidden'); }
+        function hideAddForm() { document.getElementById('student-dashboard').classList.remove('hidden'); document.getElementById('student-form-container').classList.add('hidden'); }
+        function extractDegree(reg) { if(!reg) return ''; reg = reg.toString().toUpperCase().trim(); for (const item of DEGREE_PATTERNS) { if (reg.startsWith(item.prefix)) return item.code; } return "Unknown"; }
+        function autoFillDegree(val) { const degree = extractDegree(val); if(degree && degree !== "Unknown") { document.getElementById('input_degree').value = degree; } }
+        function toProperCase(str) { if (!str) return ''; return str.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' '); }
+
+        async function saveStudentList(e) {
+            e.preventDefault(); const fd = new FormData(e.target); const reg = fd.get('reg_no').trim();
+            if(document.getElementById('edit_index').value === "-1" && g_students.some(s => s.reg_no.toLowerCase() === reg.toLowerCase())) { alert("Duplicate Reg Number!"); return; }
+            const student = { reg_no: reg, name: toProperCase(fd.get('name')), degree: fd.get('degree') || extractDegree(reg), batch: fd.get('batch'), mobile: fd.get('mobile'), email: fd.get('email') };
+            await saveData('student', student); hideAddForm(); alert("Student saved!"); 
+        }
+
         function editStudent(reg) { const s = g_students.find(x => x.reg_no === reg); if(!s) return; document.getElementById('input_reg_no').value = s.reg_no; document.getElementById('input_name').value = s.name; document.getElementById('input_degree').value = s.degree; document.getElementById('input_batch').value = s.batch; document.getElementById('input_mobile').value = s.mobile; document.getElementById('input_email').value = s.email || ''; document.getElementById('edit_index').value = "1"; document.getElementById('form-title').textContent = "Edit Student"; document.getElementById('student-dashboard').classList.add('hidden'); document.getElementById('student-form-container').classList.remove('hidden'); }
         function deleteStudent(reg) { if(confirm('Delete this student?')) deleteStudentData(reg); }
         function deleteAllStudents() { if(confirm('WARNING: Delete ALL students?')) deleteAllStudentsData(); }
         function exportStudentsToExcel() { if(g_students.length === 0) { alert("No data."); return; } const ws = XLSX.utils.json_to_sheet(g_students); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Students"); XLSX.writeFile(wb, "All_Students.xlsx"); }
-        function filterStudents() {
-            const query = document.getElementById('student_list_search').value.toLowerCase();
-            const filtered = g_students.filter(s => 
-                (s.reg_no && s.reg_no.toLowerCase().includes(query)) ||
-                (s.name && s.name.toLowerCase().includes(query)) ||
-                (s.degree && s.degree.toLowerCase().includes(query)) ||
-                (s.batch && s.batch.toLowerCase().includes(query))
-            );
-            renderStudentTable(filtered);
-        }
-        function sortStudentTable(key) {
-            sortDir = -sortDir;
-            const query = document.getElementById('student_list_search').value.toLowerCase();
-            let currentList = query ? g_students.filter(s => (s.reg_no && s.reg_no.toLowerCase().includes(query))) : [...g_students];
-            currentList.sort((a, b) => {
-                const valA = (a[key] || '').toString().toLowerCase();
-                const valB = (b[key] || '').toString().toLowerCase();
-                if (valA < valB) return -1 * sortDir;
-                if (valA > valB) return 1 * sortDir;
-                return 0;
-            });
-            renderStudentTable(currentList);
+
+        function handleStudentExcelUpload(e) { 
+            const f = e.target.files[0]; if(!f) return; 
+            document.getElementById('upload-progress-container').classList.remove('hidden'); 
+            const pBar = document.getElementById('upload-progress-bar'); pBar.style.width = '30%'; 
+            
+            const r = new FileReader(); 
+            r.onload = async function(ev) { 
+                try { 
+                    const wb = XLSX.read(new Uint8Array(ev.target.result), {type:'array'}); 
+                    const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]); 
+                    let newStudents = []; 
+                    
+                    json.forEach(row => { 
+                         // Normalize Keys (Flexible matching)
+                        const keys = Object.keys(row);
+                        
+                        // Helper to find key containing string
+                        const findKey = (search) => keys.find(k => k.toLowerCase().includes(search));
+
+                        const kReg = findKey('reg') || findKey('id'); // e.g. "Reg No", "Registration"
+                        const kName = findKey('name');
+                        const kDeg = findKey('deg') || findKey('prog'); // Degree, Program
+                        const kBat = findKey('batch') || findKey('sess'); // Batch, Session
+                        const kMob = findKey('mob') || findKey('phone');
+                        const kMail = findKey('mail');
+                        
+                        const reg = row[kReg]; 
+                        
+                        if (reg) { 
+                             newStudents.push({ 
+                                reg_no: reg.toString().trim(), 
+                                name: toProperCase((row[kName] || '').toString()), 
+                                degree: (row[kDeg] || extractDegree(reg.toString())).toString().trim(), 
+                                batch: (row[kBat] || '').toString().trim(), 
+                                mobile: (row[kMob] || '').toString().trim(), 
+                                email: (row[kMail] || '').toString().trim() 
+                            }); 
+                        } 
+                    }); 
+                    
+                    if(newStudents.length > 0) { 
+                        pBar.style.width = '100%'; 
+                        await bulkImport('students', newStudents); 
+                        alert(`Successfully imported ${newStudents.length} students.\n\nColumns Found:\nReg: ${Object.keys(json[0]).find(k=>k.toLowerCase().includes('reg')) || 'Not Found'}\nName: ${Object.keys(json[0]).find(k=>k.toLowerCase().includes('name')) || 'Not Found'}`);
+                    } else {
+                        alert(`No valid student records found.\n\nRequired Columns: Reg No, Name\nYour Columns: ${Object.keys(json[0]).join(', ')}`);
+                    }
+                } catch(err) { console.error(err); alert("Error parsing Excel file. Please ensure it is a valid .xlsx file."); } 
+                document.getElementById('upload-progress-container').classList.add('hidden');
+                e.target.value = ''; 
+            }; 
+            r.readAsArrayBuffer(f); 
         }
 
-        // ... (Repeating similar patterns for Fees, Enrollment, Paid, Discount as in previous versions)
-        // Ensure renderFeeDashboard, renderEnrollmentTable, renderPaymentTable, renderDiscountTable are defined similarly.
+        // --- ENROLLMENT UI ---
+        function showEnrollmentForm() { document.getElementById('enrollmentForm').reset(); document.getElementById('enroll_edit_id').value = "-1"; document.getElementById('enroll-form-title').textContent = "Add Enrollment"; document.getElementById('enrollment-dashboard').classList.add('hidden'); document.getElementById('enrollment-form-container').classList.remove('hidden'); }
+        function hideEnrollmentForm() { document.getElementById('enrollment-dashboard').classList.remove('hidden'); document.getElementById('enrollment-form-container').classList.add('hidden'); }
+        async function saveEnrollmentList(e) { e.preventDefault(); const fd = new FormData(e.target); const sess = `${fd.get('semester')} ${fd.get('year')}`; const id = document.getElementById('enroll_edit_id').value; const enrollment = { id: (id === "-1") ? Date.now().toString() : id, reg_no: fd.get('reg_no'), name: toProperCase(fd.get('name')), semester: sess, courses: parseInt(fd.get('courses')), cr: parseInt(fd.get('cr')) }; await saveData('enrollment', enrollment); hideEnrollmentForm(); alert("Enrollment saved!"); }
+        function editEnrollment(id) { const e = g_enrollments.find(x => x.id == id); if(!e) return; document.getElementById('enroll_reg_no').value = e.reg_no; document.getElementById('enroll_name').value = e.name; document.getElementById('enroll_courses').value = e.courses; document.getElementById('enroll_cr').value = e.cr; const parts = e.semester.split(' '); document.getElementById('enroll_sem').value = parts[0] || 'Fall'; document.getElementById('enroll_year').value = parts[1] || '2023'; document.getElementById('enroll_edit_id').value = e.id || id; document.getElementById('enroll-form-title').textContent = "Edit Enrollment"; document.getElementById('enrollment-dashboard').classList.add('hidden'); document.getElementById('enrollment-form-container').classList.remove('hidden'); }
+        function deleteEnrollment(id) { if(confirm("Delete this enrollment?")) deleteEnrollmentData(id); }
+        function deleteAllEnrollments() { if(confirm("Delete ALL enrollment data?")) deleteAllEnrollmentsData(); }
+        function exportEnrollmentsToExcel() { if(g_enrollments.length === 0) { alert("No data."); return; } const ws = XLSX.utils.json_to_sheet(g_enrollments); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Enrollments"); XLSX.writeFile(wb, "Enrollments.xlsx"); }
+        function filterEnrollments() { const query = document.getElementById('enrollment_list_search').value.toLowerCase(); const filtered = g_enrollments.filter(e => (e.reg_no && e.reg_no.toLowerCase().includes(query)) || (e.name && e.name.toLowerCase().includes(query)) || (e.semester && e.semester.toLowerCase().includes(query))); renderEnrollmentTable(filtered); }
+        function sortEnrollmentTable(key) { enrollSortDir = -enrollSortDir; const query = document.getElementById('enrollment_list_search').value.toLowerCase(); let currentList = query ? g_enrollments.filter(e => (e.reg_no && e.reg_no.toLowerCase().includes(query)) || (e.name && e.name.toLowerCase().includes(query))) : [...g_enrollments]; currentList.sort((a,b) => { const valA = (a[key] || '').toString().toLowerCase(); const valB = (b[key] || '').toString().toLowerCase(); if (valA < valB) return -1 * enrollSortDir; if (valA > valB) return 1 * enrollSortDir; return 0; }); renderEnrollmentTable(currentList); }
 
-        function renderFeeDashboard() { 
-            const t=document.getElementById('feeDashboardBody'); 
-            if(g_fees.length==0) { t.innerHTML='<tr><td colspan="8" class="p-4 text-center italic">No records found.</td></tr>'; return; } 
-            t.innerHTML=g_fees.slice().reverse().map(r=>`
-            <tr class="hover:bg-gray-50 border-b">
-                <td class="p-2 font-medium">${r.degree}</td>
-                <td class="p-2">${r.batch}</td>
-                <td class="p-2 text-right text-gray-600">${num(r.per_cr_fee)}</td>
-                <td class="p-2 text-right text-blue-600">${num(r.exam_fee)}</td>
-                <td class="p-2 text-right text-gray-600">${num(r.other_fee)}</td>
-                <td class="p-2 text-right font-bold">${num(parseFloat(r.tuition_fee)+parseFloat(r.exam_fee)+parseFloat(r.other_fee)+parseFloat(r.reg_fee))}</td>
-                <td class="p-2 text-center text-xs text-gray-500">${r.semester} ${r.year}</td>
-                <td class="p-2 text-center space-x-1">
-                    <button onclick="editFeeRecord(${r.id})" class="text-blue-600 hover:text-blue-800" title="Edit"><i class="fas fa-edit"></i></button>
-                    <button onclick="duplicateFeeRecord(${r.id})" class="text-orange-600 hover:text-orange-800" title="Duplicate"><i class="fas fa-copy"></i></button>
-                    <button onclick="deleteFeeRecord(${r.id})" class="text-red-600 hover:text-red-800" title="Delete"><i class="fas fa-trash"></i></button>
-                </td>
-            </tr>`).join(''); 
-        }
-
-        function renderEnrollmentTable(data = g_enrollments) {
-            document.getElementById('total_enrollments_count').textContent = data.length;
-            const t=document.getElementById('enrollmentTableBody'); 
+        // --- FEE PAID UI (NEW) ---
+        function showPaidForm() { document.getElementById('paidForm').reset(); document.getElementById('paid_edit_id').value = "-1"; document.getElementById('paid-form-title').textContent = "Add Payment"; document.getElementById('paid-dashboard').classList.add('hidden'); document.getElementById('paid-form-container').classList.remove('hidden'); }
+        function hidePaidForm() { document.getElementById('paid-dashboard').classList.remove('hidden'); document.getElementById('paid-form-container').classList.add('hidden'); }
+        async function savePaymentList(e) { e.preventDefault(); const fd = new FormData(e.target); const sess = `${fd.get('semester')} ${fd.get('year')}`; const id = document.getElementById('paid_edit_id').value; const payment = { id: (id === "-1") ? Date.now().toString() : id, reg_no: fd.get('reg_no'), name: toProperCase(fd.get('name')), semester: sess, amount: parseFloat(fd.get('amount')), date: fd.get('date') }; await saveData('payment', payment); hidePaidForm(); alert("Payment saved!"); }
+        function editPayment(id) { const e = g_payments.find(x => x.id == id); if(!e) return; document.getElementById('paid_reg_no').value = e.reg_no; document.getElementById('paid_name').value = e.name; document.getElementById('paid_amount').value = e.amount; document.getElementById('paid_date').value = e.date; const parts = e.semester.split(' '); document.getElementById('paid_sem').value = parts[0] || 'Fall'; document.getElementById('paid_year').value = parts[1] || '2023'; document.getElementById('paid_edit_id').value = e.id || id; document.getElementById('paid-form-title').textContent = "Edit Payment"; document.getElementById('paid-dashboard').classList.add('hidden'); document.getElementById('paid-form-container').classList.remove('hidden'); }
+        function deletePayment(id) { if(confirm("Delete this payment?")) deletePaymentData(id); }
+        function deleteAllPayments() { if(confirm("Delete ALL payments?")) deleteAllPaymentsData(); }
+        function exportPaymentsToExcel() { if(g_payments.length === 0) { alert("No data."); return; } const ws = XLSX.utils.json_to_sheet(g_payments); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Payments"); XLSX.writeFile(wb, "Payments.xlsx"); }
+        function filterPayments() { const query = document.getElementById('paid_list_search').value.toLowerCase(); const filtered = g_payments.filter(e => (e.reg_no && e.reg_no.toLowerCase().includes(query)) || (e.name && e.name.toLowerCase().includes(query)) || (e.semester && e.semester.toLowerCase().includes(query))); renderPaymentTable(filtered); }
+        function sortPaidTable(key) { paidSortDir = -paidSortDir; const query = document.getElementById('paid_list_search').value.toLowerCase(); let currentList = query ? g_payments.filter(e => (e.reg_no && e.reg_no.toLowerCase().includes(query)) || (e.name && e.name.toLowerCase().includes(query))) : [...g_payments]; currentList.sort((a,b) => { const valA = (a[key] || '').toString().toLowerCase(); const valB = (b[key] || '').toString().toLowerCase(); if (valA < valB) return -1 * paidSortDir; if (valA > valB) return 1 * paidSortDir; return 0; }); renderPaymentTable(currentList); }
+        function renderPaymentTable(data = g_payments) {
+            document.getElementById('total_payments_count').textContent = data.length;
+            const t=document.getElementById('paidTableBody'); 
             if(data.length==0) { t.innerHTML='<tr><td colspan="6" class="p-4 text-center italic">No records found.</td></tr>'; return; } 
             t.innerHTML=data.map((e) => `
-                <tr class="hover:bg-orange-50 border-b">
-                    <td class="p-3">${e.reg_no}</td>
-                    <td class="p-3">${e.name}</td>
-                    <td class="p-3 font-bold text-orange-700">${e.semester}</td>
-                    <td class="p-3 text-center font-bold">${e.courses}</td>
-                    <td class="p-3 text-center font-bold">${e.cr}</td>
+                <tr class="hover:bg-teal-50 border-b">
+                    <td class="p-3">${e.reg_no}</td><td class="p-3">${e.name}</td><td class="p-3 font-bold text-teal-700">${e.semester}</td>
+                    <td class="p-3 text-right font-bold">${num(e.amount)}</td><td class="p-3 text-center">${e.date || '-'}</td>
                     <td class="p-3 text-center space-x-1">
-                        <button onclick="editEnrollment('${e.id || ''}')" class="text-blue-600 hover:text-blue-800" title="Edit"><i class="fas fa-edit"></i></button>
-                        <button onclick="deleteEnrollment('${e.id || ''}')" class="text-red-600 hover:text-red-800" title="Delete"><i class="fas fa-trash"></i></button>
+                        <button onclick="editPayment('${e.id || ''}')" class="text-blue-600 hover:text-blue-800" title="Edit"><i class="fas fa-edit"></i></button>
+                        <button onclick="deletePayment('${e.id || ''}')" class="text-red-600 hover:text-red-800" title="Delete"><i class="fas fa-trash"></i></button>
                     </td>
                 </tr>`).join(''); 
         }
+        function handlePaidExcelUpload(e) {
+            const y=document.getElementById('paid_import_year').value, s=document.getElementById('paid_import_sem').value;
+            if(!y||!s) { alert("Select session."); e.target.value=''; return; }
+            processExcel(e, 'payments', r => ({ reg_no: r.reg, name: r.name, semester: `${s} ${y}`, amount: parseFloat(r.amount||r.paid||0), date: r.date }));
+        }
+        function handleFeeExcelUpload(e) {
+            processExcel(e, 'fees', r => ({
+                degree: r.degree, batch: r.batch, year: parseInt(r.year), semester: r.semester,
+                cr: parseInt(r.cr||0), per_cr_fee: parseFloat(r.per_cr_fee||0), tuition_fee: parseFloat(r.tuition_fee||0),
+                total_courses: parseInt(r.courses||0), exam_fee_per_subject: parseFloat(r.exam_rate||0), exam_fee: parseFloat(r.exam_fee||0),
+                reg_fee: parseFloat(r.reg_fee||0), other_fee: parseFloat(r.other_fee||0), paid: 0, total_fee: 0
+            }));
+        }
+        function downloadPaidTemplate() { XLSX.writeFile(XLSX.utils.book_append_sheet(XLSX.utils.book_new(), XLSX.utils.json_to_sheet([{ "Reg": "123", "Name": "A", "Amount": 5000, "Date": "2023-01-01" }]), "P"), "Payments_Template.xlsx"); }
+        function downloadFeeTemplate() { XLSX.writeFile(XLSX.utils.book_append_sheet(XLSX.utils.book_new(), XLSX.utils.json_to_sheet([{ "Degree": "BSCAF", "Batch": "Fall 2025", "Year": 2025, "Semester": "Fall", "Cr": 15, "Per_Cr_Fee": 5000, "Tuition_Fee": 75000, "Courses": 5, "Exam_Rate": 1000, "Exam_Fee": 5000, "Reg_Fee": 20000, "Other_Fee": 0 }]), "F"), "Fees_Template.xlsx"); }
+
+
+        // --- DISCOUNT UI & LOGIC (UPDATED WITH CRUD) ---
+        function showDiscountForm() { document.getElementById('discountForm').reset(); document.getElementById('discount_edit_id').value = "-1"; document.getElementById('discount-form-title').textContent = "Add Discount"; document.getElementById('discount-dashboard').classList.add('hidden'); document.getElementById('discount-form-container').classList.remove('hidden'); }
+        function hideDiscountForm() { document.getElementById('discount-dashboard').classList.remove('hidden'); document.getElementById('discount-form-container').classList.add('hidden'); }
+        
+        async function saveDiscountList(e) { 
+            e.preventDefault(); const fd = new FormData(e.target); const id = document.getElementById('discount_edit_id').value;
+            // Note: API needs 'save_discount' handler if you want live DB edit/delete
+            const discount = { 
+                id: (id === "-1") ? Date.now().toString() : id,
+                reg_no: fd.get('reg_no'), name: toProperCase(fd.get('name')), term: normalizeTerm(fd.get('term')), discount: parseFloat(fd.get('discount'))
+            };
+            await saveData('discount', discount); hideDiscountForm(); alert("Discount saved!"); 
+        }
+        
+        function editDiscount(id) {
+            const d = g_discounts.find(x => x.id == id); if(!d) return;
+            document.getElementById('discount_reg_no').value = d.reg_no;
+            document.getElementById('discount_name').value = d.name;
+            document.getElementById('discount_term').value = d.term;
+            document.getElementById('discount_val').value = d.discount;
+            document.getElementById('discount_edit_id').value = d.id || id;
+            document.getElementById('discount-form-title').textContent = "Edit Discount";
+            document.getElementById('discount-dashboard').classList.add('hidden');
+            document.getElementById('discount-form-container').classList.remove('hidden');
+        }
+        
+        function deleteDiscount(id) { if(confirm("Delete this discount?")) deleteDiscountData(id); }
+        function deleteAllDiscounts() { if(confirm("Delete ALL discounts?")) deleteAllDiscountsData(); }
+        function filterDiscounts() { const query = document.getElementById('discount_list_search').value.toLowerCase(); const filtered = g_discounts.filter(d => (d.reg_no && d.reg_no.toLowerCase().includes(query)) || (d.name && d.name.toLowerCase().includes(query))); renderDiscountTable(filtered); }
+        function sortDiscountTable(key) { discountSortDir = -discountSortDir; const query = document.getElementById('discount_list_search').value.toLowerCase(); let currentList = query ? g_discounts.filter(d => (d.reg_no && d.reg_no.toLowerCase().includes(query))) : [...g_discounts]; currentList.sort((a,b) => { const valA = (a[key] || '').toString().toLowerCase(); const valB = (b[key] || '').toString().toLowerCase(); if (valA < valB) return -1 * discountSortDir; if (valA > valB) return 1 * discountSortDir; return 0; }); renderDiscountTable(currentList); }
 
         function renderDiscountTable(data = g_discounts) { 
             document.getElementById('total_discounts_count').textContent = data.length;
@@ -524,27 +743,42 @@
                 </tr>`).join(''); 
         }
         
-        // ... (Payment table render is similar)
+        function exportDiscountsToExcel() { if(g_discounts.length === 0) { alert("No data."); return; } const ws = XLSX.utils.json_to_sheet(g_discounts); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Discounts"); XLSX.writeFile(wb, "Discounts.xlsx"); }
+
 
         function switchTab(tabId) { 
-            document.querySelectorAll('.tab-content').forEach(el => { el.classList.add('hidden'); el.classList.remove('block'); });
-            const selectedContent = document.getElementById('view-' + tabId);
-            if(selectedContent) { selectedContent.classList.remove('hidden'); selectedContent.classList.add('block'); }
-            const tabs = ['clearance', 'student', 'fee', 'enrollment', 'paid', 'discount'];
-            tabs.forEach(t => { const btn = document.getElementById('tab-' + t); if(btn) { btn.classList.remove('text-green-600', 'border-b-2', 'border-green-600'); btn.classList.add('text-gray-500'); } });
-            const activeBtn = document.getElementById('tab-' + tabId);
-            if(activeBtn) { activeBtn.classList.remove('text-gray-500'); activeBtn.classList.add('text-green-600', 'border-b-2', 'border-green-600'); }
-            if(tabId === 'fee') updateFeeDropdowns();
-        }
+            // 1. Hide all tab content
+            document.querySelectorAll('.tab-content').forEach(el => {
+                el.classList.add('hidden');
+                el.classList.remove('block');
+            });
 
-        // Placeholder for missing functions to ensure code completeness in snippet
-        // ... (Include other CRUD functions: addRecord, deleteFeeRecord, saveEnrollmentList, etc. as defined in previous turns)
-        
-        function updateFeeDropdowns() {
-            const deg = [...new Set(g_students.map(s=>s.degree).filter(Boolean))].sort();
-            const bat = [...new Set(g_students.map(s=>s.batch).filter(Boolean))].sort();
-            document.getElementById('degree_list').innerHTML = deg.map(x=>`<option value="${x}">`).join('');
-            document.getElementById('batch_list').innerHTML = bat.map(x=>`<option value="${x}">`).join('');
+            // 2. Show selected tab content
+            const selectedContent = document.getElementById('view-' + tabId);
+            if(selectedContent) {
+                selectedContent.classList.remove('hidden');
+                selectedContent.classList.add('block');
+            }
+
+            // 3. Reset all tab buttons
+            const tabs = ['clearance', 'student', 'fee', 'enrollment', 'paid', 'discount'];
+            tabs.forEach(t => {
+                const btn = document.getElementById('tab-' + t);
+                if(btn) {
+                    btn.classList.remove('text-green-600', 'border-b-2', 'border-green-600');
+                    btn.classList.add('text-gray-500');
+                }
+            });
+
+            // 4. Highlight active tab button
+            const activeBtn = document.getElementById('tab-' + tabId);
+            if(activeBtn) {
+                activeBtn.classList.remove('text-gray-500');
+                activeBtn.classList.add('text-green-600', 'border-b-2', 'border-green-600');
+            }
+
+            // 5. Special handlers
+            if(tabId === 'fee') updateFeeDropdowns();
         }
 
     </script>
