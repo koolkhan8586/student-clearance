@@ -18,7 +18,7 @@
             .container { max-width: 100%; margin: 0; padding: 0; }
             #search-container { display: none !important; }
         }
-        #debug-modal, #config-modal { background-color: rgba(0,0,0,0.5); }
+        #debug-modal { background-color: rgba(0,0,0,0.5); }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen p-4 md:p-8 font-sans">
@@ -38,45 +38,54 @@
             </div>
             <div class="flex gap-2">
                 <button onclick="window.print()" class="bg-gray-700 hover:bg-gray-800 text-white px-4 py-2 rounded-lg transition">
-                    <i class="fas fa-print mr-2"></i> Print
+                    <i class="fas fa-print mr-2"></i> Print Report
                 </button>
                 <button onclick="resetSystem()" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition">
-                    <i class="fas fa-trash mr-2"></i> Reset
+                    <i class="fas fa-trash mr-2"></i> Reset System
                 </button>
             </div>
         </div>
 
-        <!-- System Status Bar (Critical for Debugging) -->
-        <div id="conn-status" class="mb-4 px-4 py-3 rounded bg-blue-50 text-blue-800 text-sm font-bold no-print flex flex-col sm:flex-row justify-between items-center border border-blue-200">
-            <div id="data-counts" class="flex gap-4">
-                <span>Students: <span id="count-students">0</span></span>
-                <span class="text-gray-300">|</span>
-                <span>Fees: <span id="count-fees">0</span></span>
-                <span class="text-gray-300">|</span>
-                <span>Enroll: <span id="count-enroll">0</span></span>
-                <span class="text-gray-300">|</span>
-                <span>Disc: <span id="count-disc">0</span></span>
-            </div>
-            <div class="flex gap-2 mt-2 sm:mt-0">
-                 <span id="conn-msg" class="italic font-normal mr-2">Initializing...</span>
-                 <button onclick="showConfigModal()" class="bg-white text-blue-700 border border-blue-300 px-3 py-1 rounded hover:bg-blue-50 text-xs">⚙️ Config</button>
-                 <button onclick="initData()" class="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 text-xs"><i class="fas fa-sync"></i> Refresh Data</button>
-            </div>
+        <!-- Connection Status & Config (Improved Visibility) -->
+        <div id="conn-status" class="hidden mb-4 px-4 py-3 rounded text-sm font-bold no-print border flex flex-col sm:flex-row justify-between items-center transition-all duration-300">
+            <!-- Content injected by JS -->
         </div>
 
         <!-- Config Modal -->
-        <div id="config-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div class="bg-white rounded-lg shadow-2xl w-full max-w-md p-6">
-                <h3 class="text-lg font-bold mb-4">Connection Settings</h3>
-                <label class="block text-sm font-bold mb-2">API URL</label>
-                <div class="flex gap-2 mb-4">
-                    <input type="text" id="api_url_input" class="flex-grow border rounded p-2 text-sm" value="api.php">
-                    <button onclick="testApiConnection()" class="bg-yellow-500 text-white px-3 rounded font-bold text-xs">Test</button>
+        <div id="config-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+            <div class="bg-white rounded-lg shadow-2xl w-full max-w-md p-6 border-2 border-red-500">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-bold text-red-700">Connection Failed</h3>
+                    <button onclick="document.getElementById('config-modal').classList.add('hidden')" class="text-gray-500 hover:text-black">&times;</button>
                 </div>
-                <div id="api-test-result" class="text-xs p-2 bg-gray-100 rounded mb-4 hidden font-mono break-all"></div>
+                <p class="text-sm text-gray-600 mb-4">The system tried to connect to the database but failed. Please verify the API path and database credentials.</p>
+                
+                <label class="block text-sm font-bold mb-2">API URL</label>
+                <div class="flex gap-2 mb-2">
+                    <input type="text" id="api_url_input" class="flex-grow border rounded p-2 font-mono text-sm" value="api.php" placeholder="http://localhost/fee_system/api.php">
+                    <button onclick="testApiConnection()" class="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-2 rounded text-sm font-bold">Test</button>
+                </div>
+                <div id="api-test-result" class="text-xs font-mono p-2 bg-gray-100 rounded mb-4 hidden break-all max-h-24 overflow-auto"></div>
+
                 <div class="flex justify-end gap-2">
-                    <button onclick="document.getElementById('config-modal').classList.add('hidden')" class="px-4 py-2 bg-gray-200 rounded text-sm">Close</button>
-                    <button onclick="saveApiConfig()" class="px-4 py-2 bg-blue-600 text-white rounded text-sm font-bold">Save</button>
+                    <button onclick="document.getElementById('config-modal').classList.add('hidden')" class="px-4 py-2 bg-gray-200 rounded text-sm">Cancel</button>
+                    <button onclick="saveApiConfig()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-bold">Save & Retry</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Debug Modal -->
+        <div id="debug-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-lg shadow-2xl w-full max-w-2xl h-3/4 flex flex-col">
+                <div class="p-4 border-b flex justify-between items-center bg-gray-50 rounded-t-lg">
+                    <h3 class="font-bold text-lg text-red-600">Raw Server Response</h3>
+                    <button onclick="document.getElementById('debug-modal').classList.add('hidden')" class="text-gray-500 hover:text-gray-800 text-xl">&times;</button>
+                </div>
+                <div class="p-4 flex-grow overflow-auto bg-gray-100 font-mono text-xs">
+                    <pre id="debug-content" class="whitespace-pre-wrap break-all"></pre>
+                </div>
+                <div class="p-4 border-t flex justify-end bg-gray-50 rounded-b-lg">
+                    <button onclick="document.getElementById('debug-modal').classList.add('hidden')" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">Close</button>
                 </div>
             </div>
         </div>
@@ -107,7 +116,7 @@
 
             <div class="bg-white rounded-lg shadow-lg p-8 min-h-[800px] relative" id="printableArea">
                 <div class="absolute top-8 right-8 no-print">
-                    <button onclick="window.print()" class="bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded shadow flex items-center text-sm"><i class="fas fa-print mr-2"></i> Print</button>
+                    <button onclick="window.print()" class="bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded shadow flex items-center text-sm"><i class="fas fa-print mr-2"></i> Print Official Report</button>
                 </div>
                 <div class="text-center mb-8 border-b-2 border-gray-800 pb-4 mt-4">
                     <h2 class="text-2xl font-bold uppercase tracking-wide">The University of Lahore</h2>
@@ -132,7 +141,7 @@
                                 <th class="border p-2 text-right text-green-700">Paid</th><th class="border p-2 text-right text-red-700">Bal</th>
                             </tr>
                         </thead>
-                        <tbody id="feeTableBody"><tr><td colspan="13" class="text-center p-4 text-gray-500 italic">Enter a Reg # above to search.</td></tr></tbody>
+                        <tbody id="feeTableBody"><tr><td colspan="13" class="text-center p-4 text-gray-500 italic">No records found.</td></tr></tbody>
                         <tfoot class="bg-gray-50 font-bold text-gray-800" id="tableFooter"></tfoot>
                     </table>
                 </div>
@@ -153,39 +162,39 @@
         <!-- TAB 2: Student Data -->
         <div id="view-student" class="tab-content hidden">
             <div id="student-dashboard" class="bg-white rounded-lg shadow-lg p-6">
-                 <!-- Student Toolbar -->
-                 <div class="flex flex-col xl:flex-row justify-between items-center mb-6 gap-4">
-                    <div><h2 class="text-xl font-bold text-gray-800">Student Directory</h2><p class="text-sm text-gray-500">Manage all student records here</p></div>
+                <div class="flex flex-col xl:flex-row justify-between items-center mb-6 gap-4">
+                    <div><h2 class="text-xl font-bold text-gray-800">Student Directory</h2><p class="text-sm text-gray-500">Manage all student records here</p><div class="mt-2 text-sm font-semibold text-blue-600 bg-blue-50 px-3 py-1 rounded-full inline-block">Total Students: <span id="total_students_count">0</span></div></div>
                     <div class="flex flex-col sm:flex-row gap-3 w-full lg:w-auto items-center">
-                        <div class="relative w-full sm:w-64"><input type="text" id="student_list_search" placeholder="Search by Reg, Name..." onkeyup="filterStudents()" class="border border-gray-300 rounded-lg px-4 py-2 pl-10 w-full text-sm outline-none"><i class="fas fa-search absolute left-3 top-3 text-gray-400 text-xs"></i></div>
-                        <div class="flex gap-2">
-                             <input type="file" id="student_excel_file" accept=".xlsx, .xls" class="hidden" onchange="handleStudentExcelUpload(event)">
-                            <button onclick="document.getElementById('student_excel_file').click()" class="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded text-sm"><i class="fas fa-file-excel"></i> Import</button>
-                            <button onclick="exportStudentsToExcel()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded text-sm"><i class="fas fa-file-export"></i> Export</button>
-                            <button onclick="showAddForm()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded text-sm"><i class="fas fa-plus"></i> Add</button>
-                            <button onclick="deleteAllStudents()" class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded text-sm"><i class="fas fa-trash-alt"></i> Del All</button>
+                        <div class="relative w-full sm:w-64"><input type="text" id="student_list_search" placeholder="Search by Reg, Name, Batch..." onkeyup="filterStudents()" class="border border-gray-300 rounded-lg px-4 py-2 pl-10 w-full text-sm focus:ring-2 focus:ring-blue-500 outline-none shadow-sm transition"><i class="fas fa-search absolute left-3 top-3 text-gray-400 text-xs"></i></div>
+                        <div class="flex gap-2 flex-wrap justify-center sm:justify-start">
+                            <input type="file" id="student_excel_file" accept=".xlsx, .xls" class="hidden" onchange="handleStudentExcelUpload(event)">
+                            <button onclick="document.getElementById('student_excel_file').click()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-sm"><i class="fas fa-file-excel mr-1"></i> Import</button>
+                            <button onclick="exportStudentsToExcel()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-sm"><i class="fas fa-file-export mr-1"></i> Export</button>
+                            <button onclick="showAddForm()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-sm"><i class="fas fa-plus mr-1"></i> Add</button>
+                            <button onclick="deleteAllStudents()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-sm"><i class="fas fa-trash-alt mr-1"></i> Del All</button>
                         </div>
                     </div>
                 </div>
-                <div class="overflow-x-auto border rounded-lg max-h-[600px]"><table class="w-full text-sm text-left border-collapse border-b border-gray-200"><thead class="bg-gray-50 text-gray-700 uppercase text-xs sticky top-0"><tr><th class="border-b p-3 cursor-pointer" onclick="sortStudentTable('reg_no')">Reg Number</th><th class="border-b p-3 cursor-pointer" onclick="sortStudentTable('name')">Name</th><th class="border-b p-3 cursor-pointer" onclick="sortStudentTable('degree')">Degree</th><th class="border-b p-3 cursor-pointer" onclick="sortStudentTable('batch')">Batch</th><th class="border-b p-3 text-center">Actions</th></tr></thead><tbody id="studentsTableBody"><tr><td colspan="5" class="p-4 text-center text-gray-500">Loading...</td></tr></tbody></table></div>
+                <div id="upload-progress-container" class="hidden mb-4"><div class="flex justify-between text-xs mb-1 text-gray-600"><span>Processing Upload...</span><span id="progress-text">0%</span></div><div class="w-full bg-gray-200 rounded-full h-2.5"><div id="upload-progress-bar" class="bg-blue-600 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div></div></div>
+                <div class="overflow-x-auto border rounded-lg"><table class="w-full text-sm text-left border-collapse border-b border-gray-200"><thead class="bg-gray-50 text-gray-700 uppercase text-xs"><tr><th class="border-b p-3 cursor-pointer" onclick="sortStudentTable('reg_no')">Reg Number</th><th class="border-b p-3 cursor-pointer" onclick="sortStudentTable('name')">Name</th><th class="border-b p-3 cursor-pointer" onclick="sortStudentTable('degree')">Degree</th><th class="border-b p-3 cursor-pointer" onclick="sortStudentTable('batch')">Batch</th><th class="border-b p-3 text-center">Actions</th></tr></thead><tbody id="studentsTableBody"><tr><td colspan="5" class="p-4 text-center text-gray-500">Loading...</td></tr></tbody></table></div>
             </div>
-            <!-- Student Form Modal (Same as before) -->
             <div id="student-form-container" class="hidden bg-white rounded-lg shadow-lg p-6 max-w-2xl mx-auto mt-4"><div class="flex justify-between items-center border-b pb-4 mb-4"><h3 class="text-lg font-bold text-gray-800" id="form-title">Add New Student</h3><button onclick="hideAddForm()" class="text-gray-500 hover:text-red-500"><i class="fas fa-times"></i></button></div><form id="studentForm" onsubmit="saveStudentList(event)" class="space-y-4"><input type="hidden" id="edit_index" value="-1"><div class="grid grid-cols-1 md:grid-cols-2 gap-4"><div class="col-span-1 md:col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Registration Number</label><input type="text" name="reg_no" id="input_reg_no" oninput="autoFillDegree(this.value)" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div class="col-span-1 md:col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Full Name</label><input type="text" name="name" id="input_name" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div><label class="block text-sm font-medium text-gray-700 mb-1">Degree Program</label><input type="text" name="degree" id="input_degree" class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div><label class="block text-sm font-medium text-gray-700 mb-1">Batch (Session)</label><input type="text" name="batch" id="input_batch" class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div class="col-span-1 md:col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Mobile</label><input type="text" name="mobile" id="input_mobile" class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div class="col-span-1 md:col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Email</label><input type="email" name="email" id="input_email" class="w-full border border-gray-300 rounded-lg px-4 py-2"></div></div><div class="pt-4 flex gap-2"><button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg">Save Student</button><button type="button" onclick="hideAddForm()" class="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg">Cancel</button></div></form></div>
         </div>
 
         <!-- TAB 3: Fee Record -->
         <div id="view-fee" class="tab-content hidden">
-            <!-- (Content maintained from previous versions) -->
-             <div class="bg-white rounded-lg shadow-lg p-6 max-w-4xl mx-auto">
+            <div class="bg-white rounded-lg shadow-lg p-6 max-w-4xl mx-auto">
                 <div class="flex items-center gap-3 mb-6 border-b pb-4">
                     <div class="bg-green-100 text-green-600 p-3 rounded-full"><i class="fas fa-layer-group text-xl"></i></div>
                     <div><h2 class="text-xl font-bold text-gray-800">Fee Structure</h2><p class="text-sm text-gray-500">Define fee records by Degree & Batch.</p></div>
                 </div>
-                <div class="flex justify-end mb-4 gap-2">
-                    <input type="file" id="fee_excel_file" accept=".xlsx, .xls" class="hidden" onchange="handleFeeExcelUpload(event)">
-                    <button onclick="document.getElementById('fee_excel_file').click()" class="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded text-sm"><i class="fas fa-file-excel"></i> Import</button>
-                    <button onclick="downloadFeeTemplate()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded text-sm"><i class="fas fa-download"></i> Template</button>
-                     <button onclick="deleteAllFeesData()" class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded text-sm"><i class="fas fa-trash-alt"></i> Del All</button>
+                <div class="flex justify-end mb-4">
+                     <div class="flex gap-2">
+                        <input type="file" id="fee_excel_file" accept=".xlsx, .xls" class="hidden" onchange="handleFeeExcelUpload(event)">
+                        <button onclick="document.getElementById('fee_excel_file').click()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-sm"><i class="fas fa-file-excel mr-1"></i> Import Fees</button>
+                        <button onclick="downloadFeeTemplate()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition flex items-center text-sm"><i class="fas fa-download mr-1"></i> Template</button>
+                         <button onclick="deleteAllFeesData()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-sm"><i class="fas fa-trash-alt mr-1"></i> Delete All</button>
+                     </div>
                 </div>
 
                 <form id="feeForm" onsubmit="addRecord(event)" class="space-y-6">
@@ -210,10 +219,9 @@
 
         <!-- TAB 4: Enrollment -->
         <div id="view-enrollment" class="tab-content hidden">
-            <!-- (Content maintained) -->
              <div class="bg-white rounded-lg shadow-lg p-6">
                 <div class="flex flex-col md:flex-row justify-between items-end mb-6 gap-4 border-b pb-4">
-                    <div><h2 class="text-xl font-bold text-gray-800">Enrollment Data</h2><p class="text-sm text-gray-500 mb-2">Upload Excel (Reg #, Name, Courses, Credit Hrs).</p><div class="bg-orange-50 p-2 rounded border border-orange-200 mt-2"><label class="block text-xs font-bold text-orange-700 uppercase mb-1">Target Session for Import:</label><div class="flex gap-2"><select id="enroll_import_year" class="border rounded px-2 py-1 text-sm bg-white"><option value="" disabled selected>Year</option><option value="2023">2023</option><option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option></select><select id="enroll_import_sem" class="border rounded px-2 py-1 text-sm bg-white"><option value="" disabled selected>Semester</option><option value="Winter">Winter</option><option value="Spring">Spring</option><option value="Summer">Summer</option><option value="Fall">Fall</option></select></div></div></div>
+                    <div><h2 class="text-xl font-bold text-gray-800">Enrollment Data</h2><p class="text-sm text-gray-500 mb-2">Upload Excel (Reg #, Name, Courses, Credit Hrs).</p><div class="mt-2 text-sm font-semibold text-orange-600 bg-orange-50 px-3 py-1 rounded-full inline-block">Total Records: <span id="total_enrollments_count">0</span></div><div class="bg-orange-50 p-2 rounded border border-orange-200 mt-2"><label class="block text-xs font-bold text-orange-700 uppercase mb-1">Target Session for Import:</label><div class="flex gap-2"><select id="enroll_import_year" class="border rounded px-2 py-1 text-sm bg-white"><option value="" disabled selected>Year</option><option value="2023">2023</option><option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option></select><select id="enroll_import_sem" class="border rounded px-2 py-1 text-sm bg-white"><option value="" disabled selected>Semester</option><option value="Winter">Winter</option><option value="Spring">Spring</option><option value="Summer">Summer</option><option value="Fall">Fall</option></select></div></div></div>
                     <div class="flex flex-col gap-2">
                         <div class="flex gap-2">
                             <input type="file" id="enrollment_excel_file" accept=".xlsx, .xls" class="hidden" onchange="handleEnrollmentExcelUpload(event)">
@@ -235,17 +243,43 @@
                     <th class="border-b p-3 cursor-pointer" onclick="sortEnrollmentTable('name')">Name <i class="fas fa-sort ml-1"></i></th>
                     <th class="border-b p-3 cursor-pointer" onclick="sortEnrollmentTable('semester')">Semester <i class="fas fa-sort ml-1"></i></th>
                     <th class="border-b p-3 text-center">Courses</th><th class="border-b p-3 text-center">Cr. Hrs</th>
-                    <th class="border-b p-3 text-center">Actions</th>
+                    <th class="border-b p-3 text-center">Actions</th> <!-- Actions Column -->
                 </tr></thead><tbody id="enrollmentTableBody"><tr><td colspan="6" class="p-4 text-center text-gray-500 italic">Loading...</td></tr></tbody></table></div>
             </div>
+            
              <!-- Enrollment Form Modal -->
-            <div id="enrollment-form-container" class="hidden bg-white rounded-lg shadow-lg p-6 max-w-2xl mx-auto mt-4"><div class="flex justify-between items-center border-b pb-4 mb-4"><h3 class="text-lg font-bold text-gray-800" id="enroll-form-title">Add Enrollment</h3><button onclick="hideEnrollmentForm()" class="text-gray-500 hover:text-red-500"><i class="fas fa-times"></i></button></div><form id="enrollmentForm" onsubmit="saveEnrollmentList(event)" class="space-y-4"><input type="hidden" id="enroll_edit_id" value="-1"><div class="grid grid-cols-1 md:grid-cols-2 gap-4"><div class="col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Registration Number</label><input type="text" name="reg_no" id="enroll_reg_no" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div class="col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Student Name</label><input type="text" name="name" id="enroll_name" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div><label class="block text-sm font-medium text-gray-700 mb-1">Session Year</label><select name="year" id="enroll_year" class="w-full border border-gray-300 rounded-lg px-4 py-2"><option>2023</option><option>2024</option><option>2025</option><option>2026</option></select></div><div><label class="block text-sm font-medium text-gray-700 mb-1">Semester</label><select name="semester" id="enroll_sem" class="w-full border border-gray-300 rounded-lg px-4 py-2"><option>Winter</option><option>Spring</option><option>Summer</option><option>Fall</option></select></div><div><label class="block text-sm font-medium text-gray-700 mb-1">Total Courses</label><input type="number" name="courses" id="enroll_courses" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div><label class="block text-sm font-medium text-gray-700 mb-1">Total Credit Hours</label><input type="number" name="cr" id="enroll_cr" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div></div><div class="pt-4 flex gap-2"><button type="submit" class="flex-1 bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 px-4 rounded-lg">Save Record</button><button type="button" onclick="hideEnrollmentForm()" class="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg">Cancel</button></div></form></div>
+            <div id="enrollment-form-container" class="hidden bg-white rounded-lg shadow-lg p-6 max-w-2xl mx-auto mt-4">
+                <div class="flex justify-between items-center border-b pb-4 mb-4">
+                    <h3 class="text-lg font-bold text-gray-800" id="enroll-form-title">Add Enrollment</h3>
+                    <button onclick="hideEnrollmentForm()" class="text-gray-500 hover:text-red-500"><i class="fas fa-times"></i></button>
+                </div>
+                <form id="enrollmentForm" onsubmit="saveEnrollmentList(event)" class="space-y-4">
+                    <input type="hidden" id="enroll_edit_id" value="-1"> <!-- ID for editing -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Registration Number</label><input type="text" name="reg_no" id="enroll_reg_no" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div>
+                        <div class="col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Student Name</label><input type="text" name="name" id="enroll_name" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Session Year</label>
+                            <select name="year" id="enroll_year" class="w-full border border-gray-300 rounded-lg px-4 py-2"><option>2023</option><option>2024</option><option>2025</option><option>2026</option></select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Semester</label>
+                            <select name="semester" id="enroll_sem" class="w-full border border-gray-300 rounded-lg px-4 py-2"><option>Winter</option><option>Spring</option><option>Summer</option><option>Fall</option></select>
+                        </div>
+                        <div><label class="block text-sm font-medium text-gray-700 mb-1">Total Courses</label><input type="number" name="courses" id="enroll_courses" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div>
+                        <div><label class="block text-sm font-medium text-gray-700 mb-1">Total Credit Hours</label><input type="number" name="cr" id="enroll_cr" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div>
+                    </div>
+                    <div class="pt-4 flex gap-2">
+                        <button type="submit" class="flex-1 bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 px-4 rounded-lg">Save Record</button>
+                        <button type="button" onclick="hideEnrollmentForm()" class="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg">Cancel</button>
+                    </div>
+                </form>
+            </div>
         </div>
 
         <!-- NEW TAB 5: Fee Paid -->
         <div id="view-paid" class="tab-content hidden">
-            <!-- (Content maintained) -->
-             <div id="paid-dashboard" class="bg-white rounded-lg shadow-lg p-6">
+            <div id="paid-dashboard" class="bg-white rounded-lg shadow-lg p-6">
                 <!-- Top Toolbar -->
                 <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4">
                     <div><h2 class="text-xl font-bold text-gray-800">Fee Payments</h2><p class="text-sm text-gray-500">Manage individual student payments</p><div class="mt-2 text-sm font-semibold text-teal-600 bg-teal-50 px-3 py-1 rounded-full inline-block">Total Records: <span id="total_payments_count">0</span></div></div>
@@ -296,7 +330,7 @@
                         <th class="border p-3 cursor-pointer" onclick="sortDiscountTable('term')">Term <i class="fas fa-sort ml-1"></i></th>
                         <th class="border p-3 text-right">Discount %</th>
                         <th class="border p-3 text-center">Actions</th>
-                    </tr></thead><tbody id="discountTableBody"><tr><td colspan="5" class="p-4 text-center text-gray-500 italic">Loading...</td></tr></tbody></table>
+                    </tr></thead><tbody id="discountTableBody"><tr><td colspan="5" class="p-4 text-center text-gray-500 italic">No records found.</td></tr></tbody></table>
                 </div>
             </div>
 
@@ -375,7 +409,17 @@
                     return;
                 }
 
-                JSON.parse(text);
+                // Attempt to clean dirty JSON (e.g., stray characters before the actual JSON)
+                const firstBrace = text.indexOf('{');
+                const firstBracket = text.indexOf('[');
+                let start = -1;
+                if (firstBrace !== -1 && firstBracket !== -1) start = Math.min(firstBrace, firstBracket);
+                else if (firstBrace !== -1) start = firstBrace;
+                else if (firstBracket !== -1) start = firstBracket;
+
+                const cleanText = start !== -1 ? text.substring(start) : text;
+
+                JSON.parse(cleanText);
                 resDiv.textContent = "Success! JSON received.";
                 resDiv.classList.remove('text-red-700');
                 resDiv.classList.add('text-green-700');
@@ -420,7 +464,18 @@
                 }
 
                 let json;
-                try { json = JSON.parse(text); } catch (e) { throw new Error("Invalid JSON"); }
+                try { 
+                    // Attempt to clean dirty JSON
+                    const firstBrace = text.indexOf('{');
+                    const firstBracket = text.indexOf('[');
+                    let start = -1;
+                    if (firstBrace !== -1 && firstBracket !== -1) start = Math.min(firstBrace, firstBracket);
+                    else if (firstBrace !== -1) start = firstBrace;
+                    else if (firstBracket !== -1) start = firstBracket;
+
+                    const cleanText = start !== -1 ? text.substring(start) : text;
+                    json = JSON.parse(cleanText); 
+                } catch (e) { throw new Error("Invalid JSON"); }
                 
                 if (json.status === 'success') {
                     USE_API = true;
