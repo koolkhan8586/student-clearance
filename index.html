@@ -16,13 +16,18 @@
             #view-clearance { display: block !important; }
             #view-student, #view-fee, #view-discount, #view-enrollment, #view-paid { display: none !important; }
             .container { max-width: 100%; margin: 0; padding: 0; }
-            #search-container { display: none !important; }
         }
         #debug-modal { background-color: rgba(0,0,0,0.5); }
-        #config-modal { background-color: rgba(0,0,0,0.5); }
+        #config-modal { background-color: rgba(0,0,0,0.8); }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen p-4 md:p-8 font-sans">
+
+    <!-- Global Error Banner -->
+    <div id="global-error" class="hidden fixed top-0 left-0 w-full bg-red-600 text-white p-4 text-center z-50 font-bold shadow-lg">
+        CRITICAL ERROR: <span id="global-error-msg"></span>
+        <button onclick="this.parentElement.classList.add('hidden')" class="ml-4 border border-white px-2 rounded hover:bg-red-700">Dismiss</button>
+    </div>
 
     <div class="max-w-7xl mx-auto container">
         
@@ -59,11 +64,11 @@
                     <h3 class="text-lg font-bold text-red-700">Connection Failed</h3>
                     <button onclick="document.getElementById('config-modal').classList.add('hidden')" class="text-gray-500 hover:text-black">&times;</button>
                 </div>
-                <p class="text-sm text-gray-600 mb-4">The system tried to connect to the database but failed. Please verify the API path and database credentials.</p>
+                <p class="text-sm text-gray-600 mb-4">The system cannot connect to the database. Please verify the API path.</p>
                 
                 <label class="block text-sm font-bold mb-2">API URL</label>
                 <div class="flex gap-2 mb-2">
-                    <input type="text" id="api_url_input" class="flex-grow border rounded p-2 font-mono text-sm" value="api.php" placeholder="http://localhost/fee_system/api.php">
+                    <input type="text" id="api_url_input" class="flex-grow border rounded p-2 font-mono text-sm" value="api.php">
                     <button onclick="testApiConnection()" class="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-2 rounded text-sm font-bold">Test</button>
                 </div>
                 <div id="api-test-result" class="text-xs font-mono p-2 bg-gray-100 rounded mb-4 hidden break-all max-h-24 overflow-auto"></div>
@@ -856,99 +861,6 @@
 
             // 5. Special handlers
             if(tabId === 'fee') updateFeeDropdowns();
-        }
-
-        // --- SEARCH REPORT ---
-        function searchStudentByRegNo() {
-            const reg = document.getElementById('search_reg_input').value.trim();
-            const s = g_students.find(x => x.reg_no.toLowerCase() === reg.toLowerCase());
-            if(!s) return alert("Student not found.");
-            
-            document.getElementById('disp_reg').textContent = s.reg_no;
-            document.getElementById('disp_name').textContent = s.name;
-            document.getElementById('disp_degree').textContent = s.degree;
-            document.getElementById('disp_batch').textContent = s.batch;
-            
-            // Generate Report
-            const tbody = document.getElementById('feeTableBody');
-            tbody.innerHTML = '';
-            
-            // Get enrollments for this student
-            const myEnroll = g_enrollments.filter(e => e.reg_no.toLowerCase() === s.reg_no.toLowerCase());
-            
-            if(myEnroll.length === 0) {
-                 tbody.innerHTML = `<tr><td colspan="13" class="text-center p-4 text-orange-600 font-bold">Student found, but no enrollment records exist.</td></tr>`;
-                 return;
-            }
-
-            let gt=0, gp=0, gfa=0;
-            // Sort by semester (simple string sort for now, better would be parsing "Spring 2023")
-            myEnroll.sort((a,b) => a.semester.localeCompare(b.semester));
-
-            myEnroll.forEach((en, idx) => {
-                // Find matching Fee Structure (Degree + Batch + Semester + Year)
-                // Assuming Fee Structure stores Semester like "Fall" and Year like "2023" separately
-                // And Enrollment stores "Fall 2023" combined. Need to parse.
-                
-                // Flexible matching logic
-                const fee = g_fees.find(f => 
-                    f.degree.toLowerCase() === s.degree.toLowerCase() && 
-                    f.batch.toLowerCase() === s.batch.toLowerCase() && 
-                    en.semester.toLowerCase().includes(f.semester.toLowerCase()) &&
-                    en.semester.includes(f.year)
-                );
-                
-                // Find matching Discount
-                const disc = g_discounts.find(d => d.reg_no.toLowerCase() === s.reg_no.toLowerCase() && d.term.toLowerCase() === en.semester.toLowerCase());
-                
-                // Find Payments for this semester
-                const pays = g_payments.filter(p => p.reg_no.toLowerCase() === s.reg_no.toLowerCase() && p.semester.toLowerCase() === en.semester.toLowerCase());
-                
-                const tFee = fee ? parseFloat(fee.total_fee || (parseFloat(fee.tuition_fee) + parseFloat(fee.exam_fee))) : 0;
-                const paid = pays.reduce((a,b) => a + parseFloat(b.amount), 0);
-                const dPerc = disc ? parseFloat(disc.discount) : 0;
-                const faAmt = (tFee * dPerc) / 100;
-                const net = tFee - faAmt;
-                const bal = net - paid;
-                
-                gt += tFee; gp += paid; gfa += faAmt;
-
-                const row = `
-                    <tr class="border-b border-gray-300">
-                        <td class="text-center">${idx+1}</td>
-                        <td class="font-bold px-1">${en.semester}</td>
-                        <td class="text-center">${en.cr}</td>
-                        <td class="text-right px-1">${fee ? num(fee.reg_fee) : '-'}</td>
-                        <td class="text-right px-1">${fee ? num(fee.tuition_fee) : '-'}</td>
-                        <td class="text-right px-1">${fee ? num(fee.exam_fee) : '-'}</td>
-                        <td class="text-right px-1">${fee ? num(fee.other_fee) : '-'}</td>
-                        <td class="text-right px-1 bg-gray-100 font-bold">${num(tFee)}</td>
-                        <td class="text-center">${dPerc}%</td>
-                        <td class="text-right px-1">${num(faAmt)}</td>
-                        <td class="text-right px-1 font-bold">${num(net)}</td>
-                        <td class="text-right px-1 text-green-700">${num(paid)}</td>
-                        <td class="text-right px-1 font-bold ${bal>0?'text-red-600':'text-green-600'}">${num(bal)}</td>
-                    </tr>
-                `;
-                tbody.innerHTML += row;
-            });
-            
-            const gBal = (gt - gfa) - gp;
-            
-            document.getElementById('tableFooter').innerHTML = `
-                <tr class="bg-gray-100 border-t-2 border-black">
-                    <td colspan="7" class="text-right p-2 font-bold uppercase">Grand Total:</td>
-                    <td class="text-right p-2 font-bold border border-black">${num(gt)}</td>
-                    <td colspan="2" class="text-right p-2 text-green-700 border border-black">FA: ${num(gfa)}</td>
-                    <td class="text-right p-2 font-bold border border-black">${num(gt-gfa)}</td>
-                    <td class="text-right p-2 text-blue-700 border border-black">${num(gp)}</td>
-                    <td class="text-right p-2 text-red-600 font-extrabold border border-black text-lg">${num(gBal)}</td>
-                </tr>`;
-                
-             document.getElementById('summary_total').textContent = num(gt);
-             document.getElementById('summary_fa').textContent = num(gfa);
-             document.getElementById('summary_paid').textContent = num(gp);
-             document.getElementById('summary_balance').textContent = num(gBal);
         }
 
     </script>
