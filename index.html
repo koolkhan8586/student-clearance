@@ -274,7 +274,7 @@
                     <div><h2 class="text-xl font-bold text-gray-800">Discount Registry</h2><p class="text-sm text-gray-500">Upload Excel with Reg Number, Name, Academic Term, Student Discount</p></div>
                     <div class="flex gap-2">
                         <input type="file" id="discount_excel_file" accept=".xlsx, .xls" class="hidden" onchange="handleDiscountExcelUpload(event)">
-                        <button onclick="document.getElementById('discount_excel_file').click()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm"><i class="fas fa-file-import mr-2"></i> Import Discounts</button>
+                        <button onclick="document.getElementById('discount_excel_file').click()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm"><i class="fas fa-file-import mr-1"></i> Import Discounts</button>
                         <button onclick="downloadDiscountTemplate()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition flex items-center text-sm"><i class="fas fa-download mr-2"></i> Template</button>
                     </div>
                 </div>
@@ -320,9 +320,6 @@
         function normalizeTerm(t) { return t ? t.toString().toLowerCase().replace(/[^a-z0-9]/g, '') : ""; }
 
         initData();
-        
-        // Render Immediately to clear loading state
-        renderStudentTable(); renderFeeDashboard(); renderEnrollmentTable(); renderDiscountTable(); renderPaymentTable();
 
         async function initData() {
             try {
@@ -330,9 +327,8 @@
                 const text = await res.text();
                 lastRawResponse = text; 
 
-                // Check for HTML/PHP error dump
+                // Check for HTML/PHP error dump - CRITICAL FIX
                 if (text.trim().startsWith('<')) {
-                     // Assume error, fallback silently
                      console.warn("Server returned HTML, falling back to local storage");
                      throw new Error("Invalid Server Response");
                 }
@@ -353,7 +349,7 @@
                     const localStudents = getStorage('fee_system_students_list_v2');
                     
                     if (serverStudents.length === 0 && localStudents.length > 0) {
-                        // HYBRID MODE: Server is empty, User has local data. 
+                        // HYBRID MODE
                         console.warn("Server empty, loading local data for view.");
                         g_students = localStudents;
                         g_fees = getStorage('fee_system_records_v6');
@@ -391,7 +387,7 @@
                 g_discounts = getStorage('fee_system_discounts_v1') || [];
                 g_payments = getStorage('fee_system_payments_v1') || []; 
             } finally {
-                // Clean nulls & filter invalid rows that crash render
+                // FORCE RENDER IN FINALLY BLOCK TO ENSURE LOADING IS CLEARED
                 try {
                     g_students = Array.isArray(g_students) ? g_students.filter(x => x && x.reg_no) : [];
                     g_fees = Array.isArray(g_fees) ? g_fees : [];
@@ -401,7 +397,6 @@
                      g_students = []; g_fees = []; g_enrollments = [];
                 }
                 
-                // Render UI safely - THIS MUST RUN
                 renderStudentTable(); 
                 renderFeeDashboard(); 
                 renderEnrollmentTable(); 
