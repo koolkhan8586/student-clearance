@@ -312,7 +312,7 @@
         document.getElementById('printDate').textContent = new Date().toLocaleString();
         
         // Define helpers early
-        function getStorage(k) { const s=localStorage.getItem(k); return s?JSON.parse(s):[]; }
+        function getStorage(k) { const s=localStorage.getItem(k); try { return s ? JSON.parse(s) : []; } catch(e) { return []; } }
         function setStorage(k,v) { localStorage.setItem(k,JSON.stringify(v)); }
         function num(n) { return parseFloat(n).toLocaleString('en-US'); }
         function normalizeTerm(t) { return t ? t.toString().toLowerCase().replace(/[^a-z0-9]/g, '') : ""; }
@@ -330,9 +330,9 @@
                 
                 if (json.status === 'success') {
                     USE_API = true;
-                    // Load server data
+                    // Load server data, ensuring arrays
                     const serverStudents = json.data.students || [];
-                    const serverFees = json.data.fees || []; // Note key mismatch check: api.php returns 'fees' for 'fee_structure'
+                    const serverFees = json.data.fees || []; 
                     const serverEnrollments = json.data.enrollments || [];
                     const serverDiscounts = json.data.discounts || [];
                     const serverPayments = json.data.payments || [];
@@ -342,7 +342,6 @@
                     
                     if (serverStudents.length === 0 && localStudents.length > 0) {
                         // HYBRID MODE: Server is empty, User has local data. 
-                        // Show Local Data but prompt to Sync.
                         console.warn("Server empty, loading local data for view.");
                         g_students = localStudents;
                         g_fees = getStorage('fee_system_records_v6');
@@ -353,16 +352,12 @@
                         document.getElementById('conn-status').classList.remove('hidden');
                         document.getElementById('conn-status').innerHTML = `
                              <div class="flex flex-col sm:flex-row justify-between w-full items-center gap-2">
-                                <div class="flex flex-col"><span class="text-orange-700"><strong>⚠️ database is empty</strong>. Viewing local data.</span></div>
+                                <div class="flex flex-col"><span class="text-orange-700"><strong>⚠️ Server DB is empty</strong>. Showing browser data.</span></div>
                                 <div class="flex gap-2">
                                     <button onclick="syncLocalToServer()" class="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 transition shadow-sm font-bold animate-pulse"><i class="fas fa-cloud-upload-alt mr-1"></i> Sync Data to Server</button>
                                 </div>
                             </div>
                         `;
-                        // Important: Set USE_API to false temporarily so edits update the local view until synced? 
-                        // No, let's keep USE_API true but warn them. Actually, if they add a student now, it goes to server (ID 1), while local has IDs... complex.
-                        // Simplest: Force them to sync or stay in local mode.
-                        USE_API = false; // Stay local until synced
                     } else {
                         // Normal Server Mode
                         g_students = serverStudents;
@@ -390,11 +385,20 @@
                 g_fees = getStorage('fee_system_records_v6') || [];
                 g_enrollments = getStorage('fee_system_enrollments_v1') || [];
                 g_discounts = getStorage('fee_system_discounts_v1') || [];
-                g_payments = getStorage('fee_system_payments_v1') || []; // Local fallback
+                g_payments = getStorage('fee_system_payments_v1') || []; 
             }
+            
+            // Clean nulls
+            g_students = g_students.filter(x => x && x.reg_no);
+            
+            // Render UI safely
             renderStudentTable(); renderFeeDashboard(); renderEnrollmentTable(); renderDiscountTable(); renderPaymentTable();
+            
             const saved = localStorage.getItem('active_student_session');
-            if (saved) { activeStudent = JSON.parse(saved); loadActiveStudentUI(); renderClearanceTable(); }
+            if (saved) { 
+                try { activeStudent = JSON.parse(saved); loadActiveStudentUI(); renderClearanceTable(); } 
+                catch(e) { console.error("Active student load error", e); }
+            }
         }
 
         function showDebugModal() { document.getElementById('debug-content').textContent = lastRawResponse || "No response recorded."; document.getElementById('debug-modal').classList.remove('hidden'); }
@@ -432,19 +436,31 @@
                 const res = await fetch(`${API_URL}?action=${act}`, { method: 'POST', body: JSON.stringify(data) });
                 return await res.json();
             } else {
-                if (type === 'student') { g_students.push(data); setStorage('fee_system_students_list_v2', g_students); }
+                if (type === 'student') { 
+                    if(data.reg_no) g_students = g_students.filter(s => s.reg_no !== data.reg_no);
+                    g_students.push(data); setStorage('fee_system_students_list_v2', g_students); 
+                }
                 else if (type === 'fee') { 
                     if(data.id && data.id !== '-1') g_fees = g_fees.filter(f => f.id != data.id);
+                    // Add ID for local
+                    if(!data.id || data.id === '-1') data.id = Date.now().toString();
                     g_fees.push(data); setStorage('fee_system_records_v6', g_fees); 
                 }
                 else if (type === 'enrollment') { 
-                    // Add ID for local storage if missing
-                    if(!data.id || data.id === "-1") data.id = Date.now().toString();
-                    if(data.id) g_enrollments = g_enrollments.filter(x=>x.id!=data.id);
+                    if(data.id && data.id !== "-1") g_enrollments = g_enrollments.filter(x=>x.id!=data.id);
+                    if(!data.id || data.id === "-1") data.id = Date.now().toString(); 
                     g_enrollments.push(data); setStorage('fee_system_enrollments_v1', g_enrollments); 
                 }
-                else if (type === 'payment') { if(data.id) g_payments = g_payments.filter(x=>x.id!=data.id); g_payments.push(data); setStorage('fee_system_payments_v1', g_payments); }
-                else if (type === 'discount') { if(data.id) g_discounts = g_discounts.filter(x=>x.id!=data.id); g_discounts.push(data); setStorage('fee_system_discounts_v1', g_discounts); }
+                else if (type === 'payment') { 
+                    if(data.id && data.id !== "-1") g_payments = g_payments.filter(x=>x.id!=data.id);
+                    if(!data.id || data.id === "-1") data.id = Date.now().toString();
+                    g_payments.push(data); setStorage('fee_system_payments_v1', g_payments); 
+                }
+                else if (type === 'discount') { 
+                    if(data.id && data.id !== "-1") g_discounts = g_discounts.filter(x=>x.id!=data.id);
+                    if(!data.id || data.id === "-1") data.id = Date.now().toString();
+                    g_discounts.push(data); setStorage('fee_system_discounts_v1', g_discounts); 
+                }
                 return { status: 'success' };
             }
         }
@@ -488,7 +504,6 @@
             else { g_payments = []; setStorage('fee_system_payments_v1', []); renderPaymentTable(); }
         }
         
-        // NEW DELETE ALL FEES FUNCTION
         async function deleteAllFeesData() {
             if (USE_API) { await fetch(`${API_URL}?action=delete_all_fees`, { method: 'POST' }); await initData(); } 
             else { g_fees = []; setStorage('fee_system_records_v6', []); renderFeeDashboard(); }
@@ -514,7 +529,6 @@
             } else {
                 if(type==='students') { g_students=[...g_students,...arr]; setStorage('fee_system_students_list_v2', g_students); }
                 if(type==='enrollments') { 
-                    // Add IDs for local storage imports
                     const toAdd = arr.map(e => ({...e, id: Date.now() + Math.random()}));
                     g_enrollments=[...g_enrollments,...toAdd]; setStorage('fee_system_enrollments_v1', g_enrollments); 
                 }
