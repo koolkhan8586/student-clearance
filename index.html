@@ -18,8 +18,7 @@
             .container { max-width: 100%; margin: 0; padding: 0; }
             #search-container { display: none !important; }
         }
-        #debug-modal { background-color: rgba(0,0,0,0.5); }
-        #config-modal { background-color: rgba(0,0,0,0.5); }
+        #diagnostic-modal { background-color: rgba(0,0,0,0.8); }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen p-4 md:p-8 font-sans">
@@ -29,65 +28,33 @@
         <!-- Header -->
         <div class="bg-white rounded-lg shadow-lg p-6 mb-6 flex flex-col md:flex-row justify-between items-center border-b-4 border-green-600 no-print">
             <div class="flex items-center gap-4 mb-4 md:mb-0">
-                <div class="bg-green-600 text-white p-3 rounded-full">
-                    <i class="fas fa-university text-2xl"></i>
-                </div>
+                <div class="bg-green-600 text-white p-3 rounded-full"><i class="fas fa-university text-2xl"></i></div>
                 <div>
                     <h1 class="text-2xl font-bold text-gray-800">Fee Management System</h1>
                     <p class="text-sm text-gray-500">School of Accountancy & Finance</p>
                 </div>
             </div>
             <div class="flex gap-2">
+                 <button onclick="openDiagnostic()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition shadow-sm border border-purple-800">
+                    <i class="fas fa-stethoscope mr-2"></i> Diagnose
+                </button>
                 <button onclick="window.print()" class="bg-gray-700 hover:bg-gray-800 text-white px-4 py-2 rounded-lg transition">
-                    <i class="fas fa-print mr-2"></i> Print Report
-                </button>
-                <button onclick="resetSystem()" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition">
-                    <i class="fas fa-trash mr-2"></i> Reset System
+                    <i class="fas fa-print mr-2"></i> Print
                 </button>
             </div>
         </div>
 
-        <!-- Connection Status & Config (Improved Visibility) -->
-        <div id="conn-status" class="hidden mb-4 px-4 py-3 rounded text-sm font-bold no-print border flex flex-col sm:flex-row justify-between items-center transition-all duration-300">
-            <!-- Content injected by JS -->
-        </div>
-
-        <!-- Config Modal -->
-        <div id="config-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div class="bg-white rounded-lg shadow-2xl w-full max-w-md p-6 border-2 border-red-500">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-lg font-bold text-red-700">Connection Failed</h3>
-                    <button onclick="document.getElementById('config-modal').classList.add('hidden')" class="text-gray-500 hover:text-black">&times;</button>
-                </div>
-                <p class="text-sm text-gray-600 mb-4">The system tried to connect to the database but failed. Please verify the API path and database credentials.</p>
-                
-                <label class="block text-sm font-bold mb-2">API URL</label>
-                <div class="flex gap-2 mb-2">
-                    <input type="text" id="api_url_input" class="flex-grow border rounded p-2 font-mono text-sm" value="api.php" placeholder="http://localhost/fee_system/api.php">
-                    <button onclick="testApiConnection()" class="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-2 rounded text-sm font-bold">Test</button>
-                </div>
-                <div id="api-test-result" class="text-xs font-mono p-2 bg-gray-100 rounded mb-4 hidden break-all max-h-24 overflow-auto"></div>
-
-                <div class="flex justify-end gap-2">
-                    <button onclick="document.getElementById('config-modal').classList.add('hidden')" class="px-4 py-2 bg-gray-200 rounded text-sm">Cancel</button>
-                    <button onclick="saveApiConfig()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-bold">Save & Retry</button>
-                </div>
+        <!-- System Status Bar -->
+        <div id="conn-status" class="mb-4 px-4 py-3 rounded bg-white text-gray-800 text-sm font-bold no-print flex flex-col sm:flex-row justify-between items-center border shadow-sm">
+            <div id="status-text" class="flex items-center gap-2">
+                <span class="inline-block w-3 h-3 rounded-full bg-yellow-500" id="status-dot"></span>
+                <span id="status-msg">Connecting to Database...</span>
             </div>
-        </div>
-
-        <!-- Debug Modal -->
-        <div id="debug-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div class="bg-white rounded-lg shadow-2xl w-full max-w-2xl h-3/4 flex flex-col">
-                <div class="p-4 border-b flex justify-between items-center bg-gray-50 rounded-t-lg">
-                    <h3 class="font-bold text-lg text-red-600">Raw Server Response</h3>
-                    <button onclick="document.getElementById('debug-modal').classList.add('hidden')" class="text-gray-500 hover:text-gray-800 text-xl">&times;</button>
-                </div>
-                <div class="p-4 flex-grow overflow-auto bg-gray-100 font-mono text-xs">
-                    <pre id="debug-content" class="whitespace-pre-wrap break-all"></pre>
-                </div>
-                <div class="p-4 border-t flex justify-end bg-gray-50 rounded-b-lg">
-                    <button onclick="document.getElementById('debug-modal').classList.add('hidden')" class="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">Close</button>
-                </div>
+            <div class="flex gap-4 text-xs text-gray-500 mt-2 sm:mt-0 font-mono">
+                <span>Students: <span id="count-st" class="text-black text-base">0</span></span>
+                <span>Fees: <span id="count-fe" class="text-black text-base">0</span></span>
+                <span>Enroll: <span id="count-en" class="text-black text-base">0</span></span>
+                <span>Disc: <span id="count-di" class="text-black text-base">0</span></span>
             </div>
         </div>
 
@@ -105,757 +72,292 @@
 
         <!-- TAB 1: Clearance Report -->
         <div id="view-clearance" class="tab-content block">
-            <div id="search-container" class="bg-blue-50 rounded-lg p-4 mb-6 border border-blue-200 no-print flex flex-col md:flex-row gap-4 items-end">
+            <div class="bg-blue-50 rounded-lg p-4 mb-6 border border-blue-200 no-print flex flex-col md:flex-row gap-4 items-end">
                 <div class="flex-grow w-full">
                     <label class="block text-xs font-bold text-blue-700 uppercase mb-1">Search Student by Reg #</label>
                     <div class="flex gap-2">
-                        <input type="text" id="search_reg_input" placeholder="e.g. BSCAF052530040" class="w-full border rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500 font-mono" onkeypress="handleSearchEnter(event)">
-                        <button onclick="searchStudentByRegNo()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-bold transition flex items-center"><i class="fas fa-search mr-2"></i> Search</button>
+                        <input type="text" id="search_reg_input" placeholder="e.g. BSCAF052530040" class="w-full border rounded-lg px-4 py-2 outline-none font-mono" onkeypress="handleSearchEnter(event)">
+                        <button onclick="searchStudentByRegNo()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-bold"><i class="fas fa-search mr-2"></i> Search</button>
                     </div>
                 </div>
             </div>
 
-            <div class="bg-white rounded-lg shadow-lg p-8 min-h-[800px] relative" id="printableArea">
-                <div class="absolute top-8 right-8 no-print">
-                    <button onclick="window.print()" class="bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded shadow flex items-center text-sm"><i class="fas fa-print mr-2"></i> Print Official Report</button>
-                </div>
-                <div class="text-center mb-8 border-b-2 border-gray-800 pb-4 mt-4">
-                    <h2 class="text-2xl font-bold uppercase tracking-wide">The University of Lahore</h2>
+            <div class="bg-white rounded-lg shadow-lg p-8 min-h-[500px]" id="printableArea">
+                <div class="text-center mb-8 border-b-2 border-gray-800 pb-4">
+                    <h2 class="text-2xl font-bold uppercase">The University of Lahore</h2>
                     <h3 class="text-xl font-semibold text-gray-700">School of Accountancy & Finance</h3>
                     <p class="text-sm text-gray-500 mt-1">Student Fee Clearance Report</p>
                 </div>
-                <div class="grid grid-cols-2 gap-x-8 gap-y-4 mb-6 text-sm">
-                    <div class="flex"><span class="font-bold w-32">Reg #:</span><span class="border-b border-gray-400 flex-1 px-2 text-gray-800 font-mono" id="display_reg_no">--</span></div>
-                    <div class="flex"><span class="font-bold w-32">Degree Program:</span><span class="border-b border-gray-400 flex-1 px-2 text-gray-800" id="display_degree">--</span></div>
-                    <div class="flex"><span class="font-bold w-32">Name:</span><span class="border-b border-gray-400 flex-1 px-2 text-gray-800" id="display_name">--</span></div>
-                    <div class="flex"><span class="font-bold w-32">Batch:</span><span class="border-b border-gray-400 flex-1 px-2 text-gray-800" id="display_batch">--</span></div>
-                    <div class="flex"><span class="font-bold w-32">Registration Fee:</span><span class="border-b border-gray-400 flex-1 px-2 text-gray-800 font-mono" id="display_base_reg_fee">--</span></div>
-                    <div class="flex"><span class="font-bold w-32 text-gray-700">Per Crhr Fee:</span><span class="border-b border-gray-400 flex-1 px-2 text-gray-800 font-mono" id="display_per_cr_fee">--</span></div>
+                <div class="grid grid-cols-2 gap-4 mb-6 text-sm">
+                    <div><span class="font-bold w-32 inline-block">Reg #:</span> <span id="disp_reg" class="border-b border-gray-400 px-2">--</span></div>
+                    <div><span class="font-bold w-32 inline-block">Degree:</span> <span id="disp_degree" class="border-b border-gray-400 px-2">--</span></div>
+                    <div><span class="font-bold w-32 inline-block">Name:</span> <span id="disp_name" class="border-b border-gray-400 px-2">--</span></div>
+                    <div><span class="font-bold w-32 inline-block">Batch:</span> <span id="disp_batch" class="border-b border-gray-400 px-2">--</span></div>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="w-full text-xs md:text-sm text-left border-collapse border border-gray-300">
-                        <thead class="bg-gray-100 text-gray-700 font-bold uppercase text-xs">
+                        <thead class="bg-gray-100 font-bold uppercase text-xs">
                             <tr>
-                                <th class="border p-2 text-center w-10">Sr</th><th class="border p-2">Session</th><th class="border p-2 text-center w-12">Cr</th><th class="border p-2 text-center w-16">Subjects</th>
-                                <th class="border p-2 text-right">Tuition</th><th class="border p-2 text-right">Exam</th><th class="border p-2 text-right">Others</th><th class="border p-2 text-right bg-gray-50">Total</th>
-                                <th class="border p-2 text-center w-12">FA%</th><th class="border p-2 text-right">FA Amt</th><th class="border p-2 text-right font-semibold">Net Fee</th>
+                                <th class="border p-2">Session</th><th class="border p-2 text-right">Tuition</th><th class="border p-2 text-right">Exam</th><th class="border p-2 text-right">Others</th><th class="border p-2 text-right bg-gray-50">Total</th>
                                 <th class="border p-2 text-right text-green-700">Paid</th><th class="border p-2 text-right text-red-700">Bal</th>
                             </tr>
                         </thead>
-                        <tbody id="feeTableBody"><tr><td colspan="13" class="text-center p-4 text-gray-500 italic">No records found.</td></tr></tbody>
-                        <tfoot class="bg-gray-50 font-bold text-gray-800" id="tableFooter"></tfoot>
+                        <tbody id="feeTableBody"><tr><td colspan="7" class="text-center p-8 text-gray-400 italic">Enter a Registration Number above to search.</td></tr></tbody>
                     </table>
                 </div>
-                <div class="mt-8 flex justify-end">
-                    <div class="w-64 border border-gray-800 p-4 bg-gray-50">
-                        <h4 class="font-bold text-center border-b border-gray-400 mb-2 pb-1">Summary</h4>
-                        <div class="flex justify-between mb-1"><span>Total Fee:</span><span id="summary_total">0</span></div>
-                        <div class="flex justify-between mb-1 text-green-600"><span>Fin. Assist:</span><span id="summary_fa">0</span></div>
-                        <div class="flex justify-between mb-1 text-blue-600"><span>Paid (Receipts):</span><span id="summary_paid">0</span></div>
-                        <div class="border-t border-gray-400 my-2"></div>
-                        <div class="flex justify-between font-bold text-lg text-red-600"><span>Balance:</span><span id="summary_balance">0</span></div>
-                    </div>
-                </div>
-                <div class="absolute bottom-4 left-8 right-8 flex justify-between text-xs text-gray-400 mt-12"><span>Printed: <span id="printDate"></span></span><span>System generated report</span></div>
             </div>
         </div>
 
         <!-- TAB 2: Student Data -->
         <div id="view-student" class="tab-content hidden">
-            <div id="student-dashboard" class="bg-white rounded-lg shadow-lg p-6">
-                <div class="flex flex-col xl:flex-row justify-between items-center mb-6 gap-4">
-                    <div><h2 class="text-xl font-bold text-gray-800">Student Directory</h2><p class="text-sm text-gray-500">Manage all student records here</p><div class="mt-2 text-sm font-semibold text-blue-600 bg-blue-50 px-3 py-1 rounded-full inline-block">Total Students: <span id="total_students_count">0</span></div></div>
-                    <div class="flex flex-col sm:flex-row gap-3 w-full lg:w-auto items-center">
-                        <div class="relative w-full sm:w-64"><input type="text" id="student_list_search" placeholder="Search by Reg, Name, Batch..." onkeyup="filterStudents()" class="border border-gray-300 rounded-lg px-4 py-2 pl-10 w-full text-sm focus:ring-2 focus:ring-blue-500 outline-none shadow-sm transition"><i class="fas fa-search absolute left-3 top-3 text-gray-400 text-xs"></i></div>
-                        <div class="flex gap-2 flex-wrap justify-center sm:justify-start">
-                            <input type="file" id="student_excel_file" accept=".xlsx, .xls" class="hidden" onchange="handleStudentExcelUpload(event)">
-                            <button onclick="document.getElementById('student_excel_file').click()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-sm"><i class="fas fa-file-excel mr-1"></i> Import</button>
-                            <button onclick="exportStudentsToExcel()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-sm"><i class="fas fa-file-export mr-1"></i> Export</button>
-                            <button onclick="showAddForm()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-sm"><i class="fas fa-plus mr-1"></i> Add</button>
-                            <button onclick="deleteAllStudents()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-sm"><i class="fas fa-trash-alt mr-1"></i> Del All</button>
-                        </div>
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold">Student Directory</h2>
+                    <div class="flex gap-2">
+                        <input type="file" id="student_excel" class="hidden" onchange="handleFile(e, 'students')">
+                        <button onclick="document.getElementById('student_excel').click()" class="bg-green-600 text-white px-3 py-1 rounded text-sm">Import</button>
                     </div>
                 </div>
-                <div id="upload-progress-container" class="hidden mb-4"><div class="flex justify-between text-xs mb-1 text-gray-600"><span>Processing Upload...</span><span id="progress-text">0%</span></div><div class="w-full bg-gray-200 rounded-full h-2.5"><div id="upload-progress-bar" class="bg-blue-600 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div></div></div>
-                <div class="overflow-x-auto border rounded-lg"><table class="w-full text-sm text-left border-collapse border-b border-gray-200"><thead class="bg-gray-50 text-gray-700 uppercase text-xs"><tr><th class="border-b p-3 cursor-pointer" onclick="sortStudentTable('reg_no')">Reg Number</th><th class="border-b p-3 cursor-pointer" onclick="sortStudentTable('name')">Name</th><th class="border-b p-3 cursor-pointer" onclick="sortStudentTable('degree')">Degree</th><th class="border-b p-3 cursor-pointer" onclick="sortStudentTable('batch')">Batch</th><th class="border-b p-3 text-center">Actions</th></tr></thead><tbody id="studentsTableBody"><tr><td colspan="5" class="p-4 text-center text-gray-500">Loading...</td></tr></tbody></table></div>
-            </div>
-            <div id="student-form-container" class="hidden bg-white rounded-lg shadow-lg p-6 max-w-2xl mx-auto mt-4"><div class="flex justify-between items-center border-b pb-4 mb-4"><h3 class="text-lg font-bold text-gray-800" id="form-title">Add New Student</h3><button onclick="hideAddForm()" class="text-gray-500 hover:text-red-500"><i class="fas fa-times"></i></button></div><form id="studentForm" onsubmit="saveStudentList(event)" class="space-y-4"><input type="hidden" id="edit_index" value="-1"><div class="grid grid-cols-1 md:grid-cols-2 gap-4"><div class="col-span-1 md:col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Registration Number</label><input type="text" name="reg_no" id="input_reg_no" oninput="autoFillDegree(this.value)" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div class="col-span-1 md:col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Full Name</label><input type="text" name="name" id="input_name" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div><label class="block text-sm font-medium text-gray-700 mb-1">Degree Program</label><input type="text" name="degree" id="input_degree" class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div><label class="block text-sm font-medium text-gray-700 mb-1">Batch (Session)</label><input type="text" name="batch" id="input_batch" class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div class="col-span-1 md:col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Mobile</label><input type="text" name="mobile" id="input_mobile" class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div class="col-span-1 md:col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Email</label><input type="email" name="email" id="input_email" class="w-full border border-gray-300 rounded-lg px-4 py-2"></div></div><div class="pt-4 flex gap-2"><button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg">Save Student</button><button type="button" onclick="hideAddForm()" class="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg">Cancel</button></div></form></div>
-        </div>
-
-        <!-- TAB 3: Fee Record -->
-        <div id="view-fee" class="tab-content hidden">
-            <div class="bg-white rounded-lg shadow-lg p-6 max-w-4xl mx-auto">
-                <div class="flex items-center gap-3 mb-6 border-b pb-4">
-                    <div class="bg-green-100 text-green-600 p-3 rounded-full"><i class="fas fa-layer-group text-xl"></i></div>
-                    <div><h2 class="text-xl font-bold text-gray-800">Fee Structure</h2><p class="text-sm text-gray-500">Define fee records by Degree & Batch.</p></div>
+                <input type="text" id="filter_student" onkeyup="renderStudentTable()" placeholder="Filter..." class="w-full border p-2 mb-2 rounded">
+                <div class="overflow-x-auto h-96 overflow-y-auto border rounded">
+                    <table class="w-full text-sm text-left"><thead class="bg-gray-100 sticky top-0"><tr><th class="p-2 border">Reg #</th><th class="p-2 border">Name</th><th class="p-2 border">Degree</th><th class="p-2 border">Batch</th></tr></thead><tbody id="studentBody"><tr><td colspan="4" class="p-4 text-center">No records found.</td></tr></tbody></table>
                 </div>
-                <div class="flex justify-end mb-4">
-                     <div class="flex gap-2">
-                        <input type="file" id="fee_excel_file" accept=".xlsx, .xls" class="hidden" onchange="handleFeeExcelUpload(event)">
-                        <button onclick="document.getElementById('fee_excel_file').click()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-sm"><i class="fas fa-file-excel mr-1"></i> Import Fees</button>
-                        <button onclick="downloadFeeTemplate()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition flex items-center text-sm"><i class="fas fa-download mr-1"></i> Template</button>
-                         <button onclick="deleteAllFeesData()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-sm"><i class="fas fa-trash-alt mr-1"></i> Delete All</button>
-                     </div>
-                </div>
-
-                <form id="feeForm" onsubmit="addRecord(event)" class="space-y-6">
-                    <input type="hidden" name="fee_edit_id" id="fee_edit_id" value="-1">
-                    <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-                        <h3 class="text-sm font-bold text-yellow-800 uppercase mb-3">1. Target Cohort</h3>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div><label class="block text-xs font-bold text-gray-500 uppercase">Degree Program</label><input type="text" list="degree_list" name="target_degree" id="fee_degree_select" class="w-full border border-yellow-400 rounded px-3 py-2 bg-white mt-1" placeholder="Select or Type..." required><datalist id="degree_list"></datalist></div>
-                            <div><label class="block text-xs font-bold text-gray-500 uppercase">Batch</label><input type="text" list="batch_list" name="target_batch" id="fee_batch_select" class="w-full border border-yellow-400 rounded px-3 py-2 bg-white mt-1" placeholder="Select or Type..." required><datalist id="batch_list"></datalist></div>
-                        </div>
-                    </div>
-                    <div class="bg-gray-50 p-4 rounded-lg border border-gray-200"><h3 class="text-sm font-bold text-gray-700 uppercase mb-3">2. Academic Session</h3><div class="grid grid-cols-2 gap-4"><div><label class="block text-xs font-bold text-gray-500 uppercase">Year</label><select name="year" id="fee_year" class="w-full border rounded px-3 py-2 bg-white mt-1"><option value="2023">2023</option><option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option></select></div><div><label class="block text-xs font-bold text-gray-500 uppercase">Semester</label><select name="semester" id="fee_sem" class="w-full border rounded px-3 py-2 bg-white mt-1"><option value="Winter">Winter</option><option value="Spring">Spring</option><option value="Summer">Summer</option><option value="Fall">Fall</option></select></div></div></div>
-                    <div class="bg-gray-50 p-4 rounded-lg border border-gray-200"><h3 class="text-sm font-bold text-gray-700 uppercase mb-3">3. Credit Hour & Tuition Fee</h3><div class="grid grid-cols-1 md:grid-cols-3 gap-4"><div><label class="block text-xs font-bold text-gray-500 uppercase">Total Credit Hrs</label><input type="number" name="cr" id="cr_input" oninput="calculateTotals()" class="w-full border rounded px-3 py-2 mt-1" placeholder="0"></div><div><label class="block text-xs font-bold text-gray-500 uppercase text-green-700">Cost Per Cr. Hour</label><input type="number" name="per_cr_fee" id="rate_input" oninput="calculateTotals()" class="w-full border border-green-300 bg-green-50 rounded px-3 py-2 mt-1" placeholder="0"></div><div><label class="block text-xs font-bold text-gray-500 uppercase">Tuition Fee</label><input type="number" name="tuition_fee" id="tuition_input" class="w-full border rounded px-3 py-2 bg-gray-100 mt-1 font-bold text-gray-700" placeholder="0" readonly></div></div></div>
-                    <div class="bg-gray-50 p-4 rounded-lg border border-gray-200"><h3 class="text-sm font-bold text-gray-700 uppercase mb-3">4. Examination Fee</h3><div class="grid grid-cols-1 md:grid-cols-3 gap-4"><div><label class="block text-xs font-bold text-gray-500 uppercase">Total Courses</label><input type="number" name="total_courses" id="courses_input" oninput="calculateTotals()" class="w-full border rounded px-3 py-2 mt-1" placeholder="0"></div><div><label class="block text-xs font-bold text-gray-500 uppercase text-blue-700">Exam Fee (Per Subject)</label><input type="number" name="exam_fee_per_subject" id="exam_rate_input" oninput="calculateTotals()" class="w-full border border-blue-300 bg-blue-50 rounded px-3 py-2 mt-1" placeholder="0"></div><div><label class="block text-xs font-bold text-gray-500 uppercase">Total Exam Fee</label><input type="number" name="exam_fee" id="total_exam_input" class="w-full border rounded px-3 py-2 bg-gray-100 mt-1 font-bold text-gray-700" placeholder="0" readonly></div></div></div>
-                    <div class="bg-gray-50 p-4 rounded-lg border border-gray-200"><h3 class="text-sm font-bold text-gray-700 uppercase mb-3">5. Other Charges & Payments</h3><div class="grid grid-cols-1 md:grid-cols-3 gap-4"><div><label class="block text-xs font-bold text-gray-500 uppercase">Registration Fee</label><input type="number" name="reg_fee" id="reg_fee_input" class="w-full border rounded px-3 py-2 mt-1" placeholder="0"></div><div><label class="block text-xs font-bold text-gray-500 uppercase">Other Charges</label><input type="number" name="other_fee" id="other_fee_input" class="w-full border rounded px-3 py-2 mt-1" placeholder="0"></div><div><label class="block text-xs font-bold text-gray-500 uppercase">Total Paid (Legacy)</label><input type="number" name="paid" id="paid_input" class="w-full border rounded px-3 py-2 mt-1" placeholder="0" title="Use Fee Paid tab for new records"></div></div></div>
-                    <button type="submit" id="fee_submit_btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition shadow-md"><i class="fas fa-plus-circle mr-2"></i> Add Batch Fee Record</button>
-                    <button type="button" onclick="cancelFeeEdit()" id="fee_cancel_btn" class="hidden w-full bg-gray-400 hover:bg-gray-500 text-white font-bold py-3 px-4 rounded-lg transition shadow-md mt-2">Cancel</button>
-                </form>
-                <div class="mt-8 border-t pt-4"><h4 class="text-gray-700 text-lg font-bold mb-4">Fee Record Dashboard</h4><div class="overflow-x-auto"><table class="w-full text-sm text-left border-collapse border border-gray-200"><thead class="bg-gray-100 text-gray-700 uppercase text-xs"><tr><th class="border p-2">Degree Program</th><th class="border p-2">Batch</th><th class="border p-2 text-right">Per Cr. Fee</th><th class="border p-2 text-right">Total Exam Fee</th><th class="border p-2 text-right">Others</th><th class="border p-2 text-right">Total Semester Fee</th><th class="border p-2 text-center">Session</th><th class="border p-2 text-center">Actions</th></tr></thead><tbody id="feeDashboardBody"><tr><td colspan="8" class="p-4 text-center text-gray-500 italic">No records found.</td></tr></tbody></table></div></div>
             </div>
         </div>
 
-        <!-- TAB 4: Enrollment -->
-        <div id="view-enrollment" class="tab-content hidden">
-             <div class="bg-white rounded-lg shadow-lg p-6">
-                <div class="flex flex-col md:flex-row justify-between items-end mb-6 gap-4 border-b pb-4">
-                    <div><h2 class="text-xl font-bold text-gray-800">Enrollment Data</h2><p class="text-sm text-gray-500 mb-2">Upload Excel (Reg #, Name, Courses, Credit Hrs).</p><div class="mt-2 text-sm font-semibold text-orange-600 bg-orange-50 px-3 py-1 rounded-full inline-block">Total Records: <span id="total_enrollments_count">0</span></div><div class="bg-orange-50 p-2 rounded border border-orange-200 mt-2"><label class="block text-xs font-bold text-orange-700 uppercase mb-1">Target Session for Import:</label><div class="flex gap-2"><select id="enroll_import_year" class="border rounded px-2 py-1 text-sm bg-white"><option value="" disabled selected>Year</option><option value="2023">2023</option><option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option></select><select id="enroll_import_sem" class="border rounded px-2 py-1 text-sm bg-white"><option value="" disabled selected>Semester</option><option value="Winter">Winter</option><option value="Spring">Spring</option><option value="Summer">Summer</option><option value="Fall">Fall</option></select></div></div></div>
-                    <div class="flex flex-col gap-2">
-                        <div class="flex gap-2">
-                            <input type="file" id="enrollment_excel_file" accept=".xlsx, .xls" class="hidden" onchange="handleEnrollmentExcelUpload(event)">
-                            <button onclick="document.getElementById('enrollment_excel_file').click()" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-md"><i class="fas fa-file-import mr-1"></i> Import</button>
-                            <button onclick="downloadEnrollmentTemplate()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition flex items-center text-sm"><i class="fas fa-download mr-2"></i> Template</button>
-                        </div>
-                        <div class="flex gap-2">
-                             <button onclick="showEnrollmentForm()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-sm" title="Add Manual"><i class="fas fa-plus"></i> Add Manual</button>
-                             <button onclick="deleteAllEnrollments()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition flex items-center text-sm shadow-sm" title="Delete All"><i class="fas fa-trash-alt"></i> Delete All</button>
-                        </div>
-                    </div>
-                </div>
-                <div class="relative w-full mb-4">
-                    <input type="text" id="enrollment_list_search" placeholder="Search enrollment..." onkeyup="filterEnrollments()" class="border border-gray-300 rounded px-3 py-2 pl-8 w-full text-sm focus:ring-2 focus:ring-orange-500 outline-none shadow-sm">
-                    <i class="fas fa-search absolute left-2.5 top-2.5 text-gray-400 text-xs"></i>
-                </div>
-                <div class="overflow-x-auto max-h-[600px] overflow-y-auto"><table class="w-full text-sm text-left border-collapse border border-gray-200"><thead class="bg-orange-50 text-gray-700 uppercase text-xs sticky top-0"><tr>
-                    <th class="border-b p-3 cursor-pointer" onclick="sortEnrollmentTable('reg_no')">Reg # <i class="fas fa-sort ml-1"></i></th>
-                    <th class="border-b p-3 cursor-pointer" onclick="sortEnrollmentTable('name')">Name <i class="fas fa-sort ml-1"></i></th>
-                    <th class="border-b p-3 cursor-pointer" onclick="sortEnrollmentTable('semester')">Semester <i class="fas fa-sort ml-1"></i></th>
-                    <th class="border-b p-3 text-center">Courses</th><th class="border-b p-3 text-center">Cr. Hrs</th>
-                    <th class="border-b p-3 text-center">Actions</th> <!-- Actions Column -->
-                </tr></thead><tbody id="enrollmentTableBody"><tr><td colspan="6" class="p-4 text-center text-gray-500 italic">No records found.</td></tr></tbody></table></div>
-            </div>
-            
-             <!-- Enrollment Form Modal -->
-            <div id="enrollment-form-container" class="hidden bg-white rounded-lg shadow-lg p-6 max-w-2xl mx-auto mt-4">
-                <div class="flex justify-between items-center border-b pb-4 mb-4">
-                    <h3 class="text-lg font-bold text-gray-800" id="enroll-form-title">Add Enrollment</h3>
-                    <button onclick="hideEnrollmentForm()" class="text-gray-500 hover:text-red-500"><i class="fas fa-times"></i></button>
-                </div>
-                <form id="enrollmentForm" onsubmit="saveEnrollmentList(event)" class="space-y-4">
-                    <input type="hidden" id="enroll_edit_id" value="-1"> <!-- ID for editing -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div class="col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Registration Number</label><input type="text" name="reg_no" id="enroll_reg_no" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div>
-                        <div class="col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Student Name</label><input type="text" name="name" id="enroll_name" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Session Year</label>
-                            <select name="year" id="enroll_year" class="w-full border border-gray-300 rounded-lg px-4 py-2"><option>2023</option><option>2024</option><option>2025</option><option>2026</option></select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Semester</label>
-                            <select name="semester" id="enroll_sem" class="w-full border border-gray-300 rounded-lg px-4 py-2"><option>Winter</option><option>Spring</option><option>Summer</option><option>Fall</option></select>
-                        </div>
-                        <div><label class="block text-sm font-medium text-gray-700 mb-1">Total Courses</label><input type="number" name="courses" id="enroll_courses" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div>
-                        <div><label class="block text-sm font-medium text-gray-700 mb-1">Total Credit Hours</label><input type="number" name="cr" id="enroll_cr" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div>
-                    </div>
-                    <div class="pt-4 flex gap-2">
-                        <button type="submit" class="flex-1 bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 px-4 rounded-lg">Save Record</button>
-                        <button type="button" onclick="hideEnrollmentForm()" class="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg">Cancel</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-
-        <!-- NEW TAB 5: Fee Paid -->
-        <div id="view-paid" class="tab-content hidden">
-            <div id="paid-dashboard" class="bg-white rounded-lg shadow-lg p-6">
-                <!-- Top Toolbar -->
-                <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4">
-                    <div><h2 class="text-xl font-bold text-gray-800">Fee Payments</h2><p class="text-sm text-gray-500">Manage individual student payments</p><div class="mt-2 text-sm font-semibold text-teal-600 bg-teal-50 px-3 py-1 rounded-full inline-block">Total Records: <span id="total_payments_count">0</span></div></div>
-                    <div class="flex flex-col gap-3 w-full lg:w-auto">
-                        <div class="bg-teal-50 p-2 rounded border border-teal-200 flex flex-col sm:flex-row gap-2 items-center"><label class="text-xs font-bold text-teal-700 uppercase whitespace-nowrap">Session:</label><select id="paid_import_year" class="border rounded px-2 py-1 text-sm bg-white"><option value="" disabled selected>Year</option><option value="2023">2023</option><option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option></select><select id="paid_import_sem" class="border rounded px-2 py-1 text-sm bg-white"><option value="" disabled selected>Semester</option><option value="Winter">Winter</option><option value="Spring">Spring</option><option value="Summer">Summer</option><option value="Fall">Fall</option></select><input type="file" id="paid_excel_file" accept=".xlsx, .xls" class="hidden" onchange="handlePaidExcelUpload(event)"><button onclick="document.getElementById('paid_excel_file').click()" class="bg-teal-600 hover:bg-teal-700 text-white px-3 py-1 rounded transition flex items-center text-xs shadow-sm ml-auto"><i class="fas fa-file-import mr-1"></i> Import</button></div>
-                        <div class="flex flex-col sm:flex-row gap-2 w-full"><div class="relative w-full"><input type="text" id="paid_list_search" placeholder="Search payments..." onkeyup="filterPayments()" class="border border-gray-300 rounded px-3 py-2 pl-8 w-full text-sm focus:ring-2 focus:ring-teal-500 outline-none shadow-sm"><i class="fas fa-search absolute left-2.5 top-2.5 text-gray-400 text-xs"></i></div><div class="flex gap-2 justify-end"><button onclick="downloadPaidTemplate()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded transition flex items-center text-sm" title="Template"><i class="fas fa-download"></i></button><button onclick="exportPaymentsToExcel()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded transition flex items-center text-sm shadow-sm" title="Export"><i class="fas fa-file-export"></i></button><button onclick="showPaidForm()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded transition flex items-center text-sm shadow-sm" title="Add Manual"><i class="fas fa-plus"></i></button><button onclick="deleteAllPayments()" class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded transition flex items-center text-sm shadow-sm" title="Delete All"><i class="fas fa-trash-alt"></i></button></div></div>
-                    </div>
-                </div>
-                <div class="overflow-x-auto border rounded-lg max-h-[600px]"><table class="w-full text-sm text-left border-collapse border-b border-gray-200"><thead class="bg-teal-50 text-gray-700 uppercase text-xs sticky top-0"><tr><th class="border-b p-3 cursor-pointer" onclick="sortPaidTable('reg_no')">Reg #</th><th class="border-b p-3 cursor-pointer" onclick="sortPaidTable('name')">Name</th><th class="border-b p-3 cursor-pointer" onclick="sortPaidTable('semester')">Semester</th><th class="border-b p-3 text-right">Amount</th><th class="border-b p-3 text-center">Date</th><th class="border-b p-3 text-center">Actions</th></tr></thead><tbody id="paidTableBody"><tr><td colspan="6" class="p-4 text-center text-gray-500 italic">No records found.</td></tr></tbody></table></div>
-            </div>
-            <div id="paid-form-container" class="hidden bg-white rounded-lg shadow-lg p-6 max-w-2xl mx-auto mt-4"><div class="flex justify-between items-center border-b pb-4 mb-4"><h3 class="text-lg font-bold text-gray-800" id="paid-form-title">Add Payment</h3><button onclick="hidePaidForm()" class="text-gray-500 hover:text-red-500"><i class="fas fa-times"></i></button></div><form id="paidForm" onsubmit="savePaymentList(event)" class="space-y-4"><input type="hidden" id="paid_edit_id" value="-1"><div class="grid grid-cols-1 md:grid-cols-2 gap-4"><div class="col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Registration Number</label><input type="text" name="reg_no" id="paid_reg_no" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div class="col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Student Name</label><input type="text" name="name" id="paid_name" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div><label class="block text-sm font-medium text-gray-700 mb-1">Session Year</label><select name="year" id="paid_year" class="w-full border border-gray-300 rounded-lg px-4 py-2"><option>2023</option><option>2024</option><option>2025</option><option>2026</option></select></div><div><label class="block text-sm font-medium text-gray-700 mb-1">Semester</label><select name="semester" id="paid_sem" class="w-full border border-gray-300 rounded-lg px-4 py-2"><option>Winter</option><option>Spring</option><option>Summer</option><option>Fall</option></select></div><div><label class="block text-sm font-medium text-gray-700 mb-1">Amount Paid</label><input type="number" name="amount" id="paid_amount" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div><label class="block text-sm font-medium text-gray-700 mb-1">Date</label><input type="date" name="date" id="paid_date" class="w-full border border-gray-300 rounded-lg px-4 py-2"></div></div><div class="pt-4 flex gap-2"><button type="submit" class="flex-1 bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-4 rounded-lg">Save Payment</button><button type="button" onclick="hidePaidForm()" class="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg">Cancel</button></div></form></div>
-        </div>
-
-        <!-- TAB 6: Discounts (Updated) -->
+        <!-- TAB 6: Discounts -->
         <div id="view-discount" class="tab-content hidden">
             <div class="bg-white rounded-lg shadow-lg p-6">
-                <!-- Toolbar -->
-                <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4">
-                    <div>
-                        <h2 class="text-xl font-bold text-gray-800">Discount Registry</h2>
-                        <p class="text-sm text-gray-500">Manage student discounts</p>
-                        <div class="mt-2 text-sm font-semibold text-purple-600 bg-purple-50 px-3 py-1 rounded-full inline-block">Total: <span id="total_discounts_count">0</span></div>
-                    </div>
-                    <div class="flex flex-col gap-3 w-full lg:w-auto">
-                        <div class="flex gap-2">
-                             <input type="file" id="discount_excel_file" accept=".xlsx, .xls" class="hidden" onchange="handleDiscountExcelUpload(event)">
-                            <button onclick="document.getElementById('discount_excel_file').click()" class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded transition flex items-center text-xs shadow-sm ml-auto"><i class="fas fa-file-import mr-1"></i> Import</button>
-                            <button onclick="downloadDiscountTemplate()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition flex items-center text-sm"><i class="fas fa-download mr-2"></i> Template</button>
-                        </div>
-                        <div class="flex gap-2">
-                            <button onclick="showDiscountForm()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded transition flex items-center text-sm shadow-sm" title="Add Manual"><i class="fas fa-plus"></i> Add Manual</button>
-                            <button onclick="exportDiscountsToExcel()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded transition flex items-center text-sm shadow-sm"><i class="fas fa-file-export mr-1"></i> Export</button>
-                            <button onclick="deleteAllDiscounts()" class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded transition flex items-center text-sm shadow-sm" title="Delete All"><i class="fas fa-trash-alt"></i> Delete All</button>
-                        </div>
+                 <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold">Discounts</h2>
+                    <div class="flex gap-2">
+                         <input type="file" id="disc_excel" class="hidden" onchange="handleFile(e, 'discounts')">
+                         <button onclick="document.getElementById('disc_excel').click()" class="bg-green-600 text-white px-3 py-1 rounded text-sm">Import</button>
+                         <button onclick="showDiscountForm()" class="bg-blue-600 text-white px-3 py-1 rounded text-sm">Add</button>
+                         <button onclick="deleteAll('discounts')" class="bg-red-600 text-white px-3 py-1 rounded text-sm">Del All</button>
                     </div>
                 </div>
-
-                <!-- Search -->
-                <div class="relative w-full mb-4">
-                    <input type="text" id="discount_list_search" placeholder="Search discounts..." onkeyup="filterDiscounts()" class="border border-gray-300 rounded px-3 py-2 pl-8 w-full text-sm focus:ring-2 focus:ring-purple-500 outline-none shadow-sm">
-                    <i class="fas fa-search absolute left-2.5 top-2.5 text-gray-400 text-xs"></i>
+                <input type="text" id="filter_discount" onkeyup="renderDiscountTable()" placeholder="Filter..." class="w-full border p-2 mb-2 rounded">
+                <div class="overflow-x-auto h-96 overflow-y-auto border rounded">
+                    <table class="w-full text-sm text-left"><thead class="bg-purple-50 sticky top-0"><tr><th class="p-2 border">Reg #</th><th class="p-2 border">Name</th><th class="p-2 border">Term</th><th class="p-2 border">Discount</th><th class="p-2 border">Action</th></tr></thead><tbody id="discountBody"><tr><td colspan="5" class="p-4 text-center">No records found.</td></tr></tbody></table>
                 </div>
-
-                <div class="overflow-x-auto max-h-[600px] overflow-y-auto">
-                    <table class="w-full text-sm text-left border-collapse border border-gray-200"><thead class="bg-purple-50 text-gray-700 uppercase text-xs sticky top-0"><tr>
-                        <th class="border p-3 cursor-pointer" onclick="sortDiscountTable('reg_no')">Reg # <i class="fas fa-sort ml-1"></i></th>
-                        <th class="border p-3 cursor-pointer" onclick="sortDiscountTable('name')">Name <i class="fas fa-sort ml-1"></i></th>
-                        <th class="border p-3 cursor-pointer" onclick="sortDiscountTable('term')">Term <i class="fas fa-sort ml-1"></i></th>
-                        <th class="border p-3 text-right">Discount %</th>
-                        <th class="border p-3 text-center">Actions</th>
-                    </tr></thead><tbody id="discountTableBody"><tr><td colspan="5" class="p-4 text-center text-gray-500 italic">No records found.</td></tr></tbody></table>
-                </div>
-            </div>
-
-            <!-- Discount Form Modal -->
-            <div id="discount-form-container" class="hidden bg-white rounded-lg shadow-lg p-6 max-w-2xl mx-auto mt-4">
-                <div class="flex justify-between items-center border-b pb-4 mb-4">
-                    <h3 class="text-lg font-bold text-gray-800" id="discount-form-title">Add Discount</h3>
-                    <button onclick="hideDiscountForm()" class="text-gray-500 hover:text-red-500"><i class="fas fa-times"></i></button>
-                </div>
-                <form id="discountForm" onsubmit="saveDiscountList(event)" class="space-y-4">
-                    <input type="hidden" id="discount_edit_id" value="-1">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div class="col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Registration Number</label><input type="text" name="reg_no" id="discount_reg_no" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div>
-                        <div class="col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Student Name</label><input type="text" name="name" id="discount_name" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div>
-                        <div><label class="block text-sm font-medium text-gray-700 mb-1">Term (e.g. Fall 2025)</label><input type="text" name="term" id="discount_term" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div>
-                        <div><label class="block text-sm font-medium text-gray-700 mb-1">Discount %</label><input type="number" name="discount" id="discount_val" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div>
-                    </div>
-                    <div class="pt-4 flex gap-2">
-                        <button type="submit" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-lg">Save Record</button>
-                        <button type="button" onclick="hideDiscountForm()" class="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg">Cancel</button>
-                    </div>
-                </form>
             </div>
         </div>
+
+        <!-- Add Discount Modal -->
+         <div id="discount-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white rounded p-6 w-96">
+                <h3 class="font-bold text-lg mb-4">Add Discount</h3>
+                <input type="text" id="d_reg" placeholder="Reg No" class="w-full border p-2 mb-2">
+                <input type="text" id="d_name" placeholder="Name" class="w-full border p-2 mb-2">
+                <input type="text" id="d_term" placeholder="Term" class="w-full border p-2 mb-2">
+                <input type="number" id="d_val" placeholder="%" class="w-full border p-2 mb-4">
+                <div class="flex justify-end gap-2">
+                    <button onclick="document.getElementById('discount-modal').classList.add('hidden')" class="bg-gray-300 px-4 py-2 rounded">Cancel</button>
+                    <button onclick="saveDiscount()" class="bg-blue-600 text-white px-4 py-2 rounded">Save</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Diagnostic Modal -->
+        <div id="diagnostic-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-lg shadow-2xl w-full max-w-2xl h-3/4 flex flex-col p-6">
+                <div class="flex justify-between items-center mb-4 border-b pb-2">
+                    <h3 class="text-xl font-bold text-red-600">⚠️ System Diagnostic</h3>
+                    <button onclick="document.getElementById('diagnostic-modal').classList.add('hidden')" class="text-xl font-bold">&times;</button>
+                </div>
+                <div class="flex-grow overflow-auto font-mono text-xs bg-gray-100 p-4 rounded border mb-4" id="diag-log"></div>
+                <div class="flex justify-end gap-2">
+                    <button onclick="testConnection()" class="bg-blue-600 text-white px-4 py-2 rounded">Run Test Again</button>
+                    <button onclick="document.getElementById('diagnostic-modal').classList.add('hidden')" class="bg-gray-500 text-white px-4 py-2 rounded">Close</button>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <script>
-        // --- API & DATA CONFIG ---
-        let API_URL = 'api.php'; 
-        let USE_API = false; // Default to local
+        const API_URL = 'api.php';
+        let db = { students: [], fees: [], enrollments: [], discounts: [], payments: [] };
 
-        let g_students = [];
-        let g_fees = [];
-        let g_enrollments = [];
-        let g_discounts = [];
-        let g_payments = []; 
-        let activeStudent = null;
-        let lastRawResponse = '';
-        let sortDir = 1;
-        let enrollSortDir = 1;
-        let paidSortDir = 1;
-        let discountSortDir = 1; 
+        // Start
+        window.onload = function() {
+            testConnection(); // Auto-test on load
+        };
 
-        const DEGREE_PATTERNS = [
-            { prefix: "BAF0", code: "BAF" }, { prefix: "BCOM0", code: "BCOM" }, { prefix: "BAF2Y0", code: "BAF2Y" },
-            { prefix: "BSCAF0", code: "BSCAF" }, { prefix: "MSFP0", code: "MSFP" }, { prefix: "MAF2Y0", code: "MAF2Y" },
-            { prefix: "DAF0", code: "DAF" }, { prefix: "BCM0", code: "BCM" }, { prefix: "BST0", code: "BST" },
-            { prefix: "BIB0", code: "BIB" }, { prefix: "PAF0", code: "PAF" }, 
-        ];
+        // --- CORE FUNCTIONS ---
 
-        document.getElementById('printDate').textContent = new Date().toLocaleString();
-        
-        // Define helpers early
-        function getStorage(k) { const s=localStorage.getItem(k); try { return s ? JSON.parse(s) : []; } catch(e) { return []; } }
-        function setStorage(k,v) { localStorage.setItem(k,JSON.stringify(v)); }
-        function num(n) { return parseFloat(n).toLocaleString('en-US'); }
-        function normalizeTerm(t) { return t ? t.toString().toLowerCase().replace(/[^a-z0-9]/g, '') : ""; }
-
-        // Start initialization immediately
-        initData();
-
-        function showConfigModal() { document.getElementById('config-modal').classList.remove('hidden'); }
-        async function testApiConnection() {
-            const url = document.getElementById('api_url_input').value.trim();
-            const resDiv = document.getElementById('api-test-result');
-            resDiv.classList.remove('hidden', 'text-green-700', 'text-red-700');
-            resDiv.textContent = "Testing...";
+        async function testConnection() {
+            logDiag("Starting connection test...");
+            updateStatus("yellow", "Connecting...");
+            
             try {
-                const res = await fetch(`${url}?action=fetch_all&t=${Date.now()}`);
+                // 1. Fetch
+                const res = await fetch(`${API_URL}?action=fetch_all&t=${Date.now()}`);
                 const text = await res.text();
                 
-                // Show raw response in debug for "HTML" error
+                logDiag(`Server Response Length: ${text.length} chars`);
+
+                // 2. Check for HTML (Common Error)
                 if (text.trim().startsWith('<')) {
-                    resDiv.textContent = "Failed: Server returned HTML. Check API path.";
-                    resDiv.classList.add('text-red-700');
+                    logDiag("❌ ERROR: Server returned HTML. Path to api.php is likely wrong.");
+                    logDiag("Preview: " + text.substring(0, 100));
+                    updateStatus("red", "Error: Server returned HTML (404/500)");
+                    // Use local storage fallback silently
+                    loadLocal();
                     return;
                 }
 
-                // Attempt to clean dirty JSON
+                // 3. Clean JSON (The "Smart Fix")
+                let cleanText = text;
                 const firstBrace = text.indexOf('{');
-                const firstBracket = text.indexOf('[');
-                let start = -1;
-                if (firstBrace !== -1 && firstBracket !== -1) start = Math.min(firstBrace, firstBracket);
-                else if (firstBrace !== -1) start = firstBrace;
-                else if (firstBracket !== -1) start = firstBracket;
-
-                const cleanText = start !== -1 ? text.substring(start) : text;
-
-                JSON.parse(cleanText);
-                resDiv.textContent = "Success! JSON received.";
-                resDiv.classList.remove('text-red-700');
-                resDiv.classList.add('text-green-700');
-            } catch(e) {
-                resDiv.textContent = "Failed: " + e.message;
-                resDiv.classList.add('text-red-700');
-            }
-        }
-        function saveApiConfig() {
-            API_URL = document.getElementById('api_url_input').value.trim();
-            document.getElementById('config-modal').classList.add('hidden');
-            initData();
-        }
-
-        async function initData() {
-            // First render with local storage data (instant)
-            loadLocalData();
-            
-            // Now attempt server connection
-            try {
-                const res = await fetch(`${API_URL}?action=fetch_all&t=${new Date().getTime()}`);
-                const text = await res.text();
-                lastRawResponse = text; 
-
-                // Check for HTML/PHP error dump
-                if (text.trim().startsWith('<')) {
-                     const statusDiv = document.getElementById('conn-status');
-                     statusDiv.classList.remove('hidden');
-                     // More robust error message
-                     let err = "Server returned HTML (Website Code)";
-                     if(text.includes("404")) err = "404 Not Found (Check API Path)";
-                     
-                     statusDiv.innerHTML = `
-                        <div class="flex justify-between w-full items-center">
-                            <span class="text-red-700 font-bold">⚠️ Connection Error: ${err}</span>
-                            <div class="flex gap-2">
-                                <button onclick="showConfigModal()" class="bg-white text-red-700 border border-red-300 px-3 py-1 rounded hover:bg-red-50 text-xs">Config</button>
-                                <button onclick="showDebugModal()" class="bg-gray-200 text-gray-700 px-3 py-1 rounded text-xs">Debug</button>
-                            </div>
-                        </div>`;
-                     throw new Error("Invalid Server Response");
+                if(firstBrace > 0) {
+                     logDiag(`⚠️ Warning: Junk characters found before JSON. Cleaning...`);
+                     cleanText = text.substring(firstBrace);
                 }
 
-                let json;
-                try { 
-                    // Clean dirty JSON
-                     const firstBrace = text.indexOf('{');
-                    const firstBracket = text.indexOf('[');
-                    let start = -1;
-                    if (firstBrace !== -1 && firstBracket !== -1) start = Math.min(firstBrace, firstBracket);
-                    else if (firstBrace !== -1) start = firstBrace;
-                    else if (firstBracket !== -1) start = firstBracket;
-                    const cleanText = start !== -1 ? text.substring(start) : text;
-                    json = JSON.parse(cleanText); 
-                } catch (e) { throw new Error("Invalid JSON"); }
+                // 4. Parse
+                const json = JSON.parse(cleanText);
                 
                 if (json.status === 'success') {
-                    USE_API = true;
-                    // Load server data
-                    const sData = json.data.students || [];
-                    if (sData.length > 0) {
-                        g_students = sData;
-                        g_fees = json.data.fees || []; 
-                        g_enrollments = json.data.enrollments || [];
-                        g_discounts = json.data.discounts || [];
-                        g_payments = json.data.payments || [];
-                        document.getElementById('conn-status').classList.add('hidden');
-                        
-                        // Re-render with server data
-                        renderAll();
-                    } else if(getStorage('fee_system_students_list_v2').length > 0) {
-                         // Fallback to local if server empty
-                         document.getElementById('conn-status').classList.remove('hidden');
-                         document.getElementById('conn-status').innerHTML = `
-                            <span class="text-orange-700"><strong>Server DB Connected but Empty.</strong> Showing Local Data.</span>
-                            <button onclick="syncLocalToServer()" class="ml-2 bg-blue-600 text-white px-2 py-1 rounded text-xs">Sync Now</button>`;
-                         loadLocalData();
-                    }
-                } 
-            } catch (e) {
-                // If API fails (e.g. Access Denied), show error
-                console.warn("API Error:", e);
-                USE_API = false;
-                loadLocalData();
-
-                // Show the specific DB error in the red bar
-                const statusDiv = document.getElementById('conn-status');
-                statusDiv.classList.remove('hidden');
-                statusDiv.innerHTML = `
-                    <div class="flex justify-between w-full items-center">
-                        <span class="text-red-700 font-bold">⚠️ DB Error: ${e.message}</span>
-                        <div class="flex gap-2">
-                             <button onclick="showConfigModal()" class="bg-white text-red-700 border border-red-300 px-3 py-1 rounded hover:bg-red-50 text-xs">Config</button>
-                             <button onclick="showDebugModal()" class="bg-gray-200 text-gray-700 px-3 py-1 rounded text-xs">Debug</button>
-                        </div>
-                    </div>`;
-            } finally {
-                // FORCE RENDER
-                renderAll();
-            }
-        }
-
-        function loadLocalData() {
-            g_students = getStorage('fee_system_students_list_v2') || [];
-            g_fees = getStorage('fee_system_records_v6') || [];
-            g_enrollments = getStorage('fee_system_enrollments_v1') || [];
-            g_discounts = getStorage('fee_system_discounts_v1') || [];
-            g_payments = getStorage('fee_system_payments_v1') || []; 
-            
-            // Clean bad data
-            g_students = Array.isArray(g_students) ? g_students.filter(x => x && x.reg_no) : [];
-            g_fees = Array.isArray(g_fees) ? g_fees : [];
-            
-            renderAll();
-        }
-        
-        function renderAll() {
-            renderStudentTable(); 
-            renderFeeDashboard(); 
-            renderEnrollmentTable(); 
-            renderDiscountTable(); 
-            renderPaymentTable();
-            
-            // Restore active session
-            const saved = localStorage.getItem('active_student_session');
-            if (saved) { 
-                try { activeStudent = JSON.parse(saved); loadActiveStudentUI(); renderClearanceTable(); } 
-                catch(e) { console.error("Active student load error", e); }
-            }
-            
-            // Update Counts
-            document.getElementById('total_discounts_count').textContent = g_discounts.length;
-            // No IDs for other counts, add if needed or remove
-        }
-
-        function showDebugModal() { document.getElementById('debug-content').textContent = lastRawResponse || "No response recorded."; document.getElementById('debug-modal').classList.remove('hidden'); }
-        
-        async function syncLocalToServer() {
-            if(!confirm("Upload all local browser data to the server database?")) return;
-            const s = getStorage('fee_system_students_list_v2');
-            if(s.length) await bulkImport('students', s);
-            // ... (sync rest)
-            alert("Sync Complete! Reloading...");
-            location.reload();
-        }
-
-        // --- DATA OPS ---
-        async function saveData(type, data) {
-            // ALWAYS update local state for immediate UI feedback
-            if (type === 'student') { 
-                if(data.reg_no) g_students = g_students.filter(s => s.reg_no !== data.reg_no);
-                g_students.push(data); setStorage('fee_system_students_list_v2', g_students); 
-                renderStudentTable(); 
-            }
-            else if (type === 'fee') { 
-                if(!data.id || data.id === '-1') data.id = Date.now().toString();
-                g_fees = g_fees.filter(f => f.id != data.id);
-                g_fees.push(data); setStorage('fee_system_records_v6', g_fees); 
-                renderFeeDashboard();
-            }
-            else if (type === 'enrollment') { 
-                if(!data.id || data.id === "-1") data.id = Date.now().toString(); 
-                g_enrollments = g_enrollments.filter(x=>x.id!=data.id);
-                g_enrollments.push(data); setStorage('fee_system_enrollments_v1', g_enrollments); 
-                renderEnrollmentTable();
-            }
-            else if (type === 'payment') { 
-                if(!data.id || data.id === "-1") data.id = Date.now().toString();
-                g_payments = g_payments.filter(x=>x.id!=data.id);
-                g_payments.push(data); setStorage('fee_system_payments_v1', g_payments); 
-                renderPaymentTable();
-            }
-            else if (type === 'discount') { 
-                if(!data.id || data.id === "-1") data.id = Date.now().toString();
-                g_discounts = g_discounts.filter(x=>x.id!=data.id);
-                g_discounts.push(data); setStorage('fee_system_discounts_v1', g_discounts); 
-                renderDiscountTable();
-            }
-
-            // Then try Server
-            if (USE_API) {
-                let act = '';
-                if(type === 'student') act = 'save_student';
-                if(type === 'fee') act = 'save_fee';
-                if(type === 'enrollment') act = 'save_enrollment';
-                if(type === 'payment') act = 'save_payment';
-                if(type === 'discount') act = 'save_discount';
-                try {
-                     await fetch(`${API_URL}?action=${act}`, { method: 'POST', body: JSON.stringify(data) });
-                } catch(e) { console.warn("Sync failed, data saved locally."); }
-            }
-            return { status: 'success' };
-        }
-
-        async function deleteData(type, id) {
-             // 1. Local Update
-             if (type === 'student') { g_students = g_students.filter(s => s.reg_no !== id); setStorage('fee_system_students_list_v2', g_students); renderStudentTable(); } 
-             else if (type === 'fee') { g_fees = g_fees.filter(f => f.id != id); setStorage('fee_system_records_v6', g_fees); renderFeeDashboard(); } 
-             else if (type === 'enrollment') { g_enrollments = g_enrollments.filter(e => e.id !== id); setStorage('fee_system_enrollments_v1', g_enrollments); renderEnrollmentTable(); }
-             else if (type === 'payment') { g_payments = g_payments.filter(e => e.id !== id); setStorage('fee_system_payments_v1', g_payments); renderPaymentTable(); }
-             else if (type === 'discount') { g_discounts = g_discounts.filter(e => e.id !== id); setStorage('fee_system_discounts_v1', g_discounts); renderDiscountTable(); }
-
-             // 2. Server Sync
-             if (USE_API) {
-                 let act = ''; let body = {};
-                 if (type === 'student') { act = 'delete_student'; body = {reg_no: id}; }
-                 else if (type === 'fee') { act = 'delete_fee'; body = {id: id}; }
-                 else if (type === 'enrollment') { act = 'delete_enrollment'; body = {id: id}; }
-                 else if (type === 'payment') { act = 'delete_payment'; body = {id: id}; }
-                 else if (type === 'discount') { act = 'delete_discount'; body = {id: id}; }
-                 
-                 try { await fetch(`${API_URL}?action=${act}`, { method: 'POST', body: JSON.stringify(body) }); }
-                 catch(e) { console.warn("Sync delete failed"); }
-             } 
-        }
-
-        async function deleteStudentData(regNo) { deleteData('student', regNo); }
-        async function deleteFeeData(id) { deleteData('fee', id); }
-        async function deleteEnrollmentData(id) { deleteData('enrollment', id); }
-        async function deletePaymentData(id) { deleteData('payment', id); }
-        async function deleteDiscountData(id) { deleteData('discount', id); }
-
-        async function deleteAllStudentsData() {
-            g_students = []; setStorage('fee_system_students_list_v2', []); renderStudentTable();
-            if (USE_API) await fetch(`${API_URL}?action=delete_all_students`, { method: 'POST' }); 
-        }
-        async function deleteAllEnrollmentsData() {
-             g_enrollments = []; setStorage('fee_system_enrollments_v1', []); renderEnrollmentTable(); 
-            if (USE_API) await fetch(`${API_URL}?action=delete_all_enrollments`, { method: 'POST' }); 
-        }
-        async function deleteAllPaymentsData() {
-             g_payments = []; setStorage('fee_system_payments_v1', []); renderPaymentTable(); 
-            if (USE_API) await fetch(`${API_URL}?action=delete_all_payments`, { method: 'POST' }); 
-        }
-        
-        async function deleteAllFeesData() {
-             g_fees = []; setStorage('fee_system_records_v6', []); renderFeeDashboard(); 
-            if (USE_API) await fetch(`${API_URL}?action=delete_all_fees`, { method: 'POST' }); 
-        }
-         async function deleteAllDiscountsData() {
-             g_discounts = []; setStorage('fee_system_discounts_v1', []); renderDiscountTable(); 
-            if (USE_API) await fetch(`${API_URL}?action=delete_all_discounts`, { method: 'POST' }); 
-        }
-
-        async function bulkImport(type, arr) {
-            // Local Update
-            if(type==='students') { g_students=[...g_students,...arr]; setStorage('fee_system_students_list_v2', g_students); }
-            if(type==='enrollments') { 
-                const toAdd = arr.map(e => ({...e, id: Date.now() + Math.random()}));
-                g_enrollments=[...g_enrollments,...toAdd]; setStorage('fee_system_enrollments_v1', g_enrollments); 
-            }
-            if(type==='discounts') { 
-                 const toAdd = arr.map(d => ({...d, id: Date.now() + Math.random()}));
-                g_discounts=[...g_discounts,...toAdd]; setStorage('fee_system_discounts_v1', g_discounts); 
-            }
-            if(type==='payments') { 
-                const toAdd = arr.map(p => ({...p, id: Date.now() + Math.random()}));
-                g_payments=[...g_payments,...toAdd]; setStorage('fee_system_payments_v1', g_payments); 
-            }
-            if(type==='fees') { 
-                const toAdd = arr.map(f => ({...f, id: Date.now() + Math.random()}));
-                g_fees=[...g_fees,...toAdd]; setStorage('fee_system_records_v6', g_fees); 
-            }
-            
-            // Server Update
-            if (USE_API) {
-                let act = '';
-                if(type==='students') act='import_students';
-                if(type==='enrollments') act='import_enrollments';
-                if(type==='discounts') act='import_discounts';
-                if(type==='payments') act='import_payments';
-                if(type==='fees') act='import_fees';
-
-                await fetch(`${API_URL}?action=${act}`, { method: 'POST', body: JSON.stringify(arr) });
-            }
-            
-            renderStudentTable(); renderEnrollmentTable(); renderDiscountTable(); renderPaymentTable(); renderFeeDashboard();
-            return { status: 'success' };
-        }
-
-        // --- STUDENT UI ---
-        function showAddForm() { document.getElementById('studentForm').reset(); document.getElementById('edit_index').value = "-1"; document.getElementById('form-title').textContent = "Add New Student"; document.getElementById('student-dashboard').classList.add('hidden'); document.getElementById('student-form-container').classList.remove('hidden'); }
-        function hideAddForm() { document.getElementById('student-dashboard').classList.remove('hidden'); document.getElementById('student-form-container').classList.add('hidden'); }
-        function extractDegree(reg) { if(!reg) return ''; reg = reg.toString().toUpperCase().trim(); for (const item of DEGREE_PATTERNS) { if (reg.startsWith(item.prefix)) return item.code; } return "Unknown"; }
-        function autoFillDegree(val) { const degree = extractDegree(val); if(degree && degree !== "Unknown") { document.getElementById('input_degree').value = degree; } }
-        function toProperCase(str) { if (!str) return ''; return str.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' '); }
-
-        async function saveStudentList(e) {
-            e.preventDefault(); const fd = new FormData(e.target); const reg = fd.get('reg_no').trim();
-            if(document.getElementById('edit_index').value === "-1" && g_students.some(s => s.reg_no.toLowerCase() === reg.toLowerCase())) { alert("Duplicate Reg Number!"); return; }
-            const student = { reg_no: reg, name: toProperCase(fd.get('name')), degree: fd.get('degree') || extractDegree(reg), batch: fd.get('batch'), mobile: fd.get('mobile'), email: fd.get('email') };
-            await saveData('student', student); hideAddForm(); alert("Student saved!"); 
-        }
-
-        function editStudent(reg) { const s = g_students.find(x => x.reg_no === reg); if(!s) return; document.getElementById('input_reg_no').value = s.reg_no; document.getElementById('input_name').value = s.name; document.getElementById('input_degree').value = s.degree; document.getElementById('input_batch').value = s.batch; document.getElementById('input_mobile').value = s.mobile; document.getElementById('input_email').value = s.email || ''; document.getElementById('edit_index').value = "1"; document.getElementById('form-title').textContent = "Edit Student"; document.getElementById('student-dashboard').classList.add('hidden'); document.getElementById('student-form-container').classList.remove('hidden'); }
-        function deleteStudent(reg) { if(confirm('Delete this student?')) deleteStudentData(reg); }
-        function deleteAllStudents() { if(confirm('WARNING: Delete ALL students?')) deleteAllStudentsData(); }
-        function exportStudentsToExcel() { if(g_students.length === 0) { alert("No data."); return; } const ws = XLSX.utils.json_to_sheet(g_students); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Students"); XLSX.writeFile(wb, "All_Students.xlsx"); }
-
-        function handleStudentExcelUpload(e) { /* Logic same as previous, abbreviated */ const f = e.target.files[0]; if(!f) return; document.getElementById('upload-progress-container').classList.remove('hidden'); const pBar = document.getElementById('upload-progress-bar'); const pText = document.getElementById('progress-text'); pBar.style.width = '30%'; pText.textContent = 'Parsing...'; const r = new FileReader(); r.onload = async function(ev) { try { const wb = XLSX.read(new Uint8Array(ev.target.result), {type:'array'}); const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]); let newStudents = []; let duplicates = 0; pBar.style.width = '60%'; pText.textContent = 'Checking Duplicates...'; await new Promise(r => setTimeout(r, 100)); json.forEach(row => { const keys = Object.keys(row); const getKey = (term) => keys.find(k => k.toLowerCase().includes(term)); const reg = row[getKey('reg')] || row[getKey('id')]; if (reg) { if(!g_students.some(s => s.reg_no.trim().toLowerCase() === reg.toString().trim().toLowerCase())) { const extractedDeg = extractDegree(reg.toString()); newStudents.push({ reg_no: reg, name: toProperCase(row[getKey('name')] || ''), degree: row[getKey('degree')] || row[getKey('prog')] || extractedDeg, batch: row[getKey('session')] || row[getKey('batch')] || '', mobile: row[getKey('mobile')] || row[getKey('phone')] || '', email: row[getKey('email')] || '' }); } else { duplicates++; } } }); if(newStudents.length > 0) { pBar.style.width = '90%'; pText.textContent = 'Saving...'; const res = await bulkImport('students', newStudents); if(res.status === 'success') { pBar.style.width = '100%'; pText.textContent = 'Done!'; setTimeout(() => { alert(`Imported ${newStudents.length} new.\nSkipped ${duplicates} duplicates.`); document.getElementById('upload-progress-container').classList.add('hidden'); pBar.style.width = '0%'; }, 500); } } else { pBar.style.width = '100%'; pText.textContent = 'Done!'; setTimeout(() => { alert(`No new students.\nSkipped ${duplicates} duplicates.`); document.getElementById('upload-progress-container').classList.add('hidden'); pBar.style.width = '0%'; }, 500); } } catch(err) { console.error(err); alert("Error parsing Excel."); document.getElementById('upload-progress-container').classList.add('hidden'); } }; r.readAsArrayBuffer(f); e.target.value = ''; }
-
-        // --- ENROLLMENT UI ---
-        function showEnrollmentForm() { document.getElementById('enrollmentForm').reset(); document.getElementById('enroll_edit_id').value = "-1"; document.getElementById('enroll-form-title').textContent = "Add Enrollment"; document.getElementById('enrollment-dashboard').classList.add('hidden'); document.getElementById('enrollment-form-container').classList.remove('hidden'); }
-        function hideEnrollmentForm() { document.getElementById('enrollment-dashboard').classList.remove('hidden'); document.getElementById('enrollment-form-container').classList.add('hidden'); }
-        async function saveEnrollmentList(e) { e.preventDefault(); const fd = new FormData(e.target); const sess = `${fd.get('semester')} ${fd.get('year')}`; const id = document.getElementById('enroll_edit_id').value; const enrollment = { id: (id === "-1") ? Date.now().toString() : id, reg_no: fd.get('reg_no'), name: toProperCase(fd.get('name')), semester: sess, courses: parseInt(fd.get('courses')), cr: parseInt(fd.get('cr')) }; await saveData('enrollment', enrollment); hideEnrollmentForm(); alert("Enrollment saved!"); }
-        function editEnrollment(id) { const e = g_enrollments.find(x => x.id == id); if(!e) return; document.getElementById('enroll_reg_no').value = e.reg_no; document.getElementById('enroll_name').value = e.name; document.getElementById('enroll_courses').value = e.courses; document.getElementById('enroll_cr').value = e.cr; const parts = e.semester.split(' '); document.getElementById('enroll_sem').value = parts[0] || 'Fall'; document.getElementById('enroll_year').value = parts[1] || '2023'; document.getElementById('enroll_edit_id').value = e.id || id; document.getElementById('enroll-form-title').textContent = "Edit Enrollment"; document.getElementById('enrollment-dashboard').classList.add('hidden'); document.getElementById('enrollment-form-container').classList.remove('hidden'); }
-        function deleteEnrollment(id) { if(confirm("Delete this enrollment?")) deleteEnrollmentData(id); }
-        function deleteAllEnrollments() { if(confirm("Delete ALL enrollment data?")) deleteAllEnrollmentsData(); }
-        function exportEnrollmentsToExcel() { if(g_enrollments.length === 0) { alert("No data."); return; } const ws = XLSX.utils.json_to_sheet(g_enrollments); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Enrollments"); XLSX.writeFile(wb, "Enrollments.xlsx"); }
-        function filterEnrollments() { const query = document.getElementById('enrollment_list_search').value.toLowerCase(); const filtered = g_enrollments.filter(e => (e.reg_no && e.reg_no.toLowerCase().includes(query)) || (e.name && e.name.toLowerCase().includes(query)) || (e.semester && e.semester.toLowerCase().includes(query))); renderEnrollmentTable(filtered); }
-        function sortEnrollmentTable(key) { enrollSortDir = -enrollSortDir; const query = document.getElementById('enrollment_list_search').value.toLowerCase(); let currentList = query ? g_enrollments.filter(e => (e.reg_no && e.reg_no.toLowerCase().includes(query)) || (e.name && e.name.toLowerCase().includes(query))) : [...g_enrollments]; currentList.sort((a,b) => { const valA = (a[key] || '').toString().toLowerCase(); const valB = (b[key] || '').toString().toLowerCase(); if (valA < valB) return -1 * enrollSortDir; if (valA > valB) return 1 * enrollSortDir; return 0; }); renderEnrollmentTable(currentList); }
-
-        // --- FEE PAID UI (NEW) ---
-        function showPaidForm() { document.getElementById('paidForm').reset(); document.getElementById('paid_edit_id').value = "-1"; document.getElementById('paid-form-title').textContent = "Add Payment"; document.getElementById('paid-dashboard').classList.add('hidden'); document.getElementById('paid-form-container').classList.remove('hidden'); }
-        function hidePaidForm() { document.getElementById('paid-dashboard').classList.remove('hidden'); document.getElementById('paid-form-container').classList.add('hidden'); }
-        async function savePaymentList(e) { e.preventDefault(); const fd = new FormData(e.target); const sess = `${fd.get('semester')} ${fd.get('year')}`; const id = document.getElementById('paid_edit_id').value; const payment = { id: (id === "-1") ? Date.now().toString() : id, reg_no: fd.get('reg_no'), name: toProperCase(fd.get('name')), semester: sess, amount: parseFloat(fd.get('amount')), date: fd.get('date') }; await saveData('payment', payment); hidePaidForm(); alert("Payment saved!"); }
-        function editPayment(id) { const e = g_payments.find(x => x.id == id); if(!e) return; document.getElementById('paid_reg_no').value = e.reg_no; document.getElementById('paid_name').value = e.name; document.getElementById('paid_amount').value = e.amount; document.getElementById('paid_date').value = e.date; const parts = e.semester.split(' '); document.getElementById('paid_sem').value = parts[0] || 'Fall'; document.getElementById('paid_year').value = parts[1] || '2023'; document.getElementById('paid_edit_id').value = e.id || id; document.getElementById('paid-form-title').textContent = "Edit Payment"; document.getElementById('paid-dashboard').classList.add('hidden'); document.getElementById('paid-form-container').classList.remove('hidden'); }
-        function deletePayment(id) { if(confirm("Delete this payment?")) deletePaymentData(id); }
-        function deleteAllPayments() { if(confirm("Delete ALL payments?")) deleteAllPaymentsData(); }
-        function exportPaymentsToExcel() { if(g_payments.length === 0) { alert("No data."); return; } const ws = XLSX.utils.json_to_sheet(g_payments); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Payments"); XLSX.writeFile(wb, "Payments.xlsx"); }
-        function filterPayments() { const query = document.getElementById('paid_list_search').value.toLowerCase(); const filtered = g_payments.filter(e => (e.reg_no && e.reg_no.toLowerCase().includes(query)) || (e.name && e.name.toLowerCase().includes(query)) || (e.semester && e.semester.toLowerCase().includes(query))); renderPaymentTable(filtered); }
-        function sortPaidTable(key) { paidSortDir = -paidSortDir; const query = document.getElementById('paid_list_search').value.toLowerCase(); let currentList = query ? g_payments.filter(e => (e.reg_no && e.reg_no.toLowerCase().includes(query)) || (e.name && e.name.toLowerCase().includes(query))) : [...g_payments]; currentList.sort((a,b) => { const valA = (a[key] || '').toString().toLowerCase(); const valB = (b[key] || '').toString().toLowerCase(); if (valA < valB) return -1 * paidSortDir; if (valA > valB) return 1 * paidSortDir; return 0; }); renderPaymentTable(currentList); }
-        function renderPaymentTable(data = g_payments) {
-            document.getElementById('total_payments_count').textContent = data.length;
-            const t=document.getElementById('paidTableBody'); 
-            if(data.length==0) { t.innerHTML='<tr><td colspan="6" class="p-4 text-center italic">No records found.</td></tr>'; return; } 
-            t.innerHTML=data.map((e) => `
-                <tr class="hover:bg-teal-50 border-b">
-                    <td class="p-3">${e.reg_no}</td><td class="p-3">${e.name}</td><td class="p-3 font-bold text-teal-700">${e.semester}</td>
-                    <td class="p-3 text-right font-bold">${num(e.amount)}</td><td class="p-3 text-center">${e.date || '-'}</td>
-                    <td class="p-3 text-center space-x-1">
-                        <button onclick="editPayment('${e.id || ''}')" class="text-blue-600 hover:text-blue-800" title="Edit"><i class="fas fa-edit"></i></button>
-                        <button onclick="deletePayment('${e.id || ''}')" class="text-red-600 hover:text-red-800" title="Delete"><i class="fas fa-trash"></i></button>
-                    </td>
-                </tr>`).join(''); 
-        }
-        function handlePaidExcelUpload(e) {
-            const y=document.getElementById('paid_import_year').value, s=document.getElementById('paid_import_sem').value;
-            if(!y||!s) { alert("Select session."); e.target.value=''; return; }
-            processExcel(e, 'payments', r => ({ reg_no: r.reg, name: r.name, semester: `${s} ${y}`, amount: parseFloat(r.amount||r.paid||0), date: r.date }));
-        }
-        function handleFeeExcelUpload(e) {
-            processExcel(e, 'fees', r => ({
-                degree: r.degree, batch: r.batch, year: parseInt(r.year), semester: r.semester,
-                cr: parseInt(r.cr||0), per_cr_fee: parseFloat(r.per_cr_fee||0), tuition_fee: parseFloat(r.tuition_fee||0),
-                total_courses: parseInt(r.courses||0), exam_fee_per_subject: parseFloat(r.exam_rate||0), exam_fee: parseFloat(r.exam_fee||0),
-                reg_fee: parseFloat(r.reg_fee||0), other_fee: parseFloat(r.other_fee||0), paid: 0, total_fee: 0
-            }));
-        }
-        function downloadPaidTemplate() { XLSX.writeFile(XLSX.utils.book_append_sheet(XLSX.utils.book_new(), XLSX.utils.json_to_sheet([{ "Reg": "123", "Name": "A", "Amount": 5000, "Date": "2023-01-01" }]), "P"), "Payments_Template.xlsx"); }
-        function downloadFeeTemplate() { XLSX.writeFile(XLSX.utils.book_append_sheet(XLSX.utils.book_new(), XLSX.utils.json_to_sheet([{ "Degree": "BSCAF", "Batch": "Fall 2025", "Year": 2025, "Semester": "Fall", "Cr": 15, "Per_Cr_Fee": 5000, "Tuition_Fee": 75000, "Courses": 5, "Exam_Rate": 1000, "Exam_Fee": 5000, "Reg_Fee": 20000, "Other_Fee": 0 }]), "F"), "Fees_Template.xlsx"); }
-
-
-        // --- DISCOUNT UI & LOGIC (UPDATED WITH CRUD) ---
-        function showDiscountForm() { document.getElementById('discountForm').reset(); document.getElementById('discount_edit_id').value = "-1"; document.getElementById('discount-form-title').textContent = "Add Discount"; document.getElementById('discount-dashboard').classList.add('hidden'); document.getElementById('discount-form-container').classList.remove('hidden'); }
-        function hideDiscountForm() { document.getElementById('discount-dashboard').classList.remove('hidden'); document.getElementById('discount-form-container').classList.add('hidden'); }
-        
-        async function saveDiscountList(e) { 
-            e.preventDefault(); const fd = new FormData(e.target); const id = document.getElementById('discount_edit_id').value;
-            // Note: API needs 'save_discount' handler if you want live DB edit/delete
-            const discount = { 
-                id: (id === "-1") ? Date.now().toString() : id,
-                reg_no: fd.get('reg_no'), name: toProperCase(fd.get('name')), term: normalizeTerm(fd.get('term')), discount: parseFloat(fd.get('discount'))
-            };
-            await saveData('discount', discount); hideDiscountForm(); alert("Discount saved!"); 
-        }
-        
-        function editDiscount(id) {
-            const d = g_discounts.find(x => x.id == id); if(!d) return;
-            document.getElementById('discount_reg_no').value = d.reg_no;
-            document.getElementById('discount_name').value = d.name;
-            document.getElementById('discount_term').value = d.term;
-            document.getElementById('discount_val').value = d.discount;
-            document.getElementById('discount_edit_id').value = d.id || id;
-            document.getElementById('discount-form-title').textContent = "Edit Discount";
-            document.getElementById('discount-dashboard').classList.add('hidden');
-            document.getElementById('discount-form-container').classList.remove('hidden');
-        }
-        
-        function deleteDiscount(id) { if(confirm("Delete this discount?")) deleteDiscountData(id); }
-        function deleteAllDiscounts() { if(confirm("Delete ALL discounts?")) deleteAllDiscountsData(); }
-        function filterDiscounts() { const query = document.getElementById('discount_list_search').value.toLowerCase(); const filtered = g_discounts.filter(d => (d.reg_no && d.reg_no.toLowerCase().includes(query)) || (d.name && d.name.toLowerCase().includes(query))); renderDiscountTable(filtered); }
-        function sortDiscountTable(key) { discountSortDir = -discountSortDir; const query = document.getElementById('discount_list_search').value.toLowerCase(); let currentList = query ? g_discounts.filter(d => (d.reg_no && d.reg_no.toLowerCase().includes(query))) : [...g_discounts]; currentList.sort((a,b) => { const valA = (a[key] || '').toString().toLowerCase(); const valB = (b[key] || '').toString().toLowerCase(); if (valA < valB) return -1 * discountSortDir; if (valA > valB) return 1 * discountSortDir; return 0; }); renderDiscountTable(currentList); }
-
-        function renderDiscountTable(data = g_discounts) { 
-            document.getElementById('total_discounts_count').textContent = data.length;
-            const t=document.getElementById('discountTableBody'); 
-            if(data.length==0) { t.innerHTML='<tr><td colspan="5" class="p-4 text-center italic">No records found.</td></tr>'; return; } 
-            t.innerHTML=data.map(d=>`
-                <tr class="hover:bg-purple-50 border-b">
-                    <td class="p-3">${d.reg_no}</td><td class="p-3">${d.name}</td><td class="p-3 font-bold text-purple-700">${d.term}</td>
-                    <td class="p-3 text-right font-bold text-green-600">${d.discount}%</td>
-                    <td class="p-3 text-center space-x-1">
-                        <button onclick="editDiscount('${d.id || ''}')" class="text-blue-600 hover:text-blue-800" title="Edit"><i class="fas fa-edit"></i></button>
-                        <button onclick="deleteDiscount('${d.id || ''}')" class="text-red-600 hover:text-red-800" title="Delete"><i class="fas fa-trash"></i></button>
-                    </td>
-                </tr>`).join(''); 
-        }
-        
-        function exportDiscountsToExcel() { if(g_discounts.length === 0) { alert("No data."); return; } const ws = XLSX.utils.json_to_sheet(g_discounts); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Discounts"); XLSX.writeFile(wb, "Discounts.xlsx"); }
-
-
-        function switchTab(tabId) { 
-            // 1. Hide all tab content
-            document.querySelectorAll('.tab-content').forEach(el => {
-                el.classList.add('hidden');
-                el.classList.remove('block');
-            });
-
-            // 2. Show selected tab content
-            const selectedContent = document.getElementById('view-' + tabId);
-            if(selectedContent) {
-                selectedContent.classList.remove('hidden');
-                selectedContent.classList.add('block');
-            }
-
-            // 3. Reset all tab buttons
-            const tabs = ['clearance', 'student', 'fee', 'enrollment', 'paid', 'discount'];
-            tabs.forEach(t => {
-                const btn = document.getElementById('tab-' + t);
-                if(btn) {
-                    btn.classList.remove('text-green-600', 'border-b-2', 'border-green-600');
-                    btn.classList.add('text-gray-500');
+                    logDiag("✅ Connection Successful!");
+                    logDiag(`Students: ${json.data.students.length}`);
+                    db = json.data; // Load Data
+                    updateStatus("green", "Connected to Database");
+                    renderAll();
+                } else {
+                     logDiag(`❌ API Error: ${json.message}`);
+                     updateStatus("red", "API Error: " + json.message);
+                     loadLocal();
                 }
-            });
 
-            // 4. Highlight active tab button
-            const activeBtn = document.getElementById('tab-' + tabId);
-            if(activeBtn) {
-                activeBtn.classList.remove('text-gray-500');
-                activeBtn.classList.add('text-green-600', 'border-b-2', 'border-green-600');
+            } catch (e) {
+                logDiag(`❌ CRITICAL ERROR: ${e.message}`);
+                updateStatus("red", "Connection Failed");
+                loadLocal();
             }
+        }
 
-            // 5. Special handlers
-            if(tabId === 'fee') updateFeeDropdowns();
+        function loadLocal() {
+            const s = localStorage.getItem('fee_system_db');
+            if(s) {
+                db = JSON.parse(s);
+                logDiag("Loaded data from Local Storage backup.");
+                renderAll();
+            } else {
+                logDiag("No local backup found.");
+            }
+        }
+
+        function renderAll() {
+            document.getElementById('count-st').innerText = db.students.length;
+            document.getElementById('count-fe').innerText = db.fees.length;
+            document.getElementById('count-en').innerText = db.enrollments.length;
+            document.getElementById('count-di').innerText = db.discounts.length;
+            
+            renderStudentTable();
+            renderDiscountTable();
+        }
+
+        // --- RENDERERS ---
+
+        function renderStudentTable() {
+            const t = document.getElementById('studentBody');
+            const f = document.getElementById('filter_student') ? document.getElementById('filter_student').value.toLowerCase() : '';
+            const data = db.students.filter(s => !f || s.reg_no.toLowerCase().includes(f) || s.name.toLowerCase().includes(f));
+            
+            if(data.length === 0) { t.innerHTML = '<tr><td colspan="4" class="p-4 text-center">No records found.</td></tr>'; return; }
+            
+            t.innerHTML = data.slice(0, 100).map(s => `
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="p-2 border">${s.reg_no}</td>
+                    <td class="p-2 border">${s.name}</td>
+                    <td class="p-2 border">${s.degree}</td>
+                    <td class="p-2 border">${s.batch}</td>
+                </tr>
+            `).join('');
+        }
+
+        function renderDiscountTable() {
+            const t = document.getElementById('discountBody');
+            const f = document.getElementById('filter_discount') ? document.getElementById('filter_discount').value.toLowerCase() : '';
+            const data = db.discounts.filter(d => !f || d.reg_no.toLowerCase().includes(f));
+
+            if(data.length === 0) { t.innerHTML = '<tr><td colspan="5" class="p-4 text-center">No records found.</td></tr>'; return; }
+
+            t.innerHTML = data.map(d => `
+                <tr class="border-b hover:bg-purple-50">
+                    <td class="p-2 border">${d.reg_no}</td>
+                    <td class="p-2 border">${d.name}</td>
+                    <td class="p-2 border">${d.term}</td>
+                    <td class="p-2 border text-right">${d.discount}%</td>
+                    <td class="p-2 border text-center">
+                         <button onclick="deleteDisc('${d.id}')" class="text-red-500"><i class="fas fa-trash"></i></button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // --- ACTIONS ---
+
+        function searchStudentByRegNo() {
+            const reg = document.getElementById('search_reg_input').value.trim();
+            const s = db.students.find(x => x.reg_no.toLowerCase() === reg.toLowerCase());
+            
+            if(s) {
+                document.getElementById('disp_reg').innerText = s.reg_no;
+                document.getElementById('disp_name').innerText = s.name;
+                document.getElementById('disp_degree').innerText = s.degree;
+                document.getElementById('disp_batch').innerText = s.batch;
+                // Add Fee calculation logic here (filter enrollments/fees/payments for this reg)
+                document.getElementById('feeTableBody').innerHTML = `<tr><td colspan="7" class="p-4 text-center text-green-700 font-bold">Student Found! (Calculation logic placeholder)</td></tr>`;
+            } else {
+                alert("Student not found!");
+            }
+        }
+        
+        function showDiscountForm() { document.getElementById('discount-modal').classList.remove('hidden'); }
+        function hideDiscountForm() { document.getElementById('discount-modal').classList.add('hidden'); }
+        
+        async function saveDiscount() {
+            const data = {
+                reg_no: document.getElementById('d_reg').value,
+                name: document.getElementById('d_name').value,
+                term: document.getElementById('d_term').value,
+                discount: document.getElementById('d_val').value,
+                id: Date.now()
+            };
+            db.discounts.push(data);
+            hideDiscountForm();
+            renderDiscountTable();
+            // Try saving to server
+            await fetch(`${API_URL}?action=save_discount`, { method: 'POST', body: JSON.stringify(data) });
+        }
+        
+        async function deleteAll(type) {
+            if(!confirm("Delete All?")) return;
+            db[type] = [];
+            renderAll();
+            await fetch(`${API_URL}?action=delete_all_${type}`, { method: 'POST' });
+        }
+
+        // --- UTILS ---
+        function updateStatus(color, msg) {
+            document.getElementById('status-dot').className = `inline-block w-3 h-3 rounded-full bg-${color}-500`;
+            document.getElementById('status-msg').innerText = msg;
+            if(color === 'red') openDiagnostic();
+        }
+
+        function logDiag(msg) {
+            const d = document.getElementById('diag-log');
+            d.innerHTML += `<div>> ${msg}</div>`;
+        }
+
+        function openDiagnostic() { document.getElementById('diagnostic-modal').classList.remove('hidden'); }
+
+        function switchTab(id) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById('view-' + id).classList.remove('hidden');
         }
 
     </script>
