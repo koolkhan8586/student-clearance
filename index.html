@@ -247,7 +247,7 @@
                     <th class="border-b p-3 cursor-pointer" onclick="sortEnrollmentTable('semester')">Semester <i class="fas fa-sort ml-1"></i></th>
                     <th class="border-b p-3 text-center">Courses</th><th class="border-b p-3 text-center">Cr. Hrs</th>
                     <th class="border-b p-3 text-center">Actions</th> <!-- Actions Column -->
-                </tr></thead><tbody id="enrollmentTableBody"><tr><td colspan="6" class="p-4 text-center text-gray-500 italic">Loading...</td></tr></tbody></table></div>
+                </tr></thead><tbody id="enrollmentTableBody"><tr><td colspan="6" class="p-4 text-center text-gray-500 italic">No records found.</td></tr></tbody></table></div>
             </div>
             
              <!-- Enrollment Form Modal -->
@@ -291,7 +291,7 @@
                         <div class="flex flex-col sm:flex-row gap-2 w-full"><div class="relative w-full"><input type="text" id="paid_list_search" placeholder="Search payments..." onkeyup="filterPayments()" class="border border-gray-300 rounded px-3 py-2 pl-8 w-full text-sm focus:ring-2 focus:ring-teal-500 outline-none shadow-sm"><i class="fas fa-search absolute left-2.5 top-2.5 text-gray-400 text-xs"></i></div><div class="flex gap-2 justify-end"><button onclick="downloadPaidTemplate()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded transition flex items-center text-sm" title="Template"><i class="fas fa-download"></i></button><button onclick="exportPaymentsToExcel()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded transition flex items-center text-sm shadow-sm" title="Export"><i class="fas fa-file-export"></i></button><button onclick="showPaidForm()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded transition flex items-center text-sm shadow-sm" title="Add Manual"><i class="fas fa-plus"></i></button><button onclick="deleteAllPayments()" class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded transition flex items-center text-sm shadow-sm" title="Delete All"><i class="fas fa-trash-alt"></i></button></div></div>
                     </div>
                 </div>
-                <div class="overflow-x-auto border rounded-lg max-h-[600px]"><table class="w-full text-sm text-left border-collapse border-b border-gray-200"><thead class="bg-teal-50 text-gray-700 uppercase text-xs sticky top-0"><tr><th class="border-b p-3 cursor-pointer" onclick="sortPaidTable('reg_no')">Reg #</th><th class="border-b p-3 cursor-pointer" onclick="sortPaidTable('name')">Name</th><th class="border-b p-3 cursor-pointer" onclick="sortPaidTable('semester')">Semester</th><th class="border-b p-3 text-right">Amount</th><th class="border-b p-3 text-center">Date</th><th class="border-b p-3 text-center">Actions</th></tr></thead><tbody id="paidTableBody"><tr><td colspan="6" class="p-4 text-center text-gray-500 italic">Loading...</td></tr></tbody></table></div>
+                <div class="overflow-x-auto border rounded-lg max-h-[600px]"><table class="w-full text-sm text-left border-collapse border-b border-gray-200"><thead class="bg-teal-50 text-gray-700 uppercase text-xs sticky top-0"><tr><th class="border-b p-3 cursor-pointer" onclick="sortPaidTable('reg_no')">Reg #</th><th class="border-b p-3 cursor-pointer" onclick="sortPaidTable('name')">Name</th><th class="border-b p-3 cursor-pointer" onclick="sortPaidTable('semester')">Semester</th><th class="border-b p-3 text-right">Amount</th><th class="border-b p-3 text-center">Date</th><th class="border-b p-3 text-center">Actions</th></tr></thead><tbody id="paidTableBody"><tr><td colspan="6" class="p-4 text-center text-gray-500 italic">No records found.</td></tr></tbody></table></div>
             </div>
             <div id="paid-form-container" class="hidden bg-white rounded-lg shadow-lg p-6 max-w-2xl mx-auto mt-4"><div class="flex justify-between items-center border-b pb-4 mb-4"><h3 class="text-lg font-bold text-gray-800" id="paid-form-title">Add Payment</h3><button onclick="hidePaidForm()" class="text-gray-500 hover:text-red-500"><i class="fas fa-times"></i></button></div><form id="paidForm" onsubmit="savePaymentList(event)" class="space-y-4"><input type="hidden" id="paid_edit_id" value="-1"><div class="grid grid-cols-1 md:grid-cols-2 gap-4"><div class="col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Registration Number</label><input type="text" name="reg_no" id="paid_reg_no" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div class="col-span-2"><label class="block text-sm font-medium text-gray-700 mb-1">Student Name</label><input type="text" name="name" id="paid_name" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div><label class="block text-sm font-medium text-gray-700 mb-1">Session Year</label><select name="year" id="paid_year" class="w-full border border-gray-300 rounded-lg px-4 py-2"><option>2023</option><option>2024</option><option>2025</option><option>2026</option></select></div><div><label class="block text-sm font-medium text-gray-700 mb-1">Semester</label><select name="semester" id="paid_sem" class="w-full border border-gray-300 rounded-lg px-4 py-2"><option>Winter</option><option>Spring</option><option>Summer</option><option>Fall</option></select></div><div><label class="block text-sm font-medium text-gray-700 mb-1">Amount Paid</label><input type="number" name="amount" id="paid_amount" required class="w-full border border-gray-300 rounded-lg px-4 py-2"></div><div><label class="block text-sm font-medium text-gray-700 mb-1">Date</label><input type="date" name="date" id="paid_date" class="w-full border border-gray-300 rounded-lg px-4 py-2"></div></div><div class="pt-4 flex gap-2"><button type="submit" class="flex-1 bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-4 rounded-lg">Save Payment</button><button type="button" onclick="hidePaidForm()" class="px-4 py-3 bg-gray-200 text-gray-700 rounded-lg">Cancel</button></div></form></div>
         </div>
@@ -443,21 +443,6 @@
             
             // Now attempt server connection
             try {
-                // Check if running via file://
-                if (window.location.protocol === 'file:') {
-                    const statusDiv = document.getElementById('conn-status');
-                    statusDiv.classList.remove('hidden');
-                    statusDiv.classList.remove('bg-red-100', 'text-red-800', 'border-red-200');
-                    statusDiv.classList.add('bg-yellow-100', 'text-yellow-800', 'border-yellow-200');
-                    
-                    statusDiv.innerHTML = `
-                    <div class="flex justify-between w-full items-center">
-                        <span class="font-bold">⚠️ Running in File Mode. PHP/Database features will not work. Use a server (http://localhost).</span>
-                         <button onclick="document.getElementById('conn-status').classList.add('hidden')" class="text-gray-500 hover:text-black font-bold">&times;</button>
-                    </div>`;
-                    return;
-                }
-
                 const res = await fetch(`${API_URL}?action=fetch_all&t=${new Date().getTime()}`);
                 const text = await res.text();
                 lastRawResponse = text; 
@@ -474,7 +459,7 @@
                         <div class="flex justify-between w-full items-center">
                             <span class="text-red-700 font-bold">⚠️ Connection Error: ${err}</span>
                             <div class="flex gap-2">
-                                <button onclick="showConfigModal()" class="bg-white text-red-700 border border-red-300 px-3 py-1 rounded hover:bg-red-50 text-xs">Config</button>
+                                <button onclick="showConfigModal()" class="bg-white text-red-700 border border-red-300 px-3 py-1 rounded hover:bg-red-50 text-xs">Fix Path</button>
                                 <button onclick="showDebugModal()" class="bg-gray-200 text-gray-700 px-3 py-1 rounded text-xs">Debug</button>
                             </div>
                         </div>`;
