@@ -291,9 +291,15 @@
                 e.preventDefault();
                 const newData = { ...formData, id: editingId || Date.now().toString() };
                 
-                // For Fees, we now just save the rates. 
-                // Calculation happens dynamically in generateReport based on Enrollment data.
-                
+                if (modalType === 'fees') {
+                    const cr = parseFloat(newData.cr || 0);
+                    const rate = parseFloat(newData.per_cr_fee || 0);
+                    const courses = parseFloat(newData.total_courses || 0);
+                    const examRate = parseFloat(newData.exam_fee_per_subject || 0);
+                    newData.tuition_fee = parseFloat(newData.tuition_fee) || (cr * rate);
+                    newData.exam_fee = parseFloat(newData.exam_fee) || (courses * examRate);
+                    newData.total_fee = newData.tuition_fee + newData.exam_fee + parseFloat(newData.reg_fee||0) + parseFloat(newData.other_fee||0);
+                }
                 if (modalType === 'payments' && !newData.name) {
                     const s = data.students.find(st => norm(st.reg_no) === norm(newData.reg_no));
                     if(s) newData.name = s.name;
@@ -402,14 +408,14 @@
                                         <div className="p-8">
                                             <div className="border-b-2 border-gray-800 pb-6 mb-6 flex justify-between items-start">
                                                 <div className="w-16 h-16 rounded flex items-center justify-center font-bold text-gray-400 overflow-hidden">
-                                                    <img src="https://drive.google.com/open?id=1MZCkyZw7ZkGHn_Y3CgdO8xG7KjaUDB44&usp=drive_fs" alt="UOL Logo" className="w-full h-full object-contain" />
+                                                    <img src="src/UOL-Green-V1.png" alt="UOL Logo" className="w-full h-full object-contain" />
                                                 </div>
                                                 <div className="text-center flex-1 px-4">
                                                     <h2 className="text-2xl font-bold text-gray-900 uppercase">The University of Lahore</h2>
                                                     <p className="text-gray-600 font-medium">School of Accountancy & Finance</p>
                                                     <div className="inline-block bg-gray-100 px-3 py-1 rounded mt-2 text-xs font-bold uppercase tracking-wider">Fee Clearance Report</div>
                                                 </div>
-                                                <div className="text-right text-xs text-gray-500"><p>Date: {new Date().toLocaleDateString()}</p></div>
+                                                <div className="text-right text-xs text-gray-500"><p>Printed: {new Date().toLocaleString()}</p></div>
                                             </div>
                                             <div className="grid grid-cols-2 gap-x-12 gap-y-4 mb-8 text-sm">
                                                 <div className="flex justify-between border-b border-gray-200 py-1"><span className="font-bold text-gray-600">Registration No:</span><span className="font-mono font-bold text-gray-900">{clearanceResult.student.reg_no}</span></div>
@@ -423,7 +429,7 @@
                                             <div className="overflow-x-auto">
                                                 <table className="w-full text-xs">
                                                     <thead className="bg-gray-100 text-gray-900 font-bold uppercase">
-                                                        <tr><th className="p-2 border">Sem</th><th className="p-2 border text-center">Cr</th><th className="p-2 border text-right">Tuition</th><th className="p-2 border text-right">Exam</th><th className="p-2 border text-right">Misc</th><th className="p-2 border text-right bg-gray-50">Total</th><th className="p-2 border text-center">Disc</th><th className="p-2 border text-right">Net Fee</th><th className="p-2 border text-right text-green-700">Paid</th><th className="p-2 border text-right">Balance</th></tr>
+                                                        <tr><th className="p-2 border">Sem</th><th className="p-2 border text-center">Cr</th><th className="p-2 border text-right">Tuition</th><th className="p-2 border text-right">Exam</th><th className="p-2 border text-right">Misc</th><th className="p-2 border text-right bg-gray-50">Total</th><th className="p-2 border text-center">Schol.</th><th className="p-2 border text-right">Net Fee</th><th className="p-2 border text-right text-green-700">Paid</th><th className="p-2 border text-right">Balance</th></tr>
                                                     </thead>
                                                     <tbody className="divide-y divide-gray-200">
                                                         {clearanceResult.rows.map((row, idx) => (
@@ -434,7 +440,7 @@
                                                                 <td className="p-2 border text-right text-gray-600">{num(row.exam)}</td>
                                                                 <td className="p-2 border text-right text-gray-600">{num(row.reg + row.other)}</td>
                                                                 <td className="p-2 border text-right font-bold bg-gray-50">{num(row.total)}</td>
-                                                                <td className="p-2 border text-center text-gray-500">{row.discPct > 0 ? `${row.discPct}%` : '-'}</td>
+                                                                <td className="p-2 border text-center text-gray-500">{row.discPct > 0 ? num(row.discAmt) : '-'}</td>
                                                                 <td className="p-2 border text-right font-bold">{num(row.netFee)}</td>
                                                                 <td className="p-2 border text-right font-bold text-green-600">{num(row.totalPaid)}</td>
                                                                 <td className={`p-2 border text-right font-bold ${row.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>{num(row.balance)}</td>
