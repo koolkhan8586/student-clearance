@@ -207,8 +207,7 @@
                 }
             };
 
-            // --- CORE LOGIC (SAME AS BEFORE BUT WITH DB DATA) ---
-            // (Keeping the logic identical, but using the 'data' state populated from DB)
+            // --- CORE LOGIC ---
             const generateReport = () => {
                 if (!searchReg) return;
                 const cleanReg = norm(searchReg);
@@ -279,8 +278,6 @@
                 }
                 
                 // Determine action
-                const typeSingular = modalType.endsWith('s') ? modalType.slice(0, -1) : modalType; // fee -> fees is messy, let's fix
-                // Mapping: students->student, fees->fee, enrollments->enrollment...
                 let actionType = modalType.slice(0, -1);
                 if(modalType === 'others') actionType = 'other';
                 
@@ -311,13 +308,9 @@
             };
             const deleteSelected = async () => {
                 if (!confirm(`Delete ${selectedIds.size} records?`)) return;
-                // Since API doesn't support bulk delete yet, we loop (not efficient but works for now) or modify API
                 for (let id of selectedIds) {
-                    // Mapping tab name to delete action is tricky, simplifying:
-                    // Using existing delete logic loop
                     let type = activeTab; // e.g. students
-                    if(type === 'others') type = 'other'; // api expects delete_other usually? Actually api expects delete_fees etc.
-                    // Let's rely on standard ID delete from API
+                    if(type === 'others') type = 'other'; 
                     await postToApi(`delete_${type.slice(0,-1)}`, { id });
                 }
                 setSelectedIds(new Set());
@@ -339,6 +332,85 @@
                 const perms = formData.permissions || [];
                 if (perms.includes(tabId)) setFormData({ ...formData, permissions: perms.filter(p => p !== tabId) });
                 else setFormData({ ...formData, permissions: [...perms, tabId] });
+            };
+            
+            const getHeaders = (type) => {
+                switch(type) {
+                    case 'students': return ['reg_no', 'name', 'degree', 'batch'];
+                    case 'fees': return ['degree', 'batch', 'per_cr_fee', 'per_course_fee', 'reg_fee', 'other_fee'];
+                    case 'enrollments': return ['reg_no', 'name', 'semester', 'cr', 'courses'];
+                    case 'payments': return ['reg_no', 'name', 'semester', 'amount', 'date'];
+                    case 'discounts': return ['reg_no', 'name', 'term', 'discount'];
+                    case 'others': return ['reg_no', 'name', 'semester', 'fee_name', 'amount'];
+                    case 'users': return ['username', 'password', 'role', 'permissions'];
+                    default: return [];
+                }
+            };
+            
+            const downloadSample = (type) => {
+                const headers = getHeaders(type);
+                const csvContent = "data:text/csv;charset=utf-8," + headers.join(",");
+                const encodedUri = encodeURI(csvContent);
+                const link = document.createElement("a");
+                link.setAttribute("href", encodedUri);
+                link.setAttribute("download", `${type}_sample.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            };
+
+            const handleExport = (type) => {
+                const records = data[type];
+                if (!records || records.length === 0) return alert("No data to export");
+                const headers = getHeaders(type);
+                const csvRows = [
+                    headers.join(','),
+                    ...records.map(row => headers.map(fieldName => {
+                        let val = row[fieldName];
+                        if (Array.isArray(val)) val = val.join('|'); 
+                        val = String(val || '');
+                        if (val.includes(',')) val = `"${val}"`; 
+                        return val;
+                    }).join(','))
+                ];
+                const csvContent = "data:text/csv;charset=utf-8," + csvRows.join("\n");
+                const encodedUri = encodeURI(csvContent);
+                const link = document.createElement("a");
+                link.setAttribute("href", encodedUri);
+                link.setAttribute("download", `${type}_export.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            };
+
+            const handleImport = (e, type) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = async (evt) => {
+                    const text = evt.target.result;
+                    const rows = text.split('\n').map(r => r.trim()).filter(r => r);
+                    if (rows.length < 2) return; 
+                    const headers = rows[0].split(',').map(h => h.trim());
+                    
+                    let actionType = type.slice(0, -1);
+                    if(type === 'others') actionType = 'other';
+
+                    for (let i = 1; i < rows.length; i++) {
+                        const values = rows[i].split(',');
+                        const obj = {};
+                        headers.forEach((h, index) => {
+                            let val = values[index];
+                            if (val && val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1);
+                            obj[h] = val;
+                        });
+                        // Import one by one to DB
+                        await postToApi(`save_${actionType}`, { data: obj });
+                    }
+                    alert(`Imported ${rows.length - 1} records!`);
+                    e.target.value = null;
+                };
+                reader.readAsText(file);
             };
             
             const TABS = [{ id: 'clearance', label: 'Clearance', icon: FileText }, { id: 'students', label: 'Students', icon: Users }, { id: 'fees', label: 'Fee Structure', icon: DollarSign }, { id: 'others', label: 'Other Charges', icon: AlertCircle }, { id: 'enrollments', label: 'Enrollments', icon: BookOpen }, { id: 'payments', label: 'Payments', icon: CreditCard }, { id: 'discounts', label: 'Discounts', icon: Percent }];
@@ -474,7 +546,13 @@
                                                 {filteredData.map((item, idx) => (
                                                     <tr key={item.id || idx} className={`hover:bg-gray-50 transition ${selectedIds.has(item.id) ? 'bg-blue-50' : ''}`}>
                                                         <td className="p-4"><input type="checkbox" checked={selectedIds.has(item.id || item.reg_no)} onChange={() => handleSelectRow(item.id || item.reg_no)} className="rounded" /></td>
-                                                        {getHeaders(activeTab).map(h => <td key={h} className="p-4">{item[h]}</td>)}
+                                                        {activeTab === 'students' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4 font-bold">{item.name}</td><td className="p-4"><span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-bold">{item.degree}</span></td><td className="p-4 text-gray-500">{item.batch}</td></>}
+                                                        {activeTab === 'fees' && <><td className="p-4 font-bold">{item.degree}</td><td className="p-4 text-gray-600">{item.batch}</td><td className="p-4 text-right text-gray-500">{num(item.per_cr_fee)}</td><td className="p-4 text-right font-bold text-green-700">{num(item.per_course_fee)}</td></>}
+                                                        {activeTab === 'enrollments' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4"><span className="bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-xs font-bold">{item.semester}</span></td><td className="p-4">{item.cr}</td></>}
+                                                        {activeTab === 'payments' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4"><span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-bold">{item.semester}</span></td><td className="p-4 text-right font-bold">{num(item.amount)}</td></>}
+                                                        {activeTab === 'others' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4 text-gray-600">{item.semester}</td><td className="p-4"><span className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs font-bold">{item.fee_name}</span></td><td className="p-4 text-right font-bold">{num(item.amount)}</td></>}
+                                                        {activeTab === 'discounts' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4 text-gray-500">{item.term}</td><td className="p-4 text-right font-bold text-purple-600">{item.discount}%</td></>}
+                                                        {activeTab === 'users' && <><td className="p-4 font-bold">{item.username}</td><td className="p-4 capitalize">{item.role}</td><td className="p-4 text-xs max-w-xs truncate">{item.role === 'admin' ? 'Full Access' : item.permissions.join(', ')}</td></>}
                                                         <td className="p-4 text-center flex justify-center gap-2">
                                                             <button onClick={() => openModal(activeTab, item)} className="p-2 text-blue-600 hover:bg-blue-50 rounded"><i className="fas fa-edit"></i> Edit</button>
                                                             <button onClick={() => handleDelete(activeTab, item.id)} className="p-2 text-red-600 hover:bg-red-50 rounded"><Trash2 className="h-4 w-4" /></button>
