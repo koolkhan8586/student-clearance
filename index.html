@@ -207,7 +207,7 @@
                         <button onclick="deleteAll('students')" class="bg-red-600 text-white px-3 rounded text-sm">Clear</button>
                     </div>
                 </div>
-                <input type="text" id="filter_student" onkeyup="renderTable('students')" placeholder="Filter by Name, Reg, Degree..." class="w-full border p-2 mb-2 rounded">
+                <input type="text" id="filter_student" onkeyup="renderTable('students')" placeholder="Filter by Name, Reg, Degree, Batch..." class="w-full border p-2 mb-2 rounded">
                 <div class="h-96 overflow-y-auto border rounded">
                     <table class="w-full text-sm text-left border-collapse border-b border-gray-200">
                         <thead class="bg-gray-50 text-gray-700 uppercase text-xs sticky top-0">
@@ -552,12 +552,20 @@
             if (type === 'students') {
                 tbodyId = 'body-st';
                 const f = document.getElementById('filter_student') ? document.getElementById('filter_student').value.toLowerCase() : '';
-                html = data.filter(s => !f || s.reg_no.toLowerCase().includes(f) || s.name.toLowerCase().includes(f)).slice(0,100).map(s => `
+                
+                // Show ALL students (removed slice limit) and improved search to include degree and batch
+                html = data.filter(s => 
+                    !f || 
+                    s.reg_no.toLowerCase().includes(f) || 
+                    s.name.toLowerCase().includes(f) || 
+                    (s.degree && s.degree.toLowerCase().includes(f)) || 
+                    (s.batch && s.batch.toLowerCase().includes(f))
+                ).map(s => `
                     <tr>
                         <td class="p-2 border">${s.reg_no}</td>
                         <td class="p-2 border">${s.name}</td>
                         <td class="p-2 border">${s.degree}</td>
-                        <td class="p-2 border">${s.batch}</td> <!-- Fixed: Added Batch Column -->
+                        <td class="p-2 border">${s.batch}</td>
                         <td class="p-2 border text-center">
                             <button onclick="editStudent('${s.reg_no}')" class="text-blue-600 mr-2"><i class="fas fa-edit"></i></button>
                             <button onclick="deleteItem('students','${s.reg_no}')" class="text-red-600"><i class="fas fa-trash"></i></button>
@@ -568,7 +576,8 @@
                 html = data.map(f => `<tr><td class="p-2 border">${f.degree}</td><td class="p-2 border">${f.batch}</td><td class="p-2 border">${f.semester} ${f.year}</td><td class="p-2 border text-right">${parseFloat(f.total_fee||0) || (parseFloat(f.tuition_fee)+parseFloat(f.exam_fee))}</td><td class="p-2 border text-center"><button onclick="editFeeRecord('${f.id}')" class="text-blue-600 mr-2"><i class="fas fa-edit"></i></button><button onclick="deleteItem('fees','${f.id}')" class="text-red-600"><i class="fas fa-trash"></i></button></td></tr>`).join('');
             } else if (type === 'enrollments') {
                 tbodyId = 'body-en';
-                const f = document.getElementById('enrollment_list_search') ? document.getElementById('enrollment_list_search').value.toLowerCase() : '';
+                // Fixed: Correct ID for enrollment search input (was enrollment_list_search)
+                const f = document.getElementById('filter_enrollment') ? document.getElementById('filter_enrollment').value.toLowerCase() : '';
                 html = data.filter(e => !f || e.reg_no.toLowerCase().includes(f) || e.name.toLowerCase().includes(f)).map(e => `<tr><td class="p-2 border">${e.reg_no}</td><td class="p-2 border">${e.name}</td><td class="p-2 border">${e.semester}</td><td class="p-2 border text-center">${e.courses}</td><td class="p-2 border text-center">${e.cr}</td><td class="p-2 border text-center"><button onclick="editEnrollment('${e.id}')" class="text-blue-600 mr-2"><i class="fas fa-edit"></i></button><button onclick="deleteItem('enrollments','${e.id}')" class="text-red-600"><i class="fas fa-trash"></i></button></td></tr>`).join('');
             } else if (type === 'payments') {
                 tbodyId = 'body-pa';
@@ -606,6 +615,10 @@
         function filterEnrollments() { renderTable('enrollments'); }
         function filterPayments() { renderTable('payments'); }
 
+        // --- FIXED: ADDED MISSING SEARCH HANDLER ---
+        function handleSearchEnter(e) {
+            if (e.key === 'Enter') searchStudentByRegNo();
+        }
 
         // --- SEARCH CORE LOGIC ---
         function searchStudentByRegNo() {
