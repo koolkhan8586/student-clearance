@@ -407,7 +407,7 @@
                                     <div className="bg-white rounded-xl shadow-lg overflow-hidden" id="printableArea">
                                         <div className="p-8">
                                             <div className="border-b-2 border-gray-800 pb-6 mb-6 flex justify-between items-start">
-                                                <div className="w-16 h-16 rounded flex items-center justify-center font-bold text-gray-400 overflow-hidden">
+                                                <div className="w-24 h-24 rounded-lg flex items-center justify-center font-bold text-gray-400 overflow-hidden">
                                                     <img src="src/UOL-Green-V1.png" alt="UOL Logo" className="w-full h-full object-contain" />
                                                 </div>
                                                 <div className="text-center flex-1 px-4">
@@ -440,7 +440,7 @@
                                                                 <td className="p-2 border text-right text-gray-600">{num(row.exam)}</td>
                                                                 <td className="p-2 border text-right text-gray-600">{num(row.reg + row.other)}</td>
                                                                 <td className="p-2 border text-right font-bold bg-gray-50">{num(row.total)}</td>
-                                                                <td className="p-2 border text-center text-gray-500">{row.discPct > 0 ? num(row.discAmt) : '-'}</td>
+                                                                <td className="p-2 border text-center text-gray-500">{row.discPct > 0 ? `${row.discPct}% (${num(row.discAmt)})` : '-'}</td>
                                                                 <td className="p-2 border text-right font-bold">{num(row.netFee)}</td>
                                                                 <td className="p-2 border text-right font-bold text-green-600">{num(row.totalPaid)}</td>
                                                                 <td className={`p-2 border text-right font-bold ${row.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>{num(row.balance)}</td>
