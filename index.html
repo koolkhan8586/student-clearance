@@ -31,27 +31,18 @@
                 visibility: visible;
             }
             #printableArea {
-                position: fixed;
+                position: absolute;
                 left: 0;
                 top: 0;
                 width: 100%;
-                height: 100%;
                 margin: 0;
-                padding: 10mm; /* Standard print padding */
+                padding: 20px; /* Add some padding for better fit */
                 box-shadow: none !important;
                 border: none !important;
-                overflow: hidden; /* Prevent spillover */
-                page-break-inside: avoid;
             }
-            
-            /* Scale down content if it overflows vertically */
-            .overflow-x-auto {
-                overflow: visible !important;
-            }
-            
             /* Hide URL/Page info headers/footers in modern browsers if possible via @page, though browser settings override this */
             @page {
-                size: A4 portrait;
+                size: auto;
                 margin: 0mm;
             }
         }
@@ -87,9 +78,13 @@
         const XSquare = (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg>;
         const AlertCircle = (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>;
         const CalendarX = (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="10" y1="14" x2="14" y2="18"/><line x1="14" y1="14" x2="10" y2="18"/></svg>;
+        const Lock = (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>;
+        const LogOut = (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>;
+        const Shield = (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>;
 
         function App() {
             // --- STATE MANAGEMENT ---
+            const [user, setUser] = useState(null); // Current Logged In User
             const [activeTab, setActiveTab] = useState('clearance');
             const [data, setData] = useState({
                 students: [],
@@ -97,13 +92,14 @@
                 enrollments: [],
                 payments: [],
                 discounts: [],
-                others: [] // NEW: Other Charges
+                others: [],
+                users: [] // System Users
             });
             
             // Search & Filter States
-            const [searchReg, setSearchReg] = useState(''); // For Clearance Report
-            const [tabSearch, setTabSearch] = useState(''); // For Data Tabs
-            const [selectedIds, setSelectedIds] = useState(new Set()); // For Bulk Actions
+            const [searchReg, setSearchReg] = useState('');
+            const [tabSearch, setTabSearch] = useState('');
+            const [selectedIds, setSelectedIds] = useState(new Set());
             const [clearanceResult, setClearanceResult] = useState(null);
             
             // Modal States
@@ -112,42 +108,36 @@
             const [editingId, setEditingId] = useState(null);
             const [formData, setFormData] = useState({});
 
+            // Login Form State
+            const [loginData, setLoginData] = useState({ username: '', password: '' });
+
             // --- PERSISTENCE ---
             useEffect(() => {
                 const saved = localStorage.getItem('feeSystemData_v2');
                 if (saved) {
                     try { 
                         const parsed = JSON.parse(saved);
-                        // Ensure 'others' array exists if loading from older data
                         if (!parsed.others) parsed.others = [];
+                        if (!parsed.users) {
+                            // Seed default admin if missing
+                            parsed.users = [{ id: 'admin', username: 'admin', password: '123', role: 'admin', permissions: ['all'] }];
+                        }
                         setData(parsed); 
                     } 
                     catch (e) { console.error("Failed to load data", e); }
                 } else {
-                    // MIGRATION: Try to load from old HTML system key
-                    const oldData = localStorage.getItem('fee_system_local');
-                    if (oldData) {
-                        try {
-                            const parsed = JSON.parse(oldData);
-                            const migratedData = {
-                                students: parsed.students || [],
-                                fees: parsed.fees || [],
-                                enrollments: parsed.enrollments || [],
-                                payments: parsed.payments || [],
-                                discounts: parsed.discounts || [],
-                                others: parsed.others || []
-                            };
-                            setData(migratedData);
-                            localStorage.setItem('feeSystemData_v2', JSON.stringify(migratedData));
-                            alert("Data restored from previous version!");
-                        } catch (e) { console.error("Migration failed", e); }
-                    }
+                    // Seed initial data
+                    const initialData = {
+                        students: [], fees: [], enrollments: [], payments: [], discounts: [], others: [],
+                        users: [{ id: 'admin', username: 'admin', password: '123', role: 'admin', permissions: ['all'] }]
+                    };
+                    setData(initialData);
+                    localStorage.setItem('feeSystemData_v2', JSON.stringify(initialData));
                 }
             }, []);
 
             useEffect(() => {
-                // Save whenever data changes
-                if (data.students.length > 0 || data.fees.length > 0 || data.payments.length > 0 || data.others.length > 0) {
+                if (data.users.length > 0) {
                     localStorage.setItem('feeSystemData_v2', JSON.stringify(data));
                 }
             }, [data]);
@@ -161,6 +151,43 @@
             const norm = (str) => str ? str.toString().toLowerCase().replace(/[^a-z0-9]/g, '') : '';
             const num = (n) => parseFloat(n || 0).toLocaleString('en-US');
             
+            // --- AUTH LOGIC ---
+            const handleLogin = (e) => {
+                e.preventDefault();
+                const found = data.users.find(u => u.username === loginData.username && u.password === loginData.password);
+                if (found) {
+                    setUser(found);
+                    setLoginData({ username: '', password: '' });
+                    // Set default tab based on permission
+                    if(found.role === 'admin' || found.permissions.includes('clearance')) setActiveTab('clearance');
+                    else if(found.permissions.length > 0) setActiveTab(found.permissions[0]);
+                } else {
+                    alert("Invalid Credentials");
+                }
+            };
+
+            const handleLogout = () => {
+                setUser(null);
+                setClearanceResult(null);
+                setActiveTab('clearance');
+            };
+
+            const TABS = [
+                { id: 'clearance', label: 'Clearance', icon: FileText },
+                { id: 'students', label: 'Students', icon: Users },
+                { id: 'fees', label: 'Fee Structure', icon: DollarSign },
+                { id: 'others', label: 'Other Charges', icon: AlertCircle },
+                { id: 'enrollments', label: 'Enrollments', icon: BookOpen },
+                { id: 'payments', label: 'Payments', icon: CreditCard },
+                { id: 'discounts', label: 'Discounts', icon: Percent }
+            ];
+
+            const availableTabs = user ? (
+                user.role === 'admin' 
+                ? [...TABS, { id: 'users', label: 'Users & Access', icon: Shield }] 
+                : TABS.filter(t => user.permissions.includes(t.id))
+            ) : [];
+
             // --- IMPORT / EXPORT LOGIC ---
             const getHeaders = (type) => {
                 switch(type) {
@@ -169,7 +196,8 @@
                     case 'enrollments': return ['reg_no', 'name', 'semester', 'cr', 'courses'];
                     case 'payments': return ['reg_no', 'name', 'semester', 'amount', 'date'];
                     case 'discounts': return ['reg_no', 'name', 'term', 'discount'];
-                    case 'others': return ['reg_no', 'name', 'semester', 'fee_name', 'amount']; // NEW
+                    case 'others': return ['reg_no', 'name', 'semester', 'fee_name', 'amount'];
+                    case 'users': return ['username', 'password', 'role', 'permissions'];
                     default: return [];
                 }
             };
@@ -193,8 +221,10 @@
                 const csvRows = [
                     headers.join(','),
                     ...records.map(row => headers.map(fieldName => {
-                        let val = row[fieldName] || '';
-                        if (typeof val === 'string' && val.includes(',')) val = `"${val}"`; 
+                        let val = row[fieldName];
+                        if (Array.isArray(val)) val = val.join('|'); // Handle permissions array
+                        val = String(val || '');
+                        if (val.includes(',')) val = `"${val}"`; 
                         return val;
                     }).join(','))
                 ];
@@ -226,6 +256,10 @@
                             if (val && val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1);
                             obj[h] = val;
                         });
+                        // Handle permissions array import
+                        if (type === 'users' && obj.permissions && typeof obj.permissions === 'string') {
+                            obj.permissions = obj.permissions.split('|');
+                        }
                         newItems.push(obj);
                     }
                     setData(prev => ({ ...prev, [type]: [...prev[type], ...newItems] }));
@@ -246,7 +280,6 @@
                     return;
                 }
                 
-                // UNIVERSAL FEE LOGIC: Match by Degree & Batch only
                 const masterFee = data.fees.find(f => 
                     norm(f.degree) === norm(student.degree) && 
                     norm(f.batch) === norm(student.batch)
@@ -260,16 +293,13 @@
                         const courses = parseFloat(en.courses || 0);
                         let feeDetails = { tuition: 0, exam: 0, reg: 0, other: 0, total: 0 };
                         
-                        // 1. Calculate Standard Fees
                         if (masterFee) {
                             feeDetails.tuition = cr * parseFloat(masterFee.per_cr_fee || 0);
                             feeDetails.exam = courses * parseFloat(masterFee.per_course_fee || 0); 
                             feeDetails.reg = parseFloat(masterFee.reg_fee || 0);
-                            // Initial 'other' is just semester fee
                             feeDetails.other = parseFloat(masterFee.other_fee || 0);
                         }
 
-                        // 2. Add 'Other Charges' (Fines/Events) for this semester
                         const otherCharges = data.others.filter(o => 
                             norm(o.reg_no) === cleanReg && 
                             (norm(o.semester) === enSem || enSem.includes(norm(o.semester)))
@@ -277,16 +307,13 @@
                         const extraCharges = otherCharges.reduce((sum, o) => sum + parseFloat(o.amount || 0), 0);
                         feeDetails.other += extraCharges;
 
-                        // 3. Total
                         feeDetails.total = feeDetails.tuition + feeDetails.exam + feeDetails.reg + feeDetails.other;
 
-                        // 4. Discount
                         const discRecord = data.discounts.find(d => norm(d.reg_no) === cleanReg && norm(d.term) === enSem);
                         const discPct = discRecord ? parseFloat(discRecord.discount || 0) : 0;
                         const discAmt = (feeDetails.total * discPct) / 100;
                         const netFee = feeDetails.total - discAmt;
 
-                        // 5. Payments
                         const payments = data.payments.filter(p => {
                             if (norm(p.reg_no) !== cleanReg) return false;
                             const pSem = norm(p.semester);
@@ -320,6 +347,11 @@
                 e.preventDefault();
                 const newData = { ...formData, id: editingId || Date.now().toString() };
                 
+                // Permission Array Handling for User Form
+                if (modalType === 'users' && !newData.permissions) {
+                    newData.permissions = []; // Should be handled by checkboxes logic
+                }
+
                 if (modalType === 'fees') {
                     const cr = parseFloat(newData.cr || 0);
                     const rate = parseFloat(newData.per_cr_fee || 0);
@@ -329,7 +361,7 @@
                     newData.exam_fee = parseFloat(newData.exam_fee) || (courses * examRate);
                     newData.total_fee = newData.tuition_fee + newData.exam_fee + parseFloat(newData.reg_fee||0) + parseFloat(newData.other_fee||0);
                 }
-                // Auto-fetch name for payments/others
+                
                 if ((modalType === 'payments' || modalType === 'others') && !newData.name) {
                     const s = data.students.find(st => norm(st.reg_no) === norm(newData.reg_no));
                     if(s) newData.name = s.name;
@@ -358,7 +390,12 @@
                     setFormData(item);
                     setEditingId(item.id);
                 } else {
-                    setFormData({});
+                    // Default values for User form
+                    if (type === 'users') {
+                        setFormData({ role: 'user', permissions: [] });
+                    } else {
+                        setFormData({});
+                    }
                     setEditingId(null);
                 }
                 setShowModal(true);
@@ -397,41 +434,61 @@
                 setSelectedIds(new Set());
             };
 
-            // --- SEMESTER-WISE DELETE ---
             const deleteBySemester = () => {
                 const term = prompt("Enter Semester Name to delete (e.g., 'Fall 2024') or type 'ALL' to delete everything in this tab:");
                 if (!term) return;
-                
-                if (term.toUpperCase() === 'ALL') {
-                    deleteAllInTab();
-                    return;
-                }
-
+                if (term.toUpperCase() === 'ALL') { deleteAllInTab(); return; }
                 const cleanTerm = norm(term);
                 const beforeCount = data[activeTab].length;
-                
-                // Keep items that DO NOT match the semester
-                const newData = data[activeTab].filter(item => {
-                    // Check if item has 'semester' or 'term' field
-                    const itemSem = norm(item.semester || item.term || '');
-                    // Fuzzy match: if searched term is found inside item term
-                    return !itemSem.includes(cleanTerm);
-                });
-
+                const newData = data[activeTab].filter(item => !norm(item.semester || item.term || '').includes(cleanTerm));
                 const deletedCount = beforeCount - newData.length;
-                
                 if (deletedCount > 0) {
                     if (confirm(`Found ${deletedCount} records for '${term}'. Delete them?`)) {
                         setData(prev => ({ ...prev, [activeTab]: newData }));
                         alert(`Deleted ${deletedCount} records.`);
                     }
-                } else {
-                    alert(`No records found for semester: ${term}`);
-                }
+                } else { alert(`No records found for semester: ${term}`); }
+            };
+
+            // --- PERMISSION HANDLER ---
+            const togglePermission = (tabId) => {
+                const perms = formData.permissions || [];
+                if (perms.includes(tabId)) setFormData({ ...formData, permissions: perms.filter(p => p !== tabId) });
+                else setFormData({ ...formData, permissions: [...perms, tabId] });
             };
 
             const filteredData = getFilteredData();
 
+            // --- MAIN VIEW: IF NOT LOGGED IN ---
+            if (!user) {
+                return (
+                    <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-8">
+                            <div className="flex justify-center mb-6">
+                                <div className="bg-blue-600 p-4 rounded-full text-white">
+                                    <Shield className="h-8 w-8" />
+                                </div>
+                            </div>
+                            <h2 className="text-2xl font-bold text-center text-gray-800 mb-2">Secure Login</h2>
+                            <p className="text-center text-gray-500 mb-6">Fee Management System Access</p>
+                            <form onSubmit={handleLogin} className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-1">Username</label>
+                                    <input type="text" value={loginData.username} onChange={e => setLoginData({...loginData, username: e.target.value})} className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-1">Password</label>
+                                    <input type="password" value={loginData.password} onChange={e => setLoginData({...loginData, password: e.target.value})} className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required />
+                                </div>
+                                <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-bold transition">Sign In</button>
+                            </form>
+                            <div className="mt-6 text-center text-xs text-gray-400">Default Admin: admin / 123</div>
+                        </div>
+                    </div>
+                );
+            }
+
+            // --- MAIN VIEW: LOGGED IN ---
             return (
                 <div className="min-h-screen bg-gray-100 font-sans text-gray-800 pb-20">
                     <div className="bg-white shadow-md border-b border-gray-200 sticky top-0 z-20">
@@ -441,13 +498,17 @@
                                     <div className="bg-blue-600 text-white p-2 rounded-lg"><BookOpen className="h-6 w-6" /></div>
                                     <div><h1 className="text-xl font-bold text-gray-900 leading-none">Fee Manager</h1><p className="text-xs text-gray-500">School of Accountancy & Finance</p></div>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <button onClick={() => window.print()} className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg"><Printer className="h-5 w-5" /></button>
-                                    <button onClick={() => {if(confirm('Clear ALL System Data?')) {localStorage.removeItem('feeSystemData_v2'); window.location.reload()}}} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 className="h-5 w-5" /></button>
+                                <div className="flex items-center gap-4">
+                                    <div className="text-right hidden sm:block">
+                                        <div className="text-sm font-bold">{user.username}</div>
+                                        <div className="text-xs text-gray-500 uppercase">{user.role}</div>
+                                    </div>
+                                    <button onClick={() => window.print()} className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg" title="Print"><Printer className="h-5 w-5" /></button>
+                                    <button onClick={handleLogout} className="bg-red-50 text-red-600 px-3 py-2 rounded-lg text-sm font-bold hover:bg-red-100 flex items-center gap-2 transition"><LogOut className="h-4 w-4" /> Logout</button>
                                 </div>
                             </div>
                             <div className="flex space-x-1 overflow-x-auto no-scrollbar">
-                                {[{id:'clearance',label:'Clearance',icon:FileText},{id:'students',label:'Students',icon:Users},{id:'fees',label:'Fee Structure',icon:DollarSign},{id:'others',label:'Other Charges',icon:AlertCircle},{id:'enrollments',label:'Enrollments',icon:BookOpen},{id:'payments',label:'Payments',icon:CreditCard},{id:'discounts',label:'Discounts',icon:Percent}].map(tab => (
+                                {availableTabs.map(tab => (
                                     <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === tab.id ? 'border-blue-600 text-blue-600 bg-blue-50' : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}>
                                         <tab.icon className="h-4 w-4" />{tab.label}
                                     </button>
@@ -457,6 +518,7 @@
                     </div>
 
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                        {/* CLEARANCE REPORT UI */}
                         {activeTab === 'clearance' && (
                             <div className="space-y-6">
                                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 no-print">
@@ -538,12 +600,17 @@
                             </div>
                         )}
 
+                        {/* OTHER TABS UI */}
                         {activeTab !== 'clearance' && (
                             <div>
                                 <div className="flex flex-col gap-4 mb-6">
                                     <div className="flex justify-between items-center">
                                         <h2 className="text-2xl font-bold text-gray-800 capitalize">{activeTab} Directory</h2>
-                                        <button onClick={() => openModal(activeTab)} className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700 transition flex items-center gap-2 shadow-sm"><Plus className="h-5 w-5" /> Add New</button>
+                                        <div className="flex gap-2">
+                                            {(user.role === 'admin' || user.permissions.includes(activeTab)) && (
+                                                <button onClick={() => openModal(activeTab)} className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700 transition flex items-center gap-2 shadow-sm"><Plus className="h-5 w-5" /> Add New</button>
+                                            )}
+                                        </div>
                                     </div>
                                     <div className="bg-white p-3 rounded-xl border border-gray-200 flex flex-wrap gap-3 items-center justify-between shadow-sm">
                                         <div className="relative flex-grow max-w-md">
@@ -552,15 +619,12 @@
                                         </div>
                                         <div className="flex gap-2">
                                             {selectedIds.size > 0 && <button onClick={deleteSelected} className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm font-bold hover:bg-red-100 flex items-center gap-2 animate-pulse"><Trash2 className="h-4 w-4" /> Delete ({selectedIds.size})</button>}
-                                            
-                                            {/* ADDED: Delete by Semester for Enrollments & Payments */}
-                                            {(activeTab === 'enrollments' || activeTab === 'payments') && (
-                                                <button onClick={deleteBySemester} className="bg-orange-50 border border-orange-200 text-orange-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-orange-100 flex items-center gap-2">
-                                                    <CalendarX className="h-4 w-4" /> Del Sem
-                                                </button>
+                                            {(activeTab === 'enrollments' || activeTab === 'payments' || activeTab === 'others') && (
+                                                <button onClick={deleteBySemester} className="bg-orange-50 border border-orange-200 text-orange-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-orange-100 flex items-center gap-2"><CalendarX className="h-4 w-4" /> Del Sem</button>
                                             )}
-
-                                            <button onClick={deleteAllInTab} className="bg-white border border-red-200 text-red-600 px-3 py-2 rounded-lg text-sm font-medium hover:bg-red-50 flex items-center gap-2"><XSquare className="h-4 w-4" /> Delete All</button>
+                                            {user.role === 'admin' && (
+                                                <button onClick={deleteAllInTab} className="bg-white border border-red-200 text-red-600 px-3 py-2 rounded-lg text-sm font-medium hover:bg-red-50 flex items-center gap-2"><XSquare className="h-4 w-4" /> Delete All</button>
+                                            )}
                                             <div className="h-8 w-px bg-gray-300 mx-1"></div>
                                             <button onClick={() => downloadSample(activeTab)} className="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2"><FileSpreadsheet className="h-4 w-4" /> Sample</button>
                                             <label className="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 cursor-pointer flex items-center gap-2"><Download className="h-4 w-4" /> Import<input type="file" onChange={(e) => handleImport(e, activeTab)} className="hidden" accept=".csv" /></label>
@@ -581,6 +645,7 @@
                                                     {activeTab === 'payments' && <><th className="p-4">Reg No</th><th className="p-4">Name</th><th className="p-4">Semester</th><th className="p-4 text-right">Amount</th></>}
                                                     {activeTab === 'others' && <><th className="p-4">Reg No</th><th className="p-4">Name</th><th className="p-4">Semester</th><th className="p-4">Fee Name</th><th className="p-4 text-right">Amount</th></>}
                                                     {activeTab === 'discounts' && <><th className="p-4">Reg No</th><th className="p-4">Name</th><th className="p-4">Term</th><th className="p-4 text-right">Discount</th></>}
+                                                    {activeTab === 'users' && <><th className="p-4">Username</th><th className="p-4">Role</th><th className="p-4">Permissions</th></>}
                                                     <th className="p-4 text-center">Actions</th>
                                                 </tr>
                                             </thead>
@@ -594,13 +659,14 @@
                                                         {activeTab === 'payments' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4"><span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-bold">{item.semester}</span></td><td className="p-4 text-right font-bold">{num(item.amount)}</td></>}
                                                         {activeTab === 'others' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4 text-gray-600">{item.semester}</td><td className="p-4"><span className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs font-bold">{item.fee_name}</span></td><td className="p-4 text-right font-bold">{num(item.amount)}</td></>}
                                                         {activeTab === 'discounts' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4 text-gray-500">{item.term}</td><td className="p-4 text-right font-bold text-purple-600">{item.discount}%</td></>}
+                                                        {activeTab === 'users' && <><td className="p-4 font-bold">{item.username}</td><td className="p-4 capitalize">{item.role}</td><td className="p-4 text-xs max-w-xs truncate">{item.role === 'admin' ? 'Full Access' : item.permissions.join(', ')}</td></>}
                                                         <td className="p-4 text-center flex justify-center gap-2">
                                                             <button onClick={() => openModal(activeTab, item)} className="p-2 text-blue-600 hover:bg-blue-50 rounded"><i className="fas fa-edit"></i> Edit</button>
                                                             <button onClick={() => handleDelete(activeTab, item.id)} className="p-2 text-red-600 hover:bg-red-50 rounded"><Trash2 className="h-4 w-4" /></button>
                                                         </td>
                                                     </tr>
                                                 ))}
-                                                {filteredData.length === 0 && <tr><td colSpan="7" className="p-8 text-center text-gray-400">No records found.</td></tr>}
+                                                {filteredData.length === 0 && <tr><td colSpan="8" className="p-8 text-center text-gray-400">No records found.</td></tr>}
                                             </tbody>
                                         </table>
                                     </div>
@@ -611,7 +677,7 @@
 
                     {showModal && (
                         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-                            <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6">
+                            <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
                                 <h3 className="text-xl font-bold mb-4 capitalize">Add/Edit {modalType.slice(0, -1)}</h3>
                                 <form onSubmit={handleSave} className="space-y-4">
                                     {modalType === 'students' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={e => setFormData({...formData, reg_no: e.target.value})} /><input required placeholder="Full Name" className="w-full border p-2 rounded" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} /><div className="grid grid-cols-2 gap-4"><input placeholder="Degree (e.g. BSCAF)" className="w-full border p-2 rounded" value={formData.degree || ''} onChange={e => setFormData({...formData, degree: e.target.value})} /><input placeholder="Batch (e.g. Fall 2023)" className="w-full border p-2 rounded" value={formData.batch || ''} onChange={e => setFormData({...formData, batch: e.target.value})} /></div></>}
@@ -620,6 +686,33 @@
                                     {modalType === 'payments' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={e => setFormData({...formData, reg_no: e.target.value})} /><input required placeholder="Semester (e.g. Spring 2024)" className="w-full border p-2 rounded" value={formData.semester || ''} onChange={e => setFormData({...formData, semester: e.target.value})} /><input required type="number" placeholder="Amount Paid" className="w-full border p-2 rounded font-bold text-lg" value={formData.amount || ''} onChange={e => setFormData({...formData, amount: e.target.value})} /><input type="date" className="w-full border p-2 rounded" value={formData.date || ''} onChange={e => setFormData({...formData, date: e.target.value})} /></>}
                                     {modalType === 'others' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={e => setFormData({...formData, reg_no: e.target.value})} /><div className="grid grid-cols-2 gap-4"><input required placeholder="Semester" className="w-full border p-2 rounded" value={formData.semester || ''} onChange={e => setFormData({...formData, semester: e.target.value})} /><input required placeholder="Fee Name (e.g. Late Fine)" className="w-full border p-2 rounded" value={formData.fee_name || ''} onChange={e => setFormData({...formData, fee_name: e.target.value})} /></div><input required type="number" placeholder="Amount" className="w-full border p-2 rounded font-bold text-lg" value={formData.amount || ''} onChange={e => setFormData({...formData, amount: e.target.value})} /></>}
                                     {modalType === 'discounts' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={e => setFormData({...formData, reg_no: e.target.value})} /><input required placeholder="Term (e.g. Spring 2024)" className="w-full border p-2 rounded" value={formData.term || ''} onChange={e => setFormData({...formData, term: e.target.value})} /><input required type="number" placeholder="Discount %" className="w-full border p-2 rounded" value={formData.discount || ''} onChange={e => setFormData({...formData, discount: e.target.value})} /></>}
+                                    
+                                    {/* USER MANAGEMENT FORM */}
+                                    {modalType === 'users' && (
+                                        <div className="space-y-4">
+                                            <input required placeholder="Username" className="w-full border p-2 rounded" value={formData.username || ''} onChange={e => setFormData({...formData, username: e.target.value})} />
+                                            <input required type="password" placeholder="Password" className="w-full border p-2 rounded" value={formData.password || ''} onChange={e => setFormData({...formData, password: e.target.value})} />
+                                            <select className="w-full border p-2 rounded bg-white" value={formData.role || 'user'} onChange={e => setFormData({...formData, role: e.target.value})}>
+                                                <option value="user">Regular User</option>
+                                                <option value="admin">Administrator</option>
+                                            </select>
+                                            
+                                            {formData.role !== 'admin' && (
+                                                <div className="bg-gray-50 p-3 rounded border">
+                                                    <label className="block text-xs font-bold text-gray-500 mb-2 uppercase">Tab Access Permissions</label>
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        {TABS.map(t => (
+                                                            <label key={t.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                                                                <input type="checkbox" checked={(formData.permissions || []).includes(t.id)} onChange={() => togglePermission(t.id)} />
+                                                                {t.label}
+                                                            </label>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
                                     <div className="flex justify-end gap-3 mt-6">
                                         <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 bg-gray-100 rounded hover:bg-gray-200 font-bold">Cancel</button>
                                         <button type="submit" className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-bold">Save Record</button>
