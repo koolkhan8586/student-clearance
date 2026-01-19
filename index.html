@@ -88,6 +88,24 @@
                 if (saved) {
                     try { setData(JSON.parse(saved)); } 
                     catch (e) { console.error("Failed to load data", e); }
+                } else {
+                    // MIGRATION: Try to load from old HTML system key
+                    const oldData = localStorage.getItem('fee_system_local');
+                    if (oldData) {
+                        try {
+                            const parsed = JSON.parse(oldData);
+                            const migratedData = {
+                                students: parsed.students || [],
+                                fees: parsed.fees || [],
+                                enrollments: parsed.enrollments || [],
+                                payments: parsed.payments || [],
+                                discounts: parsed.discounts || []
+                            };
+                            setData(migratedData);
+                            localStorage.setItem('feeSystemData_v2', JSON.stringify(migratedData));
+                            alert("Data restored from previous version!");
+                        } catch (e) { console.error("Migration failed", e); }
+                    }
                 }
             }, []);
 
