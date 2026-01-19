@@ -797,14 +797,15 @@
             myEnroll.sort((a,b) => a.semester.localeCompare(b.semester));
 
             myEnroll.forEach((en, idx) => {
+                // FIXED: Normalize both sides for robust matching
                 const enSem = norm(en.semester);
                 
-                // Match Fee (Try exact match first, then fuzzy)
-                // IMPROVED LOGIC: Match normalized degree+batch+semester, allowing flexibility
+                // Match Fee: Try robust fuzzy matching for Session
+                // e.g., "Fall 2025" -> "fall2025" matches "fall2025"
                 const fee = db.fees.find(f => 
                     norm(f.degree) === norm(student.degree) && 
                     norm(f.batch) === norm(student.batch) && 
-                    (norm(f.semester + f.year) === enSem || norm(f.semester + ' ' + f.year) === enSem)
+                    (norm(f.semester + f.year) === enSem || norm(f.semester + ' ' + f.year) === enSem || enSem.includes(norm(f.semester) + norm(f.year)))
                 );
                 
                 // Match Discount
@@ -823,6 +824,8 @@
                 const regFee = fee ? parseFloat(fee.reg_fee||0) : 0;
                 const others = fee ? parseFloat(fee.other_fee||0) : 0;
                 
+                // If no Fee Record found, default total to 0 but show what we calculated (likely 0)
+                // This helps debug missing fees
                 const total = tuition + exam + regFee + others;
 
                 const paid = pays.reduce((a,b) => a + parseFloat(b.amount||0), 0);
@@ -1001,7 +1004,7 @@
             if (!data.fee_edit_id || data.fee_edit_id === '-1') apiData.id = -1;
 
             if(isOnline) await fetch(`${API_URL}?action=save_fee`, {method:'POST', body:JSON.stringify(apiData)});
-            else localStorage.setItem('fee_system_local', JSON.stringify(db));
+            else localStorage.setItem('fee_system_local', JSON.stringify(db)); // Force Update
             
             // IMPORTANT: Called refreshUI LAST to ensure storage is synced and UI updates
             renderTable('fees');
