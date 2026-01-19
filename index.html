@@ -31,18 +31,27 @@
                 visibility: visible;
             }
             #printableArea {
-                position: absolute;
+                position: fixed;
                 left: 0;
                 top: 0;
                 width: 100%;
+                height: 100%;
                 margin: 0;
-                padding: 20px; /* Add some padding for better fit */
+                padding: 10mm; /* Standard print padding */
                 box-shadow: none !important;
                 border: none !important;
+                overflow: hidden; /* Prevent spillover */
+                page-break-inside: avoid;
             }
+            
+            /* Scale down content if it overflows vertically */
+            .overflow-x-auto {
+                overflow: visible !important;
+            }
+            
             /* Hide URL/Page info headers/footers in modern browsers if possible via @page, though browser settings override this */
             @page {
-                size: auto;
+                size: A4 portrait;
                 margin: 0mm;
             }
         }
@@ -77,6 +86,7 @@
         const FileSpreadsheet = (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h2"/><path d="M8 17h2"/><path d="M14 13h2"/><path d="M14 17h2"/></svg>;
         const XSquare = (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg>;
         const AlertCircle = (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>;
+        const CalendarX = (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="10" y1="14" x2="14" y2="18"/><line x1="14" y1="14" x2="10" y2="18"/></svg>;
 
         function App() {
             // --- STATE MANAGEMENT ---
@@ -387,6 +397,39 @@
                 setSelectedIds(new Set());
             };
 
+            // --- SEMESTER-WISE DELETE ---
+            const deleteBySemester = () => {
+                const term = prompt("Enter Semester Name to delete (e.g., 'Fall 2024') or type 'ALL' to delete everything in this tab:");
+                if (!term) return;
+                
+                if (term.toUpperCase() === 'ALL') {
+                    deleteAllInTab();
+                    return;
+                }
+
+                const cleanTerm = norm(term);
+                const beforeCount = data[activeTab].length;
+                
+                // Keep items that DO NOT match the semester
+                const newData = data[activeTab].filter(item => {
+                    // Check if item has 'semester' or 'term' field
+                    const itemSem = norm(item.semester || item.term || '');
+                    // Fuzzy match: if searched term is found inside item term
+                    return !itemSem.includes(cleanTerm);
+                });
+
+                const deletedCount = beforeCount - newData.length;
+                
+                if (deletedCount > 0) {
+                    if (confirm(`Found ${deletedCount} records for '${term}'. Delete them?`)) {
+                        setData(prev => ({ ...prev, [activeTab]: newData }));
+                        alert(`Deleted ${deletedCount} records.`);
+                    }
+                } else {
+                    alert(`No records found for semester: ${term}`);
+                }
+            };
+
             const filteredData = getFilteredData();
 
             return (
@@ -509,6 +552,14 @@
                                         </div>
                                         <div className="flex gap-2">
                                             {selectedIds.size > 0 && <button onClick={deleteSelected} className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm font-bold hover:bg-red-100 flex items-center gap-2 animate-pulse"><Trash2 className="h-4 w-4" /> Delete ({selectedIds.size})</button>}
+                                            
+                                            {/* ADDED: Delete by Semester for Enrollments & Payments */}
+                                            {(activeTab === 'enrollments' || activeTab === 'payments') && (
+                                                <button onClick={deleteBySemester} className="bg-orange-50 border border-orange-200 text-orange-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-orange-100 flex items-center gap-2">
+                                                    <CalendarX className="h-4 w-4" /> Del Sem
+                                                </button>
+                                            )}
+
                                             <button onClick={deleteAllInTab} className="bg-white border border-red-200 text-red-600 px-3 py-2 rounded-lg text-sm font-medium hover:bg-red-50 flex items-center gap-2"><XSquare className="h-4 w-4" /> Delete All</button>
                                             <div className="h-8 w-px bg-gray-300 mx-1"></div>
                                             <button onClick={() => downloadSample(activeTab)} className="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2"><FileSpreadsheet className="h-4 w-4" /> Sample</button>
