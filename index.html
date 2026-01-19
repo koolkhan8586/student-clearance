@@ -24,9 +24,27 @@
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         
         @media print {
-            .no-print { display: none !important; }
-            body { background: white; }
-            #printableArea { box-shadow: none; border: none; }
+            body * {
+                visibility: hidden;
+            }
+            #printableArea, #printableArea * {
+                visibility: visible;
+            }
+            #printableArea {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                margin: 0;
+                padding: 20px; /* Add some padding for better fit */
+                box-shadow: none !important;
+                border: none !important;
+            }
+            /* Hide URL/Page info headers/footers in modern browsers if possible via @page, though browser settings override this */
+            @page {
+                size: auto;
+                margin: 0mm;
+            }
         }
     </style>
 </head>
@@ -383,7 +401,9 @@
                                     <div className="bg-white rounded-xl shadow-lg overflow-hidden" id="printableArea">
                                         <div className="p-8">
                                             <div className="border-b-2 border-gray-800 pb-6 mb-6 flex justify-between items-start">
-                                                <div className="w-16 h-16 bg-gray-200 rounded flex items-center justify-center font-bold text-gray-400">LOGO</div>
+                                                <div className="w-16 h-16 rounded flex items-center justify-center font-bold text-gray-400 overflow-hidden">
+                                                    <img src="https://drive.google.com/open?id=1MZCkyZw7ZkGHn_Y3CgdO8xG7KjaUDB44&usp=drive_fs" alt="UOL Logo" className="w-full h-full object-contain" />
+                                                </div>
                                                 <div className="text-center flex-1 px-4">
                                                     <h2 className="text-2xl font-bold text-gray-900 uppercase">The University of Lahore</h2>
                                                     <p className="text-gray-600 font-medium">School of Accountancy & Finance</p>
