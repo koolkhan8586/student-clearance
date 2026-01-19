@@ -1,126 +1,195 @@
 <?php
-// api.php - Final Clean Version for user 'koolkhan'
-error_reporting(E_ALL);
-ini_set('display_errors', 0); // Don't print errors to screen, breaks JSON
-
-header("Content-Type: application/json");
 header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type");
+header("Content-Type: application/json");
 
-ob_start(); // Start buffer
+// --- DATABASE CONFIGURATION ---
+$host = 'localhost';
+$db   = 'fee_system';
+$user = 'koolkhan';
+$pass = 'Mangohair@197'; // <--- ENTER YOUR DATABASE PASSWORD HERE IF SET
 
-// Handle Preflight
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    ob_end_clean();
-    http_response_code(200);
+$dsn = "mysql:host=$host;dbname=$db;charset=utf8mb4";
+$options = [
+    PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+    PDO::ATTR_EMULATE_PREPARES   => false,
+];
+
+try {
+    $pdo = new PDO($dsn, $user, $pass, $options);
+} catch (\PDOException $e) {
+    echo json_encode(['status' => 'error', 'message' => 'DB Connection Failed: ' . $e->getMessage()]);
     exit;
 }
 
-// DB CONFIG
-$host = "localhost";
-$user = "koolkhan"; 
-$pass = "Mangohair@197";         
-$dbname = "fee_system";
+// --- HANDLE REQUESTS ---
 
-$conn = null;
-$response = ["status" => "error", "message" => "Unknown error"];
+$method = $_SERVER['REQUEST_METHOD'];
+$input = json_decode(file_get_contents('php://input'), true);
 
-try {
-    $conn = new mysqli($host, $user, $pass, $dbname);
-    if ($conn->connect_error) {
-        throw new Exception("DB Connection Failed: " . $conn->connect_error);
-    }
-    $conn->set_charset("utf8mb4");
-
-    $action = $_GET['action'] ?? '';
-    $input_raw = file_get_contents('php://input');
-    $input = json_decode($input_raw, true);
-
-    function sanitize($conn, $val) {
-        return $conn->real_escape_string($val ?? '');
-    }
-
-    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-        if ($action === 'fetch_all') {
-            $data = [
-                'students' => [], 
-                'fees' => [], 
-                'enrollments' => [], 
-                'discounts' => [], 
-                'payments' => []
-            ];
-            
-            // Map DB Tables to JSON keys
-            $mapping = [
-                'students' => 'students',
-                'fee_structure' => 'fees',
-                'enrollments' => 'enrollments',
-                'discounts' => 'discounts',
-                'payments' => 'payments'
-            ];
-
-            foreach($mapping as $table => $key) {
-                // Check table existence to prevent crash
-                $check = $conn->query("SHOW TABLES LIKE '$table'");
-                if($check && $check->num_rows > 0) {
-                    $result = $conn->query("SELECT * FROM $table");
-                    if($result) {
-                        while($row = $result->fetch_assoc()) {
-                            $data[$key][] = $row;
-                        }
-                    }
-                }
-            }
-
-            $response = ["status" => "success", "data" => $data];
-        }
-    }
-
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        // ... (Save logic mostly same, ensuring success response) ...
+// GET Request: Fetch All Data (Load App)
+if ($method === 'GET') {
+    try {
+        $data = [
+            'students'    => $pdo->query("SELECT * FROM students")->fetchAll(),
+            'fees'        => $pdo->query("SELECT * FROM fee_structure")->fetchAll(),
+            'enrollments' => $pdo->query("SELECT * FROM enrollments")->fetchAll(),
+            'payments'    => $pdo->query("SELECT * FROM payments")->fetchAll(),
+            'discounts'   => $pdo->query("SELECT * FROM discounts")->fetchAll(),
+            'others'      => $pdo->query("SELECT * FROM other_charges")->fetchAll(),
+            'users'       => $pdo->query("SELECT * FROM users")->fetchAll()
+        ];
         
-        if ($action === 'save_student') {
-            $reg = sanitize($conn, $input['reg_no']); $name = sanitize($conn, $input['name']);
-            $deg = sanitize($conn, $input['degree']); $batch = sanitize($conn, $input['batch']); $mob = sanitize($conn, $input['mobile']);
-            $conn->query("INSERT INTO students (reg_no, name, degree, batch, mobile) VALUES ('$reg', '$name', '$deg', '$batch', '$mob') ON DUPLICATE KEY UPDATE name='$name', degree='$deg', batch='$batch', mobile='$mob'");
-            $response = ["status" => "success"];
+        // Decode permissions JSON for users
+        foreach ($data['users'] as &$u) {
+            $u['permissions'] = json_decode($u['permissions'] ?? '[]');
         }
-        elseif ($action === 'delete_student') {
-            $reg = sanitize($conn, $input['reg_no']);
-            $conn->query("DELETE FROM students WHERE reg_no = '$reg'");
-            $response = ["status" => "success"];
-        }
-        // ... (Include other delete/save actions here as needed for Fee, Enrollment, etc.) ...
-        elseif ($action === 'save_discount') {
-            $reg = sanitize($conn, $input['reg_no']); $name = sanitize($conn, $input['name']); $term = sanitize($conn, $input['term']); $disc = (float)$input['discount']; $id = $input['id'] ?? null;
-            if($id && $id != '-1') $conn->query("UPDATE discounts SET reg_no='$reg', name='$name', term='$term', discount=$disc WHERE id=$id");
-            else $conn->query("INSERT INTO discounts (reg_no, name, term, discount) VALUES ('$reg', '$name', '$term', $disc)");
-            $response = ["status" => "success"];
-        }
-        elseif ($action === 'delete_discount') { 
-            $id = (int)$input['id']; 
-            $conn->query("DELETE FROM discounts WHERE id=$id"); 
-            $response = ["status" => "success"];
-        }
-        elseif ($action === 'delete_all_discounts') {
-            $conn->query("TRUNCATE TABLE discounts");
-            $response = ["status" => "success"];
-        }
-         // ... (Other bulk imports) ...
-        elseif ($action === 'import_students') {
-            $conn->begin_transaction(); 
-            $stmt = $conn->prepare("INSERT INTO students (reg_no, name, degree, batch, mobile) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE name=VALUES(name), degree=VALUES(degree), batch=VALUES(batch), mobile=VALUES(mobile)");
-            foreach ($input as $row) { $stmt->bind_param("sssss", $row['reg_no'], $row['name'], $row['degree'], $row['batch'], $row['mobile']); $stmt->execute(); }
-            $conn->commit();
-            $response = ["status" => "success"];
-        }
-    }
 
-} catch (Exception $e) {
-    $response = ["status" => "error", "message" => $e->getMessage()];
+        echo json_encode($data);
+    } catch (Exception $e) {
+        echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+    }
+    exit;
 }
 
-ob_end_clean();
-echo json_encode($response);
+// POST Request: Actions (Save/Delete)
+if ($method === 'POST' && isset($input['action'])) {
+    $action = $input['action'];
+    $data   = $input['data'] ?? [];
+    $id     = $input['id'] ?? null;
+
+    try {
+        switch ($action) {
+            // --- STUDENTS ---
+            case 'save_student':
+                $stmt = $pdo->prepare("INSERT INTO students (reg_no, name, degree, batch) VALUES (?, ?, ?, ?) 
+                                       ON DUPLICATE KEY UPDATE name=?, degree=?, batch=?");
+                $stmt->execute([$data['reg_no'], $data['name'], $data['degree'], $data['batch'], 
+                                $data['name'], $data['degree'], $data['batch']]);
+                break;
+            case 'delete_student':
+                $stmt = $pdo->prepare("DELETE FROM students WHERE reg_no = ?"); // Assuming reg_no is unique key used in app
+                $stmt->execute([$id]);
+                break;
+
+            // --- FEE STRUCTURE ---
+            case 'save_fee':
+                $sql = "INSERT INTO fee_structure (id, degree, batch, per_cr_fee, per_course_fee, reg_fee, other_fee) 
+                        VALUES (?, ?, ?, ?, ?, ?, ?) 
+                        ON DUPLICATE KEY UPDATE degree=?, batch=?, per_cr_fee=?, per_course_fee=?, reg_fee=?, other_fee=?";
+                // If ID is new/temp, let DB handle auto-increment by passing NULL for ID in insert
+                $dbId = (is_numeric($id) && $id > 0) ? $id : null;
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute([$dbId, $data['degree'], $data['batch'], $data['per_cr_fee'], $data['per_course_fee'], $data['reg_fee'], $data['other_fee'],
+                                $data['degree'], $data['batch'], $data['per_cr_fee'], $data['per_course_fee'], $data['reg_fee'], $data['other_fee']]);
+                break;
+            case 'delete_fee':
+                $stmt = $pdo->prepare("DELETE FROM fee_structure WHERE id = ?");
+                $stmt->execute([$id]);
+                break;
+
+            // --- ENROLLMENTS ---
+            case 'save_enrollment':
+                $dbId = (is_numeric($id) && $id > 0) ? $id : null;
+                $stmt = $pdo->prepare("INSERT INTO enrollments (id, reg_no, name, semester, cr, courses) VALUES (?, ?, ?, ?, ?, ?)
+                                       ON DUPLICATE KEY UPDATE reg_no=?, name=?, semester=?, cr=?, courses=?");
+                $stmt->execute([$dbId, $data['reg_no'], $data['name'], $data['semester'], $data['cr'], $data['courses'],
+                                $data['reg_no'], $data['name'], $data['semester'], $data['cr'], $data['courses']]);
+                break;
+            case 'delete_enrollment':
+                $stmt = $pdo->prepare("DELETE FROM enrollments WHERE id = ?");
+                $stmt->execute([$id]);
+                break;
+
+            // --- PAYMENTS ---
+            case 'save_payment':
+                $dbId = (is_numeric($id) && $id > 0) ? $id : null;
+                $stmt = $pdo->prepare("INSERT INTO payments (id, reg_no, name, semester, amount, date) VALUES (?, ?, ?, ?, ?, ?)
+                                       ON DUPLICATE KEY UPDATE reg_no=?, name=?, semester=?, amount=?, date=?");
+                $stmt->execute([$dbId, $data['reg_no'], $data['name'], $data['semester'], $data['amount'], $data['date'],
+                                $data['reg_no'], $data['name'], $data['semester'], $data['amount'], $data['date']]);
+                break;
+            case 'delete_payment':
+                $stmt = $pdo->prepare("DELETE FROM payments WHERE id = ?");
+                $stmt->execute([$id]);
+                break;
+
+            // --- DISCOUNTS ---
+            case 'save_discount':
+                $dbId = (is_numeric($id) && $id > 0) ? $id : null;
+                $stmt = $pdo->prepare("INSERT INTO discounts (id, reg_no, name, term, discount) VALUES (?, ?, ?, ?, ?)
+                                       ON DUPLICATE KEY UPDATE reg_no=?, name=?, term=?, discount=?");
+                $stmt->execute([$dbId, $data['reg_no'], $data['name'], $data['term'], $data['discount'],
+                                $data['reg_no'], $data['name'], $data['term'], $data['discount']]);
+                break;
+            case 'delete_discount':
+                $stmt = $pdo->prepare("DELETE FROM discounts WHERE id = ?");
+                $stmt->execute([$id]);
+                break;
+
+            // --- OTHER CHARGES ---
+            case 'save_other':
+                $dbId = (is_numeric($id) && $id > 0) ? $id : null;
+                $stmt = $pdo->prepare("INSERT INTO other_charges (id, reg_no, name, semester, fee_name, amount) VALUES (?, ?, ?, ?, ?, ?)
+                                       ON DUPLICATE KEY UPDATE reg_no=?, name=?, semester=?, fee_name=?, amount=?");
+                $stmt->execute([$dbId, $data['reg_no'], $data['name'], $data['semester'], $data['fee_name'], $data['amount'],
+                                $data['reg_no'], $data['name'], $data['semester'], $data['fee_name'], $data['amount']]);
+                break;
+            case 'delete_other':
+                $stmt = $pdo->prepare("DELETE FROM other_charges WHERE id = ?");
+                $stmt->execute([$id]);
+                break;
+
+            // --- USERS ---
+            case 'save_user':
+                $dbId = (is_numeric($id) && $id > 0) ? $id : null;
+                // Encode permissions array to JSON string
+                $perms = json_encode($data['permissions'] ?? []);
+                $stmt = $pdo->prepare("INSERT INTO users (id, username, password, role, permissions) VALUES (?, ?, ?, ?, ?)
+                                       ON DUPLICATE KEY UPDATE username=?, password=?, role=?, permissions=?");
+                $stmt->execute([$dbId, $data['username'], $data['password'], $data['role'], $perms,
+                                $data['username'], $data['password'], $data['role'], $perms]);
+                break;
+            case 'delete_user':
+                $stmt = $pdo->prepare("DELETE FROM users WHERE id = ?");
+                $stmt->execute([$id]);
+                break;
+
+            // --- BULK OPERATIONS ---
+            case 'delete_all':
+                $table = $input['table']; // e.g. 'students'
+                // Whitelist tables to prevent injection
+                $allowed = ['students', 'fee_structure', 'enrollments', 'payments', 'discounts', 'other_charges', 'users'];
+                // Map frontend tab names to DB table names
+                $map = ['fees' => 'fee_structure', 'others' => 'other_charges'];
+                if(isset($map[$table])) $table = $map[$table];
+                
+                if (in_array($table, $allowed)) {
+                    $pdo->query("TRUNCATE TABLE $table");
+                }
+                break;
+            
+            case 'delete_semester':
+                 $table = $input['table'];
+                 $term = $input['term'];
+                 $allowed = ['enrollments', 'payments', 'other_charges'];
+                 $map = ['others' => 'other_charges'];
+                 if(isset($map[$table])) $table = $map[$table];
+
+                 if(in_array($table, $allowed) && $term) {
+                     // Using fuzzy matching for semester string
+                     $stmt = $pdo->prepare("DELETE FROM $table WHERE semester LIKE ?");
+                     $stmt->execute(["%$term%"]);
+                 }
+                 break;
+
+            default:
+                throw new Exception("Invalid Action: $action");
+        }
+        echo json_encode(['status' => 'success']);
+    } catch (Exception $e) {
+        echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+    }
+}
 ?>
