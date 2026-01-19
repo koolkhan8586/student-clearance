@@ -47,6 +47,19 @@
             border-top: 2px solid #000; 
             font-size: 12px;
         }
+
+        /* Dashboard Card Styling */
+        .dash-card {
+            background: white;
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            border-left: 5px solid;
+            transition: transform 0.2s;
+        }
+        .dash-card:hover { transform: translateY(-2px); }
+        .dash-card h4 { font-size: 0.875rem; color: #6b7280; font-weight: 600; text-transform: uppercase; }
+        .dash-card .value { font-size: 1.875rem; font-weight: 800; color: #111827; margin-top: 0.5rem; }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen p-4 md:p-8 font-sans">
@@ -116,18 +129,36 @@
         </div>
 
         <!-- Navigation -->
-        <div class="bg-white rounded-lg shadow-sm mb-6 no-print">
-            <nav class="flex flex-col sm:flex-row flex-wrap" id="nav-container"></nav>
+        <div class="bg-white rounded-lg shadow-sm mb-6 no-print overflow-hidden">
+            <nav class="flex flex-col sm:flex-row flex-wrap bg-gray-50 border-b" id="nav-container"></nav>
         </div>
 
         <!-- TAB 1: Clearance Report -->
         <div id="view-clearance" class="tab-content block">
-            <div id="search-container" class="bg-blue-50 rounded-lg p-4 mb-6 border border-blue-200 no-print flex flex-col md:flex-row gap-4 items-end">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6 no-print">
+                <div class="dash-card border-green-500">
+                    <h4>Report Status</h4>
+                    <div class="value text-green-600">Ready</div>
+                    <div class="text-xs text-gray-500 mt-1">System online</div>
+                </div>
+                <div class="dash-card border-blue-500">
+                    <h4>Active Search</h4>
+                    <div class="value" id="active-search-reg">--</div>
+                    <div class="text-xs text-gray-500 mt-1">Current Student</div>
+                </div>
+                <div class="dash-card border-purple-500">
+                    <h4>Current Date</h4>
+                    <div class="value text-lg" id="dash-date">--</div>
+                    <div class="text-xs text-gray-500 mt-1">Lahore, PKT</div>
+                </div>
+            </div>
+
+            <div id="search-container" class="bg-blue-50 rounded-lg p-6 mb-6 border border-blue-200 no-print flex flex-col md:flex-row gap-4 items-end shadow-sm">
                 <div class="flex-grow w-full">
-                    <label class="block text-xs font-bold text-blue-700 uppercase mb-1">Search Student by Reg #</label>
+                    <label class="block text-xs font-bold text-blue-700 uppercase mb-2">Search Student by Reg #</label>
                     <div class="flex gap-2">
-                        <input type="text" id="search_reg_input" placeholder="e.g. BSCAF052530040" class="w-full border rounded-lg px-4 py-2 outline-none font-mono font-bold text-gray-700" onkeypress="handleSearchEnter(event)">
-                        <button onclick="searchStudentByRegNo()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-bold transition flex items-center"><i class="fas fa-search mr-2"></i> Search</button>
+                        <input type="text" id="search_reg_input" placeholder="e.g. BSCAF052530040" class="w-full border-2 border-blue-200 rounded-lg px-4 py-3 outline-none font-mono font-bold text-gray-700 focus:border-blue-500 transition" onkeypress="handleSearchEnter(event)">
+                        <button onclick="searchStudentByRegNo()" class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-bold transition flex items-center shadow-lg transform active:scale-95"><i class="fas fa-search mr-2"></i> Search</button>
                     </div>
                 </div>
             </div>
@@ -196,63 +227,94 @@
 
         <!-- TAB 2: Student Directory -->
         <div id="view-student" class="tab-content hidden">
+             <!-- Stats Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div class="dash-card border-blue-500"><h4>Total Students</h4><div class="value" id="stat-st-total">0</div></div>
+                <div class="dash-card border-indigo-500"><h4>Active Batches</h4><div class="value" id="stat-st-batch">0</div></div>
+                <div class="dash-card border-teal-500"><h4>Degrees</h4><div class="value" id="stat-st-degree">0</div></div>
+                <div class="dash-card border-gray-500 bg-gray-50 flex items-center justify-center cursor-pointer hover:bg-gray-100" onclick="showAddForm()"><div class="text-center text-blue-600"><i class="fas fa-plus-circle text-3xl mb-1"></i><div class="font-bold">Add Student</div></div></div>
+            </div>
+
             <div class="bg-white rounded-lg shadow-lg p-6">
                 <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-xl font-bold">Student Directory (<span id="count-st">0</span>)</h2>
+                    <h2 class="text-xl font-bold text-gray-800">Student Directory</h2>
                     <div class="gap-2 flex">
-                        <button onclick="document.getElementById('file_st').click()" class="bg-green-600 text-white px-3 rounded text-sm">Import</button>
+                        <button onclick="document.getElementById('file_st').click()" class="bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700 transition">Import Excel</button>
                         <input type="file" id="file_st" class="hidden" onchange="handleImport(event, 'students')">
-                        <button onclick="exportToExcel('students')" class="bg-indigo-600 text-white px-3 rounded text-sm">Export</button>
-                        <button onclick="showAddForm()" class="bg-blue-600 text-white px-3 rounded text-sm">Add</button>
-                        <button onclick="deleteAll('students')" class="bg-red-600 text-white px-3 rounded text-sm">Clear</button>
+                        <button onclick="exportToExcel('students')" class="bg-indigo-600 text-white px-4 py-2 rounded text-sm hover:bg-indigo-700 transition">Export</button>
+                        <button onclick="deleteAll('students')" class="bg-red-600 text-white px-4 py-2 rounded text-sm hover:bg-red-700 transition">Clear All</button>
                     </div>
                 </div>
-                <input type="text" id="filter_student" onkeyup="renderTable('students')" placeholder="Filter by Name, Reg, Degree, Batch..." class="w-full border p-2 mb-2 rounded">
-                <div class="h-96 overflow-y-auto border rounded">
-                    <table class="w-full text-sm text-left border-collapse border-b border-gray-200">
-                        <thead class="bg-gray-50 text-gray-700 uppercase text-xs sticky top-0">
+                <input type="text" id="filter_student" onkeyup="renderTable('students')" placeholder="Filter by Name, Reg, Degree, Batch..." class="w-full border p-3 mb-4 rounded-lg bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-200 outline-none transition">
+                <div class="h-96 overflow-y-auto border rounded-lg shadow-inner bg-gray-50">
+                    <table class="w-full text-sm text-left border-collapse">
+                        <thead class="bg-gray-100 text-gray-700 uppercase text-xs sticky top-0 z-10 shadow-sm">
                             <tr>
-                                <th class="p-3 border cursor-pointer" onclick="sortStudentTable('reg_no')">Reg # <i class="fas fa-sort ml-1"></i></th>
-                                <th class="p-3 border cursor-pointer" onclick="sortStudentTable('name')">Name <i class="fas fa-sort ml-1"></i></th>
-                                <th class="p-3 border cursor-pointer" onclick="sortStudentTable('degree')">Degree <i class="fas fa-sort ml-1"></i></th>
-                                <th class="p-3 border cursor-pointer" onclick="sortStudentTable('batch')">Batch <i class="fas fa-sort ml-1"></i></th>
-                                <th class="p-3 border text-center">Actions</th>
+                                <th class="p-4 border-b cursor-pointer hover:bg-gray-200 transition" onclick="sortStudentTable('reg_no')">Reg # <i class="fas fa-sort ml-1 opacity-50"></i></th>
+                                <th class="p-4 border-b cursor-pointer hover:bg-gray-200 transition" onclick="sortStudentTable('name')">Name <i class="fas fa-sort ml-1 opacity-50"></i></th>
+                                <th class="p-4 border-b cursor-pointer hover:bg-gray-200 transition" onclick="sortStudentTable('degree')">Degree <i class="fas fa-sort ml-1 opacity-50"></i></th>
+                                <th class="p-4 border-b cursor-pointer hover:bg-gray-200 transition" onclick="sortStudentTable('batch')">Batch <i class="fas fa-sort ml-1 opacity-50"></i></th>
+                                <th class="p-4 border-b text-center">Actions</th>
                             </tr>
                         </thead>
-                        <tbody id="body-st"></tbody>
+                        <tbody id="body-st" class="bg-white divide-y divide-gray-100"></tbody>
                     </table>
                 </div>
             </div>
              <!-- Student Form -->
-            <div id="student-form-container" class="hidden bg-white rounded-lg shadow-lg p-6 max-w-2xl mx-auto mt-4"><div class="flex justify-between items-center border-b pb-4 mb-4"><h3 class="text-lg font-bold" id="form-title">Add Student</h3><button onclick="hideAddForm()" class="text-red-500">x</button></div><form id="studentForm" onsubmit="saveStudentList(event)" class="space-y-4"><input type="hidden" id="edit_index" value="-1"><div class="grid grid-cols-2 gap-4"><input type="text" name="reg_no" id="input_reg_no" placeholder="Reg No" class="border p-2 rounded" required><input type="text" name="name" id="input_name" placeholder="Name" class="border p-2 rounded" required><input type="text" name="degree" id="input_degree" placeholder="Degree" class="border p-2 rounded"><input type="text" name="batch" id="input_batch" placeholder="Batch" class="border p-2 rounded"></div><button type="submit" class="w-full bg-blue-600 text-white py-2 rounded">Save</button></form></div>
+            <div id="student-form-container" class="hidden fixed inset-0 z-50 flex items-center justify-center modal">
+                <div class="bg-white rounded-xl shadow-2xl p-8 max-w-2xl w-full m-4">
+                    <div class="flex justify-between items-center border-b pb-4 mb-6">
+                        <h3 class="text-xl font-bold text-gray-800" id="form-title">Add New Student</h3>
+                        <button onclick="hideAddForm()" class="text-gray-400 hover:text-red-500 transition text-2xl">&times;</button>
+                    </div>
+                    <form id="studentForm" onsubmit="saveStudentList(event)" class="space-y-6">
+                        <input type="hidden" id="edit_index" value="-1">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div><label class="block text-sm font-bold text-gray-700 mb-1">Registration No</label><input type="text" name="reg_no" id="input_reg_no" placeholder="BSCAF..." class="w-full border p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required></div>
+                            <div><label class="block text-sm font-bold text-gray-700 mb-1">Student Name</label><input type="text" name="name" id="input_name" placeholder="John Doe" class="w-full border p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required></div>
+                            <div><label class="block text-sm font-bold text-gray-700 mb-1">Degree Program</label><input type="text" name="degree" id="input_degree" placeholder="BSCAF" class="w-full border p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"></div>
+                            <div><label class="block text-sm font-bold text-gray-700 mb-1">Batch / Session</label><input type="text" name="batch" id="input_batch" placeholder="Fall-2025" class="w-full border p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"></div>
+                        </div>
+                        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-bold shadow-md transition transform active:scale-95">Save Student Record</button>
+                    </form>
+                </div>
+            </div>
         </div>
 
         <!-- TAB 3: Fee Structure -->
         <div id="view-fee" class="tab-content hidden">
+            <!-- Stats -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                 <div class="dash-card border-orange-500"><h4>Fee Structures</h4><div class="value" id="stat-fe-total">0</div></div>
+                 <div class="dash-card border-pink-500"><h4>Avg Tuition</h4><div class="value" id="stat-fe-avg">0</div></div>
+                 <div class="dash-card border-gray-500 bg-gray-50 flex items-center justify-center cursor-pointer hover:bg-gray-100" onclick="document.getElementById('feeForm').scrollIntoView({behavior:'smooth'})"><div class="text-center text-blue-600"><i class="fas fa-plus-circle text-3xl mb-1"></i><div class="font-bold">New Fee Structure</div></div></div>
+            </div>
+
             <div class="bg-white rounded-lg shadow-lg p-6">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-xl font-bold">Fee Structure (<span id="count-fe">0</span>)</h2>
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl font-bold text-gray-800">Fee Structure Management</h2>
                      <div class="gap-2 flex">
-                        <button onclick="document.getElementById('file_fe').click()" class="bg-green-600 text-white px-3 rounded text-sm">Import</button>
+                        <button onclick="document.getElementById('file_fe').click()" class="bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700">Import</button>
                         <input type="file" id="file_fe" class="hidden" onchange="handleImport(event, 'fees')">
-                        <button onclick="deleteAll('fees')" class="bg-red-600 text-white px-3 rounded text-sm">Clear</button>
+                        <button onclick="deleteAll('fees')" class="bg-red-600 text-white px-4 py-2 rounded text-sm hover:bg-red-700">Clear All</button>
                     </div>
                 </div>
                 
-                 <form id="feeForm" onsubmit="addRecord(event)" class="mb-8 p-4 bg-gray-50 border rounded shadow-sm space-y-4">
-                    <h3 class="font-bold text-gray-700 border-b pb-2">Add New Fee Record</h3>
+                 <form id="feeForm" onsubmit="addRecord(event)" class="mb-8 p-6 bg-gray-50 border border-gray-200 rounded-xl shadow-sm space-y-4">
+                    <h3 class="font-bold text-gray-800 border-b pb-3 mb-2 flex items-center"><i class="fas fa-calculator mr-2 text-blue-500"></i> Add / Edit Fee Record</h3>
                     <input type="hidden" name="fee_edit_id" id="fee_edit_id" value="-1">
                     
                     <!-- Cohort -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-xs font-bold text-gray-500 uppercase">Degree Program</label>
-                            <input type="text" list="degree_list" name="target_degree" id="fee_degree" class="w-full border p-2 rounded bg-white" placeholder="Select or Type..." required>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Degree Program</label>
+                            <input type="text" list="degree_list" name="target_degree" id="fee_degree" class="w-full border p-2 rounded bg-white focus:ring-1 focus:ring-blue-500" placeholder="Select or Type..." required>
                             <datalist id="degree_list"></datalist>
                         </div>
                         <div>
-                            <label class="block text-xs font-bold text-gray-500 uppercase">Batch (Session)</label>
-                            <input type="text" list="batch_list" name="target_batch" id="fee_batch" class="w-full border p-2 rounded bg-white" placeholder="Select or Type..." required>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Batch (Session)</label>
+                            <input type="text" list="batch_list" name="target_batch" id="fee_batch" class="w-full border p-2 rounded bg-white focus:ring-1 focus:ring-blue-500" placeholder="Select or Type..." required>
                             <datalist id="batch_list"></datalist>
                         </div>
                     </div>
@@ -260,43 +322,43 @@
                     <!-- Session -->
                     <div class="grid grid-cols-2 gap-4">
                          <div>
-                            <label class="block text-xs font-bold text-gray-500 uppercase">Year</label>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Year</label>
                             <select name="year" id="fee_year" class="w-full border p-2 rounded bg-white"><option>2023</option><option>2024</option><option>2025</option><option>2026</option></select>
                         </div>
                          <div>
-                            <label class="block text-xs font-bold text-gray-500 uppercase">Semester</label>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Semester</label>
                             <select name="semester" id="fee_sem" class="w-full border p-2 rounded bg-white"><option>Fall</option><option>Spring</option><option>Summer</option></select>
                         </div>
                     </div>
 
                     <!-- Tuition Calc -->
-                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 bg-white p-4 rounded border border-gray-200">
                         <div>
-                            <label class="block text-xs font-bold text-gray-500 uppercase">Total Credit Hrs</label>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Total Credit Hrs</label>
                             <input type="number" name="cr" id="cr_input" oninput="calculateTotals()" class="w-full border p-2 rounded" placeholder="0">
                         </div>
                         <div>
-                            <label class="block text-xs font-bold text-gray-500 uppercase text-green-700">Cost Per Cr. Hour</label>
+                            <label class="block text-xs font-bold text-gray-500 uppercase text-green-700 mb-1">Cost Per Cr. Hour</label>
                             <input type="number" name="per_cr_fee" id="rate_input" oninput="calculateTotals()" class="w-full border border-green-300 bg-green-50 p-2 rounded" placeholder="0">
                         </div>
                         <div>
-                            <label class="block text-xs font-bold text-gray-500 uppercase">Tuition Fee</label>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Tuition Fee</label>
                             <input type="number" name="tuition_fee" id="fee_tuition" class="w-full border p-2 rounded bg-gray-100 font-bold" placeholder="0" readonly>
                         </div>
                     </div>
 
                     <!-- Exam Calc -->
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 bg-white p-4 rounded border border-gray-200">
                         <div>
-                            <label class="block text-xs font-bold text-gray-500 uppercase">Total Courses</label>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Total Courses</label>
                             <input type="number" name="total_courses" id="courses_input" oninput="calculateTotals()" class="w-full border p-2 rounded" placeholder="0">
                         </div>
                         <div>
-                            <label class="block text-xs font-bold text-gray-500 uppercase text-blue-700">Exam Fee (Per Subject)</label>
+                            <label class="block text-xs font-bold text-gray-500 uppercase text-blue-700 mb-1">Exam Fee (Per Subject)</label>
                             <input type="number" name="exam_fee_per_subject" id="exam_rate_input" oninput="calculateTotals()" class="w-full border border-blue-300 bg-blue-50 p-2 rounded" placeholder="0">
                         </div>
                         <div>
-                            <label class="block text-xs font-bold text-gray-500 uppercase">Total Exam Fee</label>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Total Exam Fee</label>
                             <input type="number" name="exam_fee" id="fee_exam" class="w-full border p-2 rounded bg-gray-100 font-bold" placeholder="0" readonly>
                         </div>
                     </div>
@@ -304,131 +366,191 @@
                     <!-- Others -->
                     <div class="grid grid-cols-2 gap-4">
                          <div>
-                            <label class="block text-xs font-bold text-gray-500 uppercase">Registration Fee</label>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Registration Fee</label>
                             <input type="number" name="reg_fee" id="fee_reg" class="w-full border p-2 rounded" placeholder="0">
                         </div>
                          <div>
-                            <label class="block text-xs font-bold text-gray-500 uppercase">Other Charges</label>
+                            <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Other Charges</label>
                             <input type="number" name="other_fee" id="fee_other" class="w-full border p-2 rounded" placeholder="0">
                         </div>
                     </div>
 
-                    <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded w-full hover:bg-green-700 font-bold">Add / Update Fee Record</button>
+                    <button type="submit" class="bg-gray-800 text-white px-6 py-3 rounded-lg w-full hover:bg-black font-bold shadow transition">Save Fee Structure</button>
                 </form>
 
-                <div class="h-96 overflow-y-auto border rounded">
-                    <table class="w-full text-sm text-left"><thead class="bg-gray-100 sticky top-0">
+                <div class="h-96 overflow-y-auto border rounded-lg bg-gray-50">
+                    <table class="w-full text-sm text-left"><thead class="bg-gray-100 sticky top-0 z-10">
                         <tr>
-                            <th class="p-2 border cursor-pointer" onclick="sortFeeTable('degree')">Degree <i class="fas fa-sort ml-1"></i></th>
-                            <th class="p-2 border cursor-pointer" onclick="sortFeeTable('batch')">Batch <i class="fas fa-sort ml-1"></i></th>
-                            <th class="p-2 border cursor-pointer" onclick="sortFeeTable('semester')">Session <i class="fas fa-sort ml-1"></i></th>
-                            <th class="p-2 border text-right cursor-pointer" onclick="sortFeeTable('total_fee')">Total Fee <i class="fas fa-sort ml-1"></i></th>
-                            <th class="p-2 border text-center">Actions</th>
+                            <th class="p-3 border-b cursor-pointer" onclick="sortFeeTable('degree')">Degree <i class="fas fa-sort ml-1"></i></th>
+                            <th class="p-3 border-b cursor-pointer" onclick="sortFeeTable('batch')">Batch <i class="fas fa-sort ml-1"></i></th>
+                            <th class="p-3 border-b cursor-pointer" onclick="sortFeeTable('semester')">Session <i class="fas fa-sort ml-1"></i></th>
+                            <th class="p-3 border-b text-right cursor-pointer" onclick="sortFeeTable('total_fee')">Total Fee <i class="fas fa-sort ml-1"></i></th>
+                            <th class="p-3 border-b text-center">Actions</th>
                         </tr>
-                    </thead><tbody id="body-fe"></tbody></table>
+                    </thead><tbody id="body-fe" class="bg-white divide-y divide-gray-100"></tbody></table>
                 </div>
             </div>
         </div>
 
          <!-- TAB 4: Enrollment -->
         <div id="view-enrollment" class="tab-content hidden">
+             <!-- Stats -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                 <div class="dash-card border-indigo-500"><h4>Total Enrollments</h4><div class="value" id="stat-en-total">0</div></div>
+                 <div class="dash-card border-green-500"><h4>Credit Hours</h4><div class="value" id="stat-en-cr">0</div></div>
+                 <div class="dash-card border-gray-500 bg-gray-50 flex items-center justify-center cursor-pointer hover:bg-gray-100" onclick="showEnrollmentForm()"><div class="text-center text-blue-600"><i class="fas fa-plus-circle text-3xl mb-1"></i><div class="font-bold">Add Enrollment</div></div></div>
+            </div>
+
             <div class="bg-white rounded-lg shadow-lg p-6">
                 <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-xl font-bold">Enrollments (<span id="count-en">0</span>)</h2>
+                    <h2 class="text-xl font-bold text-gray-800">Student Enrollments</h2>
                      <div class="gap-2 flex">
-                        <button onclick="document.getElementById('file_en').click()" class="bg-green-600 text-white px-3 rounded text-sm">Import</button>
+                        <button onclick="document.getElementById('file_en').click()" class="bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700">Import Excel</button>
                         <input type="file" id="file_en" class="hidden" onchange="handleImport(event, 'enrollments')">
-                        <button onclick="showEnrollmentForm()" class="bg-blue-600 text-white px-3 rounded text-sm">Add</button>
-                        <button onclick="deleteAll('enrollments')" class="bg-red-600 text-white px-3 rounded text-sm">Clear</button>
+                        <button onclick="deleteAll('enrollments')" class="bg-red-600 text-white px-4 py-2 rounded text-sm hover:bg-red-700">Clear</button>
                     </div>
                 </div>
-                <input type="text" id="filter_enrollment" onkeyup="renderTable('enrollments')" placeholder="Filter records..." class="w-full border p-2 mb-2 rounded">
-                <div class="h-96 overflow-y-auto border rounded">
-                    <table class="w-full text-sm text-left"><thead class="bg-gray-100 sticky top-0">
+                <input type="text" id="filter_enrollment" onkeyup="renderTable('enrollments')" placeholder="Filter by Name, Reg No..." class="w-full border p-3 mb-4 rounded-lg bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-200 outline-none">
+                <div class="h-96 overflow-y-auto border rounded-lg bg-gray-50">
+                    <table class="w-full text-sm text-left"><thead class="bg-gray-100 sticky top-0 z-10">
                         <tr>
-                            <th class="p-2 border cursor-pointer" onclick="sortEnrollmentTable('reg_no')">Reg # <i class="fas fa-sort ml-1"></i></th>
-                            <th class="p-2 border cursor-pointer" onclick="sortEnrollmentTable('name')">Name <i class="fas fa-sort ml-1"></i></th>
-                            <th class="p-2 border cursor-pointer" onclick="sortEnrollmentTable('semester')">Semester <i class="fas fa-sort ml-1"></i></th>
-                            <th class="p-2 border text-center cursor-pointer" onclick="sortEnrollmentTable('courses')">Courses <i class="fas fa-sort ml-1"></i></th>
-                            <th class="p-2 border text-center cursor-pointer" onclick="sortEnrollmentTable('cr')">Cr <i class="fas fa-sort ml-1"></i></th>
-                            <th class="p-2 border text-center">Actions</th>
+                            <th class="p-3 border-b cursor-pointer" onclick="sortEnrollmentTable('reg_no')">Reg # <i class="fas fa-sort ml-1"></i></th>
+                            <th class="p-3 border-b cursor-pointer" onclick="sortEnrollmentTable('name')">Name <i class="fas fa-sort ml-1"></i></th>
+                            <th class="p-3 border-b cursor-pointer" onclick="sortEnrollmentTable('semester')">Semester <i class="fas fa-sort ml-1"></i></th>
+                            <th class="p-3 border-b text-center cursor-pointer" onclick="sortEnrollmentTable('courses')">Courses <i class="fas fa-sort ml-1"></i></th>
+                            <th class="p-3 border-b text-center cursor-pointer" onclick="sortEnrollmentTable('cr')">Cr <i class="fas fa-sort ml-1"></i></th>
+                            <th class="p-3 border-b text-center">Actions</th>
                         </tr>
-                    </thead><tbody id="body-en"></tbody></table>
+                    </thead><tbody id="body-en" class="bg-white divide-y divide-gray-100"></tbody></table>
                 </div>
             </div>
             <!-- Enroll Form -->
-            <div id="enrollment-form-container" class="hidden bg-white rounded-lg shadow-lg p-6 max-w-2xl mx-auto mt-4"><div class="flex justify-between items-center border-b pb-4 mb-4"><h3 class="text-lg font-bold">Add Enrollment</h3><button onclick="hideEnrollmentForm()" class="text-red-500">x</button></div><form id="enrollmentForm" onsubmit="saveEnrollmentList(event)" class="space-y-4"><input type="hidden" id="enroll_edit_id" value="-1"><div class="grid grid-cols-2 gap-4"><input type="text" name="reg_no" id="enroll_reg_no" placeholder="Reg No" class="border p-2 rounded" required><input type="text" name="name" id="enroll_name" placeholder="Name" class="border p-2 rounded"><input type="number" name="courses" id="enroll_courses" placeholder="Courses" class="border p-2 rounded"><input type="number" name="cr" id="enroll_cr" placeholder="Cr Hrs" class="border p-2 rounded"><input type="text" name="semester" id="enroll_sem" placeholder="Semester (e.g. Fall 2023)" class="border p-2 rounded"></div><button type="submit" class="w-full bg-blue-600 text-white py-2 rounded">Save</button></form></div>
+            <div id="enrollment-form-container" class="hidden fixed inset-0 z-50 flex items-center justify-center modal">
+                <div class="bg-white rounded-xl shadow-2xl p-8 max-w-2xl w-full m-4">
+                    <div class="flex justify-between items-center border-b pb-4 mb-6">
+                        <h3 class="text-xl font-bold text-gray-800">Add Enrollment Record</h3>
+                        <button onclick="hideEnrollmentForm()" class="text-gray-400 hover:text-red-500 transition text-2xl">&times;</button>
+                    </div>
+                    <form id="enrollmentForm" onsubmit="saveEnrollmentList(event)" class="space-y-4">
+                        <input type="hidden" id="enroll_edit_id" value="-1">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div><label class="block text-sm font-bold text-gray-700 mb-1">Registration No</label><input type="text" name="reg_no" id="enroll_reg_no" placeholder="Reg No" class="w-full border p-3 rounded-lg" required></div>
+                            <div><label class="block text-sm font-bold text-gray-700 mb-1">Student Name</label><input type="text" name="name" id="enroll_name" placeholder="Name" class="w-full border p-3 rounded-lg"></div>
+                            <div><label class="block text-sm font-bold text-gray-700 mb-1">Semester</label><input type="text" name="semester" id="enroll_sem" placeholder="e.g. Fall 2025" class="w-full border p-3 rounded-lg" required></div>
+                            <div><label class="block text-sm font-bold text-gray-700 mb-1">Total Credit Hrs</label><input type="number" name="cr" id="enroll_cr" placeholder="15" class="w-full border p-3 rounded-lg"></div>
+                            <div><label class="block text-sm font-bold text-gray-700 mb-1">No. of Courses</label><input type="number" name="courses" id="enroll_courses" placeholder="5" class="w-full border p-3 rounded-lg"></div>
+                        </div>
+                        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-bold shadow mt-4">Save Enrollment</button>
+                    </form>
+                </div>
+            </div>
         </div>
 
          <!-- TAB 5: Paid -->
         <div id="view-paid" class="tab-content hidden">
+            <!-- Stats -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                 <div class="dash-card border-green-600"><h4>Total Collected</h4><div class="value text-green-700" id="stat-pa-total">0</div></div>
+                 <div class="dash-card border-blue-500"><h4>Total Transactions</h4><div class="value" id="stat-pa-count">0</div></div>
+                 <div class="dash-card border-gray-500 bg-gray-50 flex items-center justify-center cursor-pointer hover:bg-gray-100" onclick="showPaidForm()"><div class="text-center text-blue-600"><i class="fas fa-plus-circle text-3xl mb-1"></i><div class="font-bold">Add Payment</div></div></div>
+            </div>
+
             <div class="bg-white rounded-lg shadow-lg p-6">
                 <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-xl font-bold">Fee Payments (<span id="count-pa">0</span>)</h2>
+                    <h2 class="text-xl font-bold text-gray-800">Fee Payments</h2>
                      <div class="gap-2 flex">
-                        <button onclick="document.getElementById('file_pa').click()" class="bg-green-600 text-white px-3 rounded text-sm">Import</button>
+                        <button onclick="document.getElementById('file_pa').click()" class="bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700">Import Excel</button>
                         <input type="file" id="file_pa" class="hidden" onchange="handleImport(event, 'payments')">
-                        <button onclick="showPaidForm()" class="bg-blue-600 text-white px-3 rounded text-sm">Add</button>
-                        <button onclick="deleteAll('payments')" class="bg-red-600 text-white px-3 rounded text-sm">Clear</button>
+                        <button onclick="deleteAll('payments')" class="bg-red-600 text-white px-4 py-2 rounded text-sm hover:bg-red-700">Clear</button>
                     </div>
                 </div>
-                <input type="text" id="filter_payment" onkeyup="renderTable('payments')" placeholder="Filter payments..." class="w-full border p-2 mb-2 rounded">
-                <div class="h-96 overflow-y-auto border rounded">
-                    <table class="w-full text-sm text-left"><thead class="bg-gray-100 sticky top-0">
+                <input type="text" id="filter_payment" onkeyup="renderTable('payments')" placeholder="Filter payments..." class="w-full border p-3 mb-4 rounded-lg bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-200 outline-none">
+                <div class="h-96 overflow-y-auto border rounded-lg bg-gray-50">
+                    <table class="w-full text-sm text-left"><thead class="bg-gray-100 sticky top-0 z-10">
                         <tr>
-                            <th class="p-2 border cursor-pointer" onclick="sortPaidTable('reg_no')">Reg # <i class="fas fa-sort ml-1"></i></th>
-                            <th class="p-2 border cursor-pointer" onclick="sortPaidTable('name')">Name <i class="fas fa-sort ml-1"></i></th>
-                            <th class="p-2 border cursor-pointer" onclick="sortPaidTable('semester')">Session <i class="fas fa-sort ml-1"></i></th>
-                            <th class="p-2 border text-right cursor-pointer" onclick="sortPaidTable('amount')">Amount <i class="fas fa-sort ml-1"></i></th>
-                            <th class="p-2 border text-center cursor-pointer" onclick="sortPaidTable('date')">Date <i class="fas fa-sort ml-1"></i></th>
-                            <th class="p-2 border text-center">Actions</th>
+                            <th class="p-3 border-b cursor-pointer" onclick="sortPaidTable('reg_no')">Reg # <i class="fas fa-sort ml-1"></i></th>
+                            <th class="p-3 border-b cursor-pointer" onclick="sortPaidTable('name')">Name <i class="fas fa-sort ml-1"></i></th>
+                            <th class="p-3 border-b cursor-pointer" onclick="sortPaidTable('semester')">Session <i class="fas fa-sort ml-1"></i></th>
+                            <th class="p-3 border-b text-right cursor-pointer" onclick="sortPaidTable('amount')">Amount <i class="fas fa-sort ml-1"></i></th>
+                            <th class="p-3 border-b text-center cursor-pointer" onclick="sortPaidTable('date')">Date <i class="fas fa-sort ml-1"></i></th>
+                            <th class="p-3 border-b text-center">Actions</th>
                         </tr>
-                    </thead><tbody id="body-pa"></tbody></table>
+                    </thead><tbody id="body-pa" class="bg-white divide-y divide-gray-100"></tbody></table>
                 </div>
             </div>
-            <div id="paid-form-container" class="hidden bg-white rounded-lg shadow-lg p-6 max-w-2xl mx-auto mt-4"><div class="flex justify-between items-center border-b pb-4 mb-4"><h3 class="text-lg font-bold">Add Payment</h3><button onclick="hidePaidForm()" class="text-red-500">x</button></div><form id="paidForm" onsubmit="savePaymentList(event)" class="space-y-4"><input type="hidden" id="paid_edit_id" value="-1"><div class="grid grid-cols-2 gap-4"><input type="text" name="reg_no" id="paid_reg_no" placeholder="Reg No" class="border p-2 rounded" required><input type="number" name="amount" id="paid_amount" placeholder="Amount" class="border p-2 rounded" required></div><button type="submit" class="w-full bg-blue-600 text-white py-2 rounded">Save</button></form></div>
+            
+            <div id="paid-form-container" class="hidden fixed inset-0 z-50 flex items-center justify-center modal">
+                <div class="bg-white rounded-xl shadow-2xl p-8 max-w-md w-full m-4">
+                    <div class="flex justify-between items-center border-b pb-4 mb-6">
+                        <h3 class="text-xl font-bold text-gray-800">Record Fee Payment</h3>
+                        <button onclick="hidePaidForm()" class="text-gray-400 hover:text-red-500 transition text-2xl">&times;</button>
+                    </div>
+                    <form id="paidForm" onsubmit="savePaymentList(event)" class="space-y-4">
+                        <input type="hidden" id="paid_edit_id" value="-1">
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-1">Registration No</label>
+                            <input type="text" name="reg_no" id="paid_reg_no" placeholder="Reg No" class="w-full border p-3 rounded-lg focus:ring-2 focus:ring-blue-500" required>
+                        </div>
+                         <!-- ADDED SEMESTER FIELD FOR CORRECT PAYMENT ALLOCATION -->
+                         <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-1">Semester / Term</label>
+                            <input type="text" name="semester" id="paid_semester" placeholder="e.g. Fall 2025" class="w-full border p-3 rounded-lg focus:ring-2 focus:ring-blue-500" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-1">Amount Paid</label>
+                            <input type="number" name="amount" id="paid_amount" placeholder="50000" class="w-full border p-3 rounded-lg focus:ring-2 focus:ring-blue-500 font-bold text-lg" required>
+                        </div>
+                        <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-bold shadow mt-2">Save Payment</button>
+                    </form>
+                </div>
+            </div>
         </div>
 
         <!-- TAB 6: Discounts -->
         <div id="view-discount" class="tab-content hidden">
+             <!-- Stats -->
+             <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                 <div class="dash-card border-purple-500"><h4>Total Discounts</h4><div class="value" id="stat-di-count">0</div></div>
+                 <div class="dash-card border-gray-500 bg-gray-50 flex items-center justify-center cursor-pointer hover:bg-gray-100" onclick="showDiscountForm()"><div class="text-center text-blue-600"><i class="fas fa-plus-circle text-3xl mb-1"></i><div class="font-bold">Add Discount</div></div></div>
+            </div>
+
             <div class="bg-white rounded-lg shadow-lg p-6">
                  <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-xl font-bold">Discounts (<span id="count-di">0</span>)</h2>
+                    <h2 class="text-xl font-bold text-gray-800">Scholarships & Discounts</h2>
                     <div class="flex gap-2">
-                        <button onclick="document.getElementById('file_di').click()" class="bg-green-600 text-white px-3 py-1 rounded text-sm"><i class="fas fa-file-import"></i> Import</button>
+                        <button onclick="document.getElementById('file_di').click()" class="bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700">Import Excel</button>
                         <input type="file" id="file_di" class="hidden" onchange="handleImport(event, 'discounts')">
-                        <button onclick="showDiscountForm()" class="bg-blue-600 text-white px-3 py-1 rounded text-sm"><i class="fas fa-plus"></i> Add</button>
-                        <button onclick="exportToExcel('discounts')" class="bg-indigo-600 text-white px-3 py-1 rounded text-sm"><i class="fas fa-file-export"></i> Export</button>
-                        <button onclick="deleteAll('discounts')" class="bg-red-600 text-white px-3 py-1 rounded text-sm"><i class="fas fa-trash"></i> Clear</button>
+                        <button onclick="exportToExcel('discounts')" class="bg-indigo-600 text-white px-4 py-2 rounded text-sm hover:bg-indigo-700">Export</button>
+                        <button onclick="deleteAll('discounts')" class="bg-red-600 text-white px-4 py-2 rounded text-sm hover:bg-red-700">Clear</button>
                     </div>
                 </div>
-                <input type="text" id="search_di" onkeyup="renderTable('discounts')" placeholder="Filter discounts..." class="w-full border p-2 mb-4 rounded">
-                <div class="h-96 overflow-y-auto border rounded">
-                    <table class="w-full text-sm text-left"><thead class="bg-purple-50 sticky top-0">
+                <input type="text" id="search_di" onkeyup="renderTable('discounts')" placeholder="Filter discounts..." class="w-full border p-3 mb-4 rounded-lg bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-200 outline-none">
+                <div class="h-96 overflow-y-auto border rounded-lg bg-gray-50">
+                    <table class="w-full text-sm text-left"><thead class="bg-purple-50 sticky top-0 z-10">
                         <tr>
-                            <th class="p-2 border cursor-pointer" onclick="sortDiscountTable('reg_no')">Reg # <i class="fas fa-sort ml-1"></i></th>
-                            <th class="p-2 border cursor-pointer" onclick="sortDiscountTable('name')">Name <i class="fas fa-sort ml-1"></i></th>
-                            <th class="p-2 border cursor-pointer" onclick="sortDiscountTable('term')">Term <i class="fas fa-sort ml-1"></i></th>
-                            <th class="p-2 border text-right cursor-pointer" onclick="sortDiscountTable('discount')">Disc % <i class="fas fa-sort ml-1"></i></th>
-                            <th class="p-2 border text-center">Act</th>
+                            <th class="p-3 border-b cursor-pointer" onclick="sortDiscountTable('reg_no')">Reg # <i class="fas fa-sort ml-1"></i></th>
+                            <th class="p-3 border-b cursor-pointer" onclick="sortDiscountTable('name')">Name <i class="fas fa-sort ml-1"></i></th>
+                            <th class="p-3 border-b cursor-pointer" onclick="sortDiscountTable('term')">Term <i class="fas fa-sort ml-1"></i></th>
+                            <th class="p-3 border-b text-right cursor-pointer" onclick="sortDiscountTable('discount')">Disc % <i class="fas fa-sort ml-1"></i></th>
+                            <th class="p-3 border-b text-center">Act</th>
                         </tr>
-                    </thead><tbody id="body-di"></tbody></table>
+                    </thead><tbody id="body-di" class="bg-white divide-y divide-gray-100"></tbody></table>
                 </div>
             </div>
              <!-- Discount Modal -->
-            <div id="modal-discount" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                <div class="bg-white rounded p-6 w-96 shadow-xl">
-                    <h3 class="font-bold text-lg mb-4">Add Discount</h3>
+            <div id="modal-discount" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 modal">
+                <div class="bg-white rounded-xl p-8 w-96 shadow-2xl">
+                    <h3 class="font-bold text-lg mb-6 text-gray-800">Add Discount</h3>
                     <input type="hidden" id="md_id">
-                    <div class="space-y-2">
-                        <input type="text" id="md_reg" placeholder="Reg No" class="w-full border p-2 rounded">
-                        <input type="text" id="md_name" placeholder="Student Name" class="w-full border p-2 rounded">
-                        <input type="text" id="md_term" placeholder="Term (e.g. Fall 2025)" class="w-full border p-2 rounded">
-                        <input type="number" id="md_val" placeholder="Discount %" class="w-full border p-2 rounded">
+                    <div class="space-y-4">
+                        <input type="text" id="md_reg" placeholder="Reg No" class="w-full border p-3 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <input type="text" id="md_name" placeholder="Student Name" class="w-full border p-3 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <input type="text" id="md_term" placeholder="Term (e.g. Fall 2025)" class="w-full border p-3 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <input type="number" id="md_val" placeholder="Discount %" class="w-full border p-3 rounded-lg focus:ring-2 focus:ring-blue-500">
                     </div>
-                    <div class="flex justify-end gap-2 mt-4">
-                        <button onclick="document.getElementById('modal-discount').classList.add('hidden')" class="bg-gray-300 px-4 py-2 rounded">Cancel</button>
-                        <button onclick="saveDiscount()" class="bg-blue-600 text-white px-4 py-2 rounded">Save</button>
+                    <div class="flex justify-end gap-2 mt-6">
+                        <button onclick="document.getElementById('modal-discount').classList.add('hidden')" class="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded text-gray-700 font-bold">Cancel</button>
+                        <button onclick="saveDiscount()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded font-bold">Save Record</button>
                     </div>
                 </div>
             </div>
@@ -447,20 +569,21 @@
         
         tabs.forEach(t => {
             const btn = document.createElement('button');
-            btn.className = `py-4 px-6 font-medium text-gray-500 hover:text-green-600 capitalize`;
+            btn.className = `py-4 px-6 font-bold text-gray-500 hover:text-blue-600 hover:bg-blue-50 transition border-b-2 border-transparent focus:outline-none capitalize`;
             btn.textContent = t.replace('_', ' ');
             btn.onclick = () => openTab(t, btn);
-            if(t==='clearance') btn.classList.add('text-green-600','border-b-2','border-green-600');
+            if(t==='clearance') btn.classList.add('text-blue-600','border-blue-600','bg-blue-50');
             navContainer.appendChild(btn);
         });
 
         function openTab(id, btn) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
             document.getElementById('view-' + id).classList.remove('hidden');
-            Array.from(navContainer.children).forEach(b => b.classList.remove('text-green-600','border-b-2','border-green-600'));
-            if(btn) btn.classList.add('text-green-600','border-b-2','border-green-600');
+            Array.from(navContainer.children).forEach(b => b.classList.remove('text-blue-600','border-blue-600','bg-blue-50'));
+            if(btn) btn.classList.add('text-blue-600','border-blue-600','bg-blue-50');
         }
 
+        document.getElementById('dash-date').innerText = new Date().toLocaleDateString('en-PK', { weekday:'short', year:'numeric', month:'short', day:'numeric' });
         document.getElementById('printDate').innerText = new Date().toLocaleString();
         
         // --- NORMALIZER ---
@@ -530,11 +653,29 @@
 
         function refreshUI() {
             renderTable('students'); renderTable('fees'); renderTable('enrollments'); renderTable('payments'); renderTable('discounts');
-            document.getElementById('count-st').innerText = db.students.length;
-            document.getElementById('count-fe').innerText = db.fees.length;
-            document.getElementById('count-en').innerText = db.enrollments.length;
-            document.getElementById('count-pa').innerText = db.payments.length;
-            document.getElementById('count-di').innerText = db.discounts.length;
+            
+            // --- UPDATE STATS CARDS ---
+            // Student Stats
+            document.getElementById('stat-st-total').innerText = db.students.length;
+            document.getElementById('stat-st-batch').innerText = new Set(db.students.map(s => s.batch)).size;
+            document.getElementById('stat-st-degree').innerText = new Set(db.students.map(s => s.degree)).size;
+            
+            // Fee Stats
+            document.getElementById('stat-fe-total').innerText = db.fees.length;
+            const avgFee = db.fees.length ? Math.round(db.fees.reduce((a,b)=>a+(parseFloat(b.tuition_fee)||0),0)/db.fees.length) : 0;
+            document.getElementById('stat-fe-avg').innerText = num(avgFee);
+            
+            // Enrollment Stats
+            document.getElementById('stat-en-total').innerText = db.enrollments.length;
+            document.getElementById('stat-en-cr').innerText = db.enrollments.reduce((a,b)=>a+(parseFloat(b.cr)||0),0);
+            
+            // Paid Stats
+            const totalPaid = db.payments.reduce((a,b)=>a+(parseFloat(b.amount)||0),0);
+            document.getElementById('stat-pa-total').innerText = num(totalPaid);
+            document.getElementById('stat-pa-count').innerText = db.payments.length;
+            
+            // Discount Stats
+            document.getElementById('stat-di-count').innerText = db.discounts.length;
             
             // Populate Datalists for Fee Form
             const degs = [...new Set(db.students.map(s=>s.degree))].sort();
@@ -552,8 +693,6 @@
             if (type === 'students') {
                 tbodyId = 'body-st';
                 const f = document.getElementById('filter_student') ? document.getElementById('filter_student').value.toLowerCase() : '';
-                
-                // Show ALL students (removed slice limit) and improved search to include degree and batch
                 html = data.filter(s => 
                     !f || 
                     (s.reg_no || '').toLowerCase().includes(f) || 
@@ -561,38 +700,37 @@
                     (s.degree && s.degree.toLowerCase().includes(f)) || 
                     (s.batch && s.batch.toLowerCase().includes(f))
                 ).map(s => `
-                    <tr>
-                        <td class="p-2 border">${s.reg_no}</td>
-                        <td class="p-2 border">${s.name}</td>
-                        <td class="p-2 border">${s.degree}</td>
-                        <td class="p-2 border">${s.batch}</td>
-                        <td class="p-2 border text-center">
-                            <button onclick="editStudent('${s.reg_no}')" class="text-blue-600 mr-2"><i class="fas fa-edit"></i></button>
-                            <button onclick="deleteItem('students','${s.reg_no}')" class="text-red-600"><i class="fas fa-trash"></i></button>
+                    <tr class="hover:bg-gray-50 transition">
+                        <td class="p-4 border-b font-mono font-bold text-gray-700">${s.reg_no}</td>
+                        <td class="p-4 border-b">${s.name}</td>
+                        <td class="p-4 border-b"><span class="bg-blue-100 text-blue-800 text-xs font-bold px-2 py-1 rounded">${s.degree}</span></td>
+                        <td class="p-4 border-b text-gray-500">${s.batch}</td>
+                        <td class="p-4 border-b text-center">
+                            <button onclick="editStudent('${s.reg_no}')" class="text-blue-600 hover:text-blue-800 mr-3"><i class="fas fa-edit"></i></button>
+                            <button onclick="deleteItem('students','${s.reg_no}')" class="text-red-500 hover:text-red-700"><i class="fas fa-trash"></i></button>
                         </td>
                     </tr>`).join('');
             } else if (type === 'fees') {
                 tbodyId = 'body-fe';
-                html = data.map(f => `<tr><td class="p-2 border">${f.degree}</td><td class="p-2 border">${f.batch}</td><td class="p-2 border">${f.semester} ${f.year}</td><td class="p-2 border text-right">${parseFloat(f.total_fee||0) || (parseFloat(f.tuition_fee)+parseFloat(f.exam_fee))}</td><td class="p-2 border text-center"><button onclick="editFeeRecord('${f.id}')" class="text-blue-600 mr-2"><i class="fas fa-edit"></i></button><button onclick="deleteItem('fees','${f.id}')" class="text-red-600"><i class="fas fa-trash"></i></button></td></tr>`).join('');
+                html = data.map(f => `<tr class="hover:bg-gray-50"><td class="p-3 border-b font-bold">${f.degree}</td><td class="p-3 border-b">${f.batch}</td><td class="p-3 border-b text-gray-600">${f.semester} ${f.year}</td><td class="p-3 border-b text-right font-mono font-bold">${parseFloat(f.total_fee||0) || (parseFloat(f.tuition_fee)+parseFloat(f.exam_fee))}</td><td class="p-3 border-b text-center"><button onclick="editFeeRecord('${f.id}')" class="text-blue-600 mr-2"><i class="fas fa-edit"></i></button><button onclick="deleteItem('fees','${f.id}')" class="text-red-600"><i class="fas fa-trash"></i></button></td></tr>`).join('');
             } else if (type === 'enrollments') {
                 tbodyId = 'body-en';
-                // Fixed: Correct ID for enrollment search input (was enrollment_list_search)
                 const f = document.getElementById('filter_enrollment') ? document.getElementById('filter_enrollment').value.toLowerCase() : '';
-                html = data.filter(e => !f || (e.reg_no || '').toLowerCase().includes(f) || (e.name || '').toLowerCase().includes(f)).map(e => `<tr><td class="p-2 border">${e.reg_no}</td><td class="p-2 border">${e.name}</td><td class="p-2 border">${e.semester}</td><td class="p-2 border text-center">${e.courses}</td><td class="p-2 border text-center">${e.cr}</td><td class="p-2 border text-center"><button onclick="editEnrollment('${e.id}')" class="text-blue-600 mr-2"><i class="fas fa-edit"></i></button><button onclick="deleteItem('enrollments','${e.id}')" class="text-red-600"><i class="fas fa-trash"></i></button></td></tr>`).join('');
+                html = data.filter(e => !f || (e.reg_no || '').toLowerCase().includes(f) || (e.name || '').toLowerCase().includes(f)).map(e => `<tr class="hover:bg-gray-50"><td class="p-3 border-b font-mono">${e.reg_no}</td><td class="p-3 border-b">${e.name}</td><td class="p-3 border-b"><span class="bg-indigo-100 text-indigo-800 text-xs px-2 py-1 rounded">${e.semester}</span></td><td class="p-3 border-b text-center">${e.courses}</td><td class="p-3 border-b text-center font-bold">${e.cr}</td><td class="p-3 border-b text-center"><button onclick="editEnrollment('${e.id}')" class="text-blue-600 mr-2"><i class="fas fa-edit"></i></button><button onclick="deleteItem('enrollments','${e.id}')" class="text-red-600"><i class="fas fa-trash"></i></button></td></tr>`).join('');
             } else if (type === 'payments') {
                 tbodyId = 'body-pa';
                 const f = document.getElementById('filter_payment') ? document.getElementById('filter_payment').value.toLowerCase() : '';
-                html = data.filter(p => !f || (p.reg_no || '').toLowerCase().includes(f) || (p.name || '').toLowerCase().includes(f)).map(p => `<tr><td class="p-2 border">${p.reg_no}</td><td class="p-2 border">${p.name}</td><td class="p-2 border">${p.semester}</td><td class="p-2 border text-right">${p.amount}</td><td class="p-2 border text-center">${p.date}</td><td class="p-2 border text-center"><button onclick="editPayment('${p.id}')" class="text-blue-600 mr-2"><i class="fas fa-edit"></i></button><button onclick="deleteItem('payments','${p.id}')" class="text-red-600"><i class="fas fa-trash"></i></button></td></tr>`).join('');
+                html = data.filter(p => !f || (p.reg_no || '').toLowerCase().includes(f) || (p.name || '').toLowerCase().includes(f)).map(p => `<tr class="hover:bg-gray-50"><td class="p-3 border-b font-mono">${p.reg_no}</td><td class="p-3 border-b">${p.name}</td><td class="p-3 border-b"><span class="bg-green-100 text-green-800 text-xs px-2 py-1 rounded">${p.semester}</span></td><td class="p-3 border-b text-right font-bold font-mono text-green-700">${num(p.amount)}</td><td class="p-3 border-b text-center text-xs text-gray-500">${p.date || '-'}</td><td class="p-3 border-b text-center"><button onclick="editPayment('${p.id}')" class="text-blue-600 mr-2"><i class="fas fa-edit"></i></button><button onclick="deleteItem('payments','${p.id}')" class="text-red-600"><i class="fas fa-trash"></i></button></td></tr>`).join('');
             } else if (type === 'discounts') {
                 tbodyId = 'body-di';
                 const f = document.getElementById('search_di').value.toLowerCase();
                 html = data.filter(d => !f || (d.reg_no || '').toLowerCase().includes(f)).map(d => `
-                    <tr>
-                        <td class="p-2 border">${d.reg_no}</td>
-                        <td class="p-2 border">${d.name}</td>
-                        <td class="p-2 border">${d.term}</td>
-                        <td class="p-2 border text-right font-bold text-green-600">${d.discount}%</td>
-                        <td class="p-2 border text-center">
+                    <tr class="hover:bg-gray-50">
+                        <td class="p-3 border-b font-mono">${d.reg_no}</td>
+                        <td class="p-3 border-b">${d.name}</td>
+                        <td class="p-3 border-b">${d.term}</td>
+                        <td class="p-3 border-b text-right font-bold text-purple-600">${d.discount}%</td>
+                        <td class="p-3 border-b text-center">
                             <button onclick="editDiscount('${d.id||d.reg_no}', '${d.reg_no}', '${d.name}', '${d.term}', '${d.discount}')" class="text-blue-600 mr-2"><i class="fas fa-edit"></i></button>
                             <button onclick="deleteItem('discounts', '${d.id||d.reg_no}')" class="text-red-600"><i class="fas fa-trash"></i></button>
                         </td>
@@ -601,7 +739,7 @@
             }
 
             const el = document.getElementById(tbodyId);
-            if(el) el.innerHTML = html || `<tr><td colspan="6" class="p-4 text-center italic text-gray-400">No records found.</td></tr>`;
+            if(el) el.innerHTML = html || `<tr><td colspan="6" class="p-8 text-center italic text-gray-400">No records found.</td></tr>`;
         }
         
         let sortDir = 1;
@@ -629,6 +767,9 @@
             // 1. Find Student
             const student = db.students.find(s => norm(s.reg_no) === cleanReg);
             if (!student) return alert(`Student not found! (${db.students.length} records loaded)`);
+
+            // Update Dashboard Active Card
+            document.getElementById('active-search-reg').innerText = student.reg_no;
 
             document.getElementById('disp_reg').textContent = student.reg_no;
             document.getElementById('disp_name').textContent = student.name;
@@ -757,6 +898,7 @@
             
             hideAddForm();
             renderTable('students');
+            refreshUI(); // Update stats
             document.getElementById('studentForm').reset();
             alert("Student Saved!");
         }
@@ -777,6 +919,7 @@
 
              hideEnrollmentForm();
              renderTable('enrollments');
+             refreshUI();
              document.getElementById('enrollmentForm').reset();
         }
 
@@ -787,8 +930,8 @@
              data.id = document.getElementById('paid_edit_id').value;
              if(data.id === '-1') data.id = Date.now();
              
-             // Auto-fill sem if possible
-             if(!data.semester) data.semester = new Date().getFullYear();
+             // Ensure date
+             if(!data.date) data.date = new Date().toISOString().split('T')[0];
 
              const idx = db.payments.findIndex(x => x.id == data.id);
              if(idx > -1) db.payments[idx] = data;
@@ -799,6 +942,7 @@
 
              hidePaidForm();
              renderTable('payments');
+             refreshUI();
              document.getElementById('paidForm').reset();
         }
 
@@ -834,6 +978,7 @@
             else localStorage.setItem('fee_system_local', JSON.stringify(db));
             
             renderTable('fees');
+            refreshUI();
             alert("Fee Record Saved!");
         }
 
@@ -862,6 +1007,7 @@
 
             hideDiscountForm();
             renderTable('discounts');
+            refreshUI();
         }
         
         function editDiscount(id, reg, name, term, val) {
@@ -927,7 +1073,7 @@
             if(!p) return;
             document.getElementById('paid_edit_id').value = p.id;
             document.getElementById('paid_reg_no').value = p.reg_no;
-            document.getElementById('paid_name').value = p.name;
+            document.getElementById('paid_semester').value = p.semester;
             document.getElementById('paid_amount').value = p.amount;
             // document.getElementById('paid_date').value = p.date;
             showPaidForm();
@@ -948,6 +1094,7 @@
             } else {
                 localStorage.setItem('fee_system_local', JSON.stringify(db));
             }
+            renderTable(type);
             refreshUI();
         }
         
@@ -956,6 +1103,7 @@
              if(isOnline) await fetch(`${API_URL}?action=delete_all_${type}`, {method:'POST'});
              db[type] = [];
              refreshUI();
+             renderTable(type);
              if(!isOnline) localStorage.setItem('fee_system_local', JSON.stringify(db));
         }
 
