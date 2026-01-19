@@ -407,7 +407,7 @@
                                     <div className="bg-white rounded-xl shadow-lg overflow-hidden" id="printableArea">
                                         <div className="p-8">
                                             <div className="border-b-2 border-gray-800 pb-6 mb-6 flex justify-between items-start">
-                                                <div className="w-24 h-24 rounded-lg flex items-center justify-center font-bold text-gray-400 overflow-hidden">
+                                                <div className="w-32 h-32 rounded-lg flex items-center justify-center font-bold text-gray-400 overflow-hidden">
                                                     <img src="src/UOL-Green-V1.png" alt="UOL Logo" className="w-full h-full object-contain" />
                                                 </div>
                                                 <div className="text-center flex-1 px-4">
@@ -429,28 +429,31 @@
                                             <div className="overflow-x-auto">
                                                 <table className="w-full text-xs">
                                                     <thead className="bg-gray-100 text-gray-900 font-bold uppercase">
-                                                        <tr><th className="p-2 border">Sem</th><th className="p-2 border text-center">Cr</th><th className="p-2 border text-right">Tuition</th><th className="p-2 border text-right">Exam</th><th className="p-2 border text-right">Misc</th><th className="p-2 border text-right bg-gray-50">Total</th><th className="p-2 border text-center">Schol.</th><th className="p-2 border text-right">Net Fee</th><th className="p-2 border text-right text-green-700">Paid</th><th className="p-2 border text-right">Balance</th></tr>
+                                                        <tr><th className="p-2 border">Sem</th><th className="p-2 border text-center">Cr</th><th className="p-2 border text-center">Sub</th><th className="p-2 border text-right">Tuition</th><th className="p-2 border text-right">Exam</th><th className="p-2 border text-right">Misc</th><th className="p-2 border text-right bg-gray-50">Total</th><th className="p-2 border text-center">Disc %</th><th className="p-2 border text-right">Disc Amt</th><th className="p-2 border text-right">Net Fee</th><th className="p-2 border text-right text-green-700">Paid</th><th className="p-2 border text-right">Balance</th></tr>
                                                     </thead>
                                                     <tbody className="divide-y divide-gray-200">
                                                         {clearanceResult.rows.map((row, idx) => (
                                                             <tr key={idx} className="hover:bg-gray-50">
                                                                 <td className="p-2 border font-medium">{row.semester}</td>
                                                                 <td className="p-2 border text-center">{row.cr}</td>
+                                                                <td className="p-2 border text-center">{row.courses}</td>
                                                                 <td className="p-2 border text-right text-gray-600">{num(row.tuition)}</td>
                                                                 <td className="p-2 border text-right text-gray-600">{num(row.exam)}</td>
                                                                 <td className="p-2 border text-right text-gray-600">{num(row.reg + row.other)}</td>
                                                                 <td className="p-2 border text-right font-bold bg-gray-50">{num(row.total)}</td>
-                                                                <td className="p-2 border text-center text-gray-500">{row.discPct > 0 ? `${row.discPct}% (${num(row.discAmt)})` : '-'}</td>
+                                                                <td className="p-2 border text-center text-gray-500">{row.discPct > 0 ? `${row.discPct}%` : '-'}</td>
+                                                                <td className="p-2 border text-right text-gray-500">{row.discAmt > 0 ? num(row.discAmt) : '-'}</td>
                                                                 <td className="p-2 border text-right font-bold">{num(row.netFee)}</td>
                                                                 <td className="p-2 border text-right font-bold text-green-600">{num(row.totalPaid)}</td>
                                                                 <td className={`p-2 border text-right font-bold ${row.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>{num(row.balance)}</td>
                                                             </tr>
                                                         ))}
-                                                        {clearanceResult.rows.length === 0 && <tr><td colSpan="10" className="p-4 text-center text-gray-400 italic">No enrollment records found.</td></tr>}
+                                                        {clearanceResult.rows.length === 0 && <tr><td colSpan="12" className="p-4 text-center text-gray-400 italic">No enrollment records found.</td></tr>}
                                                         <tr className="bg-gray-800 text-white font-bold">
-                                                            <td colSpan="5" className="p-3 text-right uppercase tracking-wider">Grand Totals</td>
+                                                            <td colSpan="6" className="p-3 text-right uppercase tracking-wider">Grand Totals</td>
                                                             <td className="p-3 text-right">{num(clearanceResult.summary.total)}</td>
                                                             <td className="p-3 text-center">-</td>
+                                                            <td className="p-3 text-right">{num(clearanceResult.summary.fa)}</td>
                                                             <td className="p-3 text-right">{num(clearanceResult.summary.total - clearanceResult.summary.fa)}</td>
                                                             <td className="p-3 text-right text-green-400">{num(clearanceResult.summary.paid)}</td>
                                                             <td className={`p-3 text-right ${clearanceResult.summary.balance > 0 ? 'text-red-400' : 'text-green-400'}`}>{num(clearanceResult.summary.balance)}</td>
