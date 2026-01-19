@@ -797,22 +797,35 @@
             myEnroll.sort((a,b) => a.semester.localeCompare(b.semester));
 
             myEnroll.forEach((en, idx) => {
-                // FIXED: Normalize both sides for robust matching
                 const enSem = norm(en.semester);
                 
-                // Match Fee: Try robust fuzzy matching for Session
-                // e.g., "Fall 2025" -> "fall2025" matches "fall2025"
-                const fee = db.fees.find(f => 
-                    norm(f.degree) === norm(student.degree) && 
-                    norm(f.batch) === norm(student.batch) && 
-                    (norm(f.semester + f.year) === enSem || norm(f.semester + ' ' + f.year) === enSem || enSem.includes(norm(f.semester) + norm(f.year)))
-                );
+                // --- RELAXED FEE MATCHING LOGIC ---
+                const fee = db.fees.find(f => {
+                    // Degree fuzzy match
+                    const degMatch = norm(f.degree) === norm(student.degree) || student.degree.toLowerCase().includes(f.degree.toLowerCase()) || f.degree.toLowerCase().includes(student.degree.toLowerCase());
+                    
+                    // Batch fuzzy match (e.g. "Fall 2023" inside "BAF Fall 2023")
+                    const batMatch = norm(f.batch) === norm(student.batch) || student.batch.toLowerCase().includes(f.batch.toLowerCase()) || f.batch.toLowerCase().includes(student.batch.toLowerCase());
+                    
+                    // Semester fuzzy match (e.g. "Spring 2024" contains "Spring" and "2024")
+                    const fSem = norm(f.semester);
+                    const fYear = norm(f.year);
+                    const semMatch = enSem.includes(fSem) && enSem.includes(fYear);
+                    
+                    return degMatch && batMatch && semMatch;
+                });
                 
                 // Match Discount
                 const disc = db.discounts.find(d => norm(d.reg_no) === cleanReg && norm(d.term) === enSem);
                 
-                // Match Payments
-                const pays = db.payments.filter(p => norm(p.reg_no) === cleanReg && norm(p.semester) === enSem);
+                // --- RELAXED PAYMENT MATCHING LOGIC ---
+                const pays = db.payments.filter(p => {
+                    const regMatch = norm(p.reg_no) === cleanReg;
+                    const pSem = norm(p.semester);
+                    // Check if payment semester is loosely equal to enrollment semester
+                    const semMatch = pSem === enSem || (enSem.includes(pSem) && pSem.length > 2) || (pSem.includes(enSem) && enSem.length > 2);
+                    return regMatch && semMatch;
+                });
                 
                 // --- FIXED CALCULATION LOGIC ---
                 // Tuition = (Enrollment Credits) * (Fee Structure Per Credit Rate)
@@ -902,8 +915,10 @@
                  db.students.push(data);
             }
             
+            // FORCE SAVE LOCAL FIRST
+            localStorage.setItem('fee_system_local', JSON.stringify(db));
+
             if(isOnline) await fetch(`${API_URL}?action=save_student`, {method:'POST', body:JSON.stringify(data)});
-            else localStorage.setItem('fee_system_local', JSON.stringify(db));
             
             hideAddForm();
             renderTable('students');
@@ -923,8 +938,10 @@
              if(idx > -1) db.enrollments[idx] = data;
              else db.enrollments.push(data);
              
+             // FORCE SAVE LOCAL FIRST
+             localStorage.setItem('fee_system_local', JSON.stringify(db));
+
              if(isOnline) await fetch(`${API_URL}?action=save_enrollment`, {method:'POST', body:JSON.stringify(data)});
-             else localStorage.setItem('fee_system_local', JSON.stringify(db));
 
              hideEnrollmentForm();
              renderTable('enrollments');
@@ -965,8 +982,10 @@
              if(idx > -1) db.payments[idx] = data;
              else db.payments.push(data);
              
+             // FORCE SAVE LOCAL FIRST
+             localStorage.setItem('fee_system_local', JSON.stringify(db));
+
              if(isOnline) await fetch(`${API_URL}?action=save_payment`, {method:'POST', body:JSON.stringify(data)});
-             else localStorage.setItem('fee_system_local', JSON.stringify(db));
 
              hidePaidForm();
              renderTable('payments');
@@ -999,12 +1018,14 @@
                  db.fees.push(data);
             }
             
+            // FORCE SAVE LOCAL FIRST
+            localStorage.setItem('fee_system_local', JSON.stringify(db));
+
             // Prepare API payload (set ID to -1 if new for server logic)
             const apiData = { ...data };
             if (!data.fee_edit_id || data.fee_edit_id === '-1') apiData.id = -1;
 
             if(isOnline) await fetch(`${API_URL}?action=save_fee`, {method:'POST', body:JSON.stringify(apiData)});
-            else localStorage.setItem('fee_system_local', JSON.stringify(db)); // Force Update
             
             // IMPORTANT: Called refreshUI LAST to ensure storage is synced and UI updates
             renderTable('fees');
@@ -1029,11 +1050,13 @@
             if(idx > -1) db.discounts[idx] = data;
             else db.discounts.push(data);
             
+            // FORCE SAVE LOCAL FIRST
+            localStorage.setItem('fee_system_local', JSON.stringify(db));
+
             const apiData = { ...data };
             if (!document.getElementById('md_id').value) apiData.id = -1;
 
             if(isOnline) await fetch(`${API_URL}?action=save_discount`, {method:'POST', body:JSON.stringify(apiData)});
-            else localStorage.setItem('fee_system_local', JSON.stringify(db));
 
             hideDiscountForm();
             renderTable('discounts');
@@ -1117,13 +1140,14 @@
             if(type === 'students') db[type] = db[type].filter(x => x.reg_no != id);
             else db[type] = db[type].filter(x => x.id != id);
             
+            // FORCE SAVE LOCAL FIRST
+            localStorage.setItem('fee_system_local', JSON.stringify(db));
+
             // Server Sync
             if(isOnline) {
                  const act = type === 'students' ? 'delete_student' : (type === 'fees' ? 'delete_fee' : (type === 'enrollments' ? 'delete_enrollment' : (type === 'payments' ? 'delete_payment' : 'delete_discount')));
                  const payload = type === 'students' ? {reg_no: id} : {id: id};
                  await fetch(`${API_URL}?action=${act}`, { method:'POST', body:JSON.stringify(payload) });
-            } else {
-                localStorage.setItem('fee_system_local', JSON.stringify(db));
             }
             renderTable(type);
             refreshUI();
@@ -1133,69 +1157,10 @@
              if(!confirm("Delete ALL records in this category?")) return;
              if(isOnline) await fetch(`${API_URL}?action=delete_all_${type}`, {method:'POST'});
              db[type] = [];
+             
+             // FORCE SAVE LOCAL FIRST
+             localStorage.setItem('fee_system_local', JSON.stringify(db));
+
              refreshUI();
              renderTable(type);
-             if(!isOnline) localStorage.setItem('fee_system_local', JSON.stringify(db));
         }
-
-        // --- UTILS ---
-        function num(n) { return parseFloat(n).toLocaleString('en-US'); }
-        function handleImport(e, type) {
-            const f = e.target.files[0];
-            const r = new FileReader();
-            r.onload = async (ev) => {
-                const wb = XLSX.read(new Uint8Array(ev.target.result), {type:'array'});
-                const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-                
-                // Map fields based on type
-                let mapped = [];
-                if(type === 'discounts') {
-                     mapped = json.map(r => ({
-                        reg_no: r['Reg'] || r['Reg No'] || r['Registration Number'],
-                        name: r['Name'] || r['Student Name'],
-                        term: r['Term'] || r['Session'],
-                        discount: r['Discount'] || r['%']
-                     })).filter(x => x.reg_no);
-                } else {
-                     mapped = json; // Default mapping
-                }
-
-                if(isOnline) {
-                     await fetch(`${API_URL}?action=import_${type}`, { method:'POST', body:JSON.stringify(mapped) });
-                     location.reload();
-                } else {
-                    db[type] = [...db[type], ...mapped]; // simple merge
-                    refreshUI();
-                }
-            };
-            r.readAsArrayBuffer(f);
-        }
-        function saveApiConfig() {
-            API_URL = document.getElementById('api_url_input').value.trim();
-            document.getElementById('config-modal').classList.add('hidden');
-            location.reload();
-        }
-        function testApiConnection() { /* ... */ }
-        function exportToExcel(type) {
-            const ws = XLSX.utils.json_to_sheet(db[type]);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, type);
-            XLSX.writeFile(wb, `${type}.xlsx`);
-        }
-        
-        // --- ADD MISSING SHOW/HIDE FUNCTIONS ---
-        function showAddForm() { document.getElementById('student-form-container').classList.remove('hidden'); }
-        function hideAddForm() { document.getElementById('student-form-container').classList.add('hidden'); }
-        function showEnrollmentForm() { document.getElementById('enrollment-form-container').classList.remove('hidden'); }
-        function hideEnrollmentForm() { document.getElementById('enrollment-form-container').classList.add('hidden'); }
-        function showPaidForm() { document.getElementById('paid-form-container').classList.remove('hidden'); }
-        function hidePaidForm() { document.getElementById('paid-form-container').classList.add('hidden'); }
-        function exportStudentsToExcel() { exportToExcel('students'); }
-        function deleteAllStudents() { deleteAll('students'); }
-        function deleteAllFeesData() { deleteAll('fees'); }
-        function deleteAllEnrollments() { deleteAll('enrollments'); }
-        function exportPaymentsToExcel() { exportToExcel('payments'); }
-        function deleteAllPayments() { deleteAll('payments'); }
-    </script>
-</body>
-</html>
