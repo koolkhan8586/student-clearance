@@ -278,7 +278,7 @@
                     balance: acc.balance + curr.balance
                 }), { total: 0, fa: 0, paid: 0, balance: 0 });
 
-                setClearanceResult({ student, rows: studentEnrollments, summary, masterFeeFound: !!masterFee });
+                setClearanceResult({ student, rows: studentEnrollments, summary, masterFeeFound: !!masterFee, masterFee });
             };
 
             // --- CRUD ACTIONS ---
@@ -422,6 +422,7 @@
                                                 <div className="flex justify-between border-b border-gray-200 py-1"><span className="font-bold text-gray-600">Student Name:</span><span className="text-gray-900">{clearanceResult.student.name}</span></div>
                                                 <div className="flex justify-between border-b border-gray-200 py-1"><span className="font-bold text-gray-600">Degree Program:</span><span className="text-gray-900">{clearanceResult.student.degree}</span></div>
                                                 <div className="flex justify-between border-b border-gray-200 py-1"><span className="font-bold text-gray-600">Batch / Session:</span><span className="text-gray-900">{clearanceResult.student.batch}</span></div>
+                                                <div className="flex justify-between border-b border-gray-200 py-1"><span className="font-bold text-gray-600">Rate (Per Cr. Hr):</span><span className="text-gray-900">{clearanceResult.masterFee ? num(clearanceResult.masterFee.per_cr_fee) : '-'}</span></div>
                                             </div>
                                             {!clearanceResult.masterFeeFound && (
                                                 <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4"><p className="text-sm text-yellow-700"><strong>Warning:</strong> No matching Fee Structure found for {clearanceResult.student.degree} {clearanceResult.student.batch}.</p></div>
