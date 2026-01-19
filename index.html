@@ -1164,3 +1164,65 @@
              refreshUI();
              renderTable(type);
         }
+
+        // --- UTILS ---
+        function num(n) { return parseFloat(n).toLocaleString('en-US'); }
+        function handleImport(e, type) {
+            const f = e.target.files[0];
+            const r = new FileReader();
+            r.onload = async (ev) => {
+                const wb = XLSX.read(new Uint8Array(ev.target.result), {type:'array'});
+                const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+                
+                // Map fields based on type
+                let mapped = [];
+                if(type === 'discounts') {
+                     mapped = json.map(r => ({
+                        reg_no: r['Reg'] || r['Reg No'] || r['Registration Number'],
+                        name: r['Name'] || r['Student Name'],
+                        term: r['Term'] || r['Session'],
+                        discount: r['Discount'] || r['%']
+                     })).filter(x => x.reg_no);
+                } else {
+                     mapped = json; // Default mapping
+                }
+
+                if(isOnline) {
+                     await fetch(`${API_URL}?action=import_${type}`, { method:'POST', body:JSON.stringify(mapped) });
+                     location.reload();
+                } else {
+                    db[type] = [...db[type], ...mapped]; // simple merge
+                    refreshUI();
+                }
+            };
+            r.readAsArrayBuffer(f);
+        }
+        function saveApiConfig() {
+            API_URL = document.getElementById('api_url_input').value.trim();
+            document.getElementById('config-modal').classList.add('hidden');
+            location.reload();
+        }
+        function testApiConnection() { /* ... */ }
+        function exportToExcel(type) {
+            const ws = XLSX.utils.json_to_sheet(db[type]);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, type);
+            XLSX.writeFile(wb, `${type}.xlsx`);
+        }
+        
+        // --- ADD MISSING SHOW/HIDE FUNCTIONS ---
+        function showAddForm() { document.getElementById('student-form-container').classList.remove('hidden'); }
+        function hideAddForm() { document.getElementById('student-form-container').classList.add('hidden'); }
+        function showEnrollmentForm() { document.getElementById('enrollment-form-container').classList.remove('hidden'); }
+        function hideEnrollmentForm() { document.getElementById('enrollment-form-container').classList.add('hidden'); }
+        function showPaidForm() { document.getElementById('paid-form-container').classList.remove('hidden'); }
+        function hidePaidForm() { document.getElementById('paid-form-container').classList.add('hidden'); }
+        function exportStudentsToExcel() { exportToExcel('students'); }
+        function deleteAllStudents() { deleteAll('students'); }
+        function deleteAllFeesData() { deleteAll('fees'); }
+        function deleteAllEnrollments() { deleteAll('enrollments'); }
+        function exportPaymentsToExcel() { exportToExcel('payments'); }
+        function deleteAllPayments() { deleteAll('payments'); }
+    </script>
+</body>
+</html>
