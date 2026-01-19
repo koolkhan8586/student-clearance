@@ -799,7 +799,9 @@
             myEnroll.forEach((en, idx) => {
                 const enSem = norm(en.semester);
                 
-                // --- RELAXED FEE MATCHING LOGIC ---
+                // --- UNIVERSAL FEE MATCHING LOGIC (Degree + Batch only) ---
+                // We now match ANY fee record that corresponds to the student's Degree and Batch
+                // This "Master Fee" is then applied to the current enrollment semester.
                 const fee = db.fees.find(f => {
                     // Degree fuzzy match
                     const degMatch = norm(f.degree) === norm(student.degree) || student.degree.toLowerCase().includes(f.degree.toLowerCase()) || f.degree.toLowerCase().includes(student.degree.toLowerCase());
@@ -807,23 +809,27 @@
                     // Batch fuzzy match (e.g. "Fall 2023" inside "BAF Fall 2023")
                     const batMatch = norm(f.batch) === norm(student.batch) || student.batch.toLowerCase().includes(f.batch.toLowerCase()) || f.batch.toLowerCase().includes(student.batch.toLowerCase());
                     
-                    // Semester fuzzy match (e.g. "Spring 2024" contains "Spring" and "2024")
-                    const fSem = norm(f.semester);
-                    const fYear = norm(f.year);
-                    const semMatch = enSem.includes(fSem) && enSem.includes(fYear);
-                    
-                    return degMatch && batMatch && semMatch;
+                    // Note: We deliberately ignore f.semester match here to apply the fee structure universally
+                    return degMatch && batMatch;
                 });
                 
                 // Match Discount
                 const disc = db.discounts.find(d => norm(d.reg_no) === cleanReg && norm(d.term) === enSem);
                 
                 // --- RELAXED PAYMENT MATCHING LOGIC ---
+                // Match payments if the payment semester string loosely matches the enrollment semester string
+                // Example: "Spring 2024", "spring24", "Spring-24" -> all match "Spring 2024"
                 const pays = db.payments.filter(p => {
                     const regMatch = norm(p.reg_no) === cleanReg;
                     const pSem = norm(p.semester);
-                    // Check if payment semester is loosely equal to enrollment semester
-                    const semMatch = pSem === enSem || (enSem.includes(pSem) && pSem.length > 2) || (pSem.includes(enSem) && enSem.length > 2);
+                    
+                    // Check for exact match or substring match (e.g., "spring2024" contains "spring")
+                    const semMatch = (pSem === enSem) || 
+                                     (enSem.includes(pSem) && pSem.length > 3) || 
+                                     (pSem.includes(enSem) && enSem.length > 3) ||
+                                     // Special check for common short forms like "spring24" vs "spring2024"
+                                     (pSem.replace('20', '') === enSem.replace('20', '')); 
+
                     return regMatch && semMatch;
                 });
                 
@@ -837,8 +843,6 @@
                 const regFee = fee ? parseFloat(fee.reg_fee||0) : 0;
                 const others = fee ? parseFloat(fee.other_fee||0) : 0;
                 
-                // If no Fee Record found, default total to 0 but show what we calculated (likely 0)
-                // This helps debug missing fees
                 const total = tuition + exam + regFee + others;
 
                 const paid = pays.reduce((a,b) => a + parseFloat(b.amount||0), 0);
@@ -854,7 +858,7 @@
                         <td class="text-center">${idx+1}</td>
                         <td class="font-bold px-1">${en.semester}</td>
                         <td class="text-center">${en.cr}</td>
-                        <td class="text-center">${en.courses || '-'}</td> <!-- Added Courses Column -->
+                        <td class="text-center">${en.courses || '-'}</td>
                         <td class="text-right px-1">${fee ? num(fee.reg_fee) : '-'}</td>
                         <td class="text-right px-1">${num(tuition)}</td>
                         <td class="text-right px-1">${fee ? num(fee.exam_fee) : '-'}</td>
@@ -1009,16 +1013,17 @@
             data.other_fee = parseFloat(data.other_fee) || 0;
             data.total_fee = data.tuition_fee + data.exam_fee + data.reg_fee + data.other_fee;
             
-            // Local update or insert
-            if(data.fee_edit_id && data.fee_edit_id != '-1') {
+            // Generate a unique ID if it's a new record
+            if (!data.fee_edit_id || data.fee_edit_id === '-1') {
+                data.id = Date.now(); 
+                db.fees.push(data);
+            } else {
+                // Update existing record
                 const idx = db.fees.findIndex(f => f.id == data.fee_edit_id);
                 if(idx > -1) db.fees[idx] = { ...db.fees[idx], ...data };
-            } else {
-                 data.id = Date.now(); // Ensure ID exists
-                 db.fees.push(data);
             }
             
-            // FORCE SAVE LOCAL FIRST
+            // FORCE SAVE LOCAL IMMEDIATELY
             localStorage.setItem('fee_system_local', JSON.stringify(db));
 
             // Prepare API payload (set ID to -1 if new for server logic)
@@ -1030,7 +1035,7 @@
             // IMPORTANT: Called refreshUI LAST to ensure storage is synced and UI updates
             renderTable('fees');
             refreshUI();
-            alert("Fee Record Saved!");
+            alert("Fee Record Saved Successfully!");
         }
 
         function showDiscountForm() { document.getElementById('modal-discount').classList.remove('hidden'); document.getElementById('discountForm').reset(); document.getElementById('md_id').value = ''; }
