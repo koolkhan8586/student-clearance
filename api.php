@@ -6,8 +6,8 @@ header("Content-Type: application/json");
 // --- DATABASE CONFIGURATION ---
 $host = 'localhost';
 $db   = 'fee_system';
-$user = 'root';
-$pass = ''; // <--- ENTER YOUR DATABASE PASSWORD HERE IF SET
+$user = 'koolkhan';
+$pass = 'Mangohair@197'; // <--- ENTER YOUR DATABASE PASSWORD HERE IF SET
 
 $dsn = "mysql:host=$host;dbname=$db;charset=utf8mb4";
 $options = [
