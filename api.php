@@ -85,9 +85,16 @@ if ($method === 'POST' && isset($input['action'])) {
                         VALUES (?, ?, ?, ?, ?, ?, ?) 
                         ON DUPLICATE KEY UPDATE degree=?, batch=?, per_cr_fee=?, per_course_fee=?, reg_fee=?, other_fee=?";
                 $dbId = (is_numeric($id) && $id > 0) ? $id : null;
+                
+                // Sanitize numeric fields to prevent SQL errors on empty strings
+                $per_cr_fee = empty($data['per_cr_fee']) ? 0 : $data['per_cr_fee'];
+                $per_course_fee = empty($data['per_course_fee']) ? 0 : $data['per_course_fee'];
+                $reg_fee = empty($data['reg_fee']) ? 0 : $data['reg_fee'];
+                $other_fee = empty($data['other_fee']) ? 0 : $data['other_fee'];
+
                 $stmt = $pdo->prepare($sql);
-                $stmt->execute([$dbId, $data['degree'], $data['batch'], $data['per_cr_fee'], $data['per_course_fee'], $data['reg_fee'], $data['other_fee'],
-                                $data['degree'], $data['batch'], $data['per_cr_fee'], $data['per_course_fee'], $data['reg_fee'], $data['other_fee']]);
+                $stmt->execute([$dbId, $data['degree'], $data['batch'], $per_cr_fee, $per_course_fee, $reg_fee, $other_fee,
+                                $data['degree'], $data['batch'], $per_cr_fee, $per_course_fee, $reg_fee, $other_fee]);
                 break;
             case 'delete_fee':
                 $stmt = $pdo->prepare("DELETE FROM fee_structure WHERE id = ?");
@@ -96,10 +103,15 @@ if ($method === 'POST' && isset($input['action'])) {
 
             case 'save_enrollment':
                 $dbId = (is_numeric($id) && $id > 0) ? $id : null;
+                
+                // Sanitize numeric fields
+                $cr = empty($data['cr']) ? 0 : $data['cr'];
+                $courses = empty($data['courses']) ? 0 : $data['courses'];
+
                 $stmt = $pdo->prepare("INSERT INTO enrollments (id, reg_no, name, semester, cr, courses) VALUES (?, ?, ?, ?, ?, ?)
                                        ON DUPLICATE KEY UPDATE reg_no=?, name=?, semester=?, cr=?, courses=?");
-                $stmt->execute([$dbId, $data['reg_no'], $data['name'], $data['semester'], $data['cr'], $data['courses'],
-                                $data['reg_no'], $data['name'], $data['semester'], $data['cr'], $data['courses']]);
+                $stmt->execute([$dbId, $data['reg_no'], $data['name'], $data['semester'], $cr, $courses,
+                                $data['reg_no'], $data['name'], $data['semester'], $cr, $courses]);
                 break;
             case 'delete_enrollment':
                 $stmt = $pdo->prepare("DELETE FROM enrollments WHERE id = ?");
@@ -109,13 +121,14 @@ if ($method === 'POST' && isset($input['action'])) {
             case 'save_payment':
                 $dbId = (is_numeric($id) && $id > 0) ? $id : null;
                 
-                // FIX: Apply Date Formatter
+                // FIX: Apply Date Formatter and Sanitize Amount
                 $formattedDate = formatDateForDB($data['date'] ?? '');
+                $amount = empty($data['amount']) ? 0 : $data['amount'];
 
                 $stmt = $pdo->prepare("INSERT INTO payments (id, reg_no, name, semester, amount, date) VALUES (?, ?, ?, ?, ?, ?)
                                        ON DUPLICATE KEY UPDATE reg_no=?, name=?, semester=?, amount=?, date=?");
-                $stmt->execute([$dbId, $data['reg_no'], $data['name'], $data['semester'], $data['amount'], $formattedDate,
-                                $data['reg_no'], $data['name'], $data['semester'], $data['amount'], $formattedDate]);
+                $stmt->execute([$dbId, $data['reg_no'], $data['name'], $data['semester'], $amount, $formattedDate,
+                                $data['reg_no'], $data['name'], $data['semester'], $amount, $formattedDate]);
                 break;
             case 'delete_payment':
                 $stmt = $pdo->prepare("DELETE FROM payments WHERE id = ?");
@@ -124,10 +137,14 @@ if ($method === 'POST' && isset($input['action'])) {
 
             case 'save_discount':
                 $dbId = (is_numeric($id) && $id > 0) ? $id : null;
+                
+                // Sanitize numeric fields
+                $discount = empty($data['discount']) ? 0 : $data['discount'];
+
                 $stmt = $pdo->prepare("INSERT INTO discounts (id, reg_no, name, term, discount) VALUES (?, ?, ?, ?, ?)
                                        ON DUPLICATE KEY UPDATE reg_no=?, name=?, term=?, discount=?");
-                $stmt->execute([$dbId, $data['reg_no'], $data['name'], $data['term'], $data['discount'],
-                                $data['reg_no'], $data['name'], $data['term'], $data['discount']]);
+                $stmt->execute([$dbId, $data['reg_no'], $data['name'], $data['term'], $discount,
+                                $data['reg_no'], $data['name'], $data['term'], $discount]);
                 break;
             case 'delete_discount':
                 $stmt = $pdo->prepare("DELETE FROM discounts WHERE id = ?");
@@ -136,10 +153,14 @@ if ($method === 'POST' && isset($input['action'])) {
 
             case 'save_other':
                 $dbId = (is_numeric($id) && $id > 0) ? $id : null;
+                
+                // Sanitize numeric fields
+                $amount = empty($data['amount']) ? 0 : $data['amount'];
+
                 $stmt = $pdo->prepare("INSERT INTO other_charges (id, reg_no, name, semester, fee_name, amount) VALUES (?, ?, ?, ?, ?, ?)
                                        ON DUPLICATE KEY UPDATE reg_no=?, name=?, semester=?, fee_name=?, amount=?");
-                $stmt->execute([$dbId, $data['reg_no'], $data['name'], $data['semester'], $data['fee_name'], $data['amount'],
-                                $data['reg_no'], $data['name'], $data['semester'], $data['fee_name'], $data['amount']]);
+                $stmt->execute([$dbId, $data['reg_no'], $data['name'], $data['semester'], $data['fee_name'], $amount,
+                                $data['reg_no'], $data['name'], $data['semester'], $data['fee_name'], $amount]);
                 break;
             case 'delete_other':
                 $stmt = $pdo->prepare("DELETE FROM other_charges WHERE id = ?");
