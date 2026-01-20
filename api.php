@@ -18,6 +18,24 @@ $options = [
 
 try {
     $pdo = new PDO($dsn, $user, $pass, $options);
+    
+    // --- AUTO-CREATE TABLES IF NOT EXIST ---
+    $pdo->exec("CREATE TABLE IF NOT EXISTS students (id INT AUTO_INCREMENT PRIMARY KEY, reg_no VARCHAR(50) UNIQUE, name VARCHAR(100), degree VARCHAR(50), batch VARCHAR(50))");
+    $pdo->exec("CREATE TABLE IF NOT EXISTS fee_structure (id INT AUTO_INCREMENT PRIMARY KEY, degree VARCHAR(50), batch VARCHAR(50), per_cr_fee DECIMAL(10,2) DEFAULT 0, per_course_fee DECIMAL(10,2) DEFAULT 0, reg_fee DECIMAL(10,2) DEFAULT 0, other_fee DECIMAL(10,2) DEFAULT 0, UNIQUE KEY unique_fee (degree, batch))");
+    $pdo->exec("CREATE TABLE IF NOT EXISTS enrollments (id INT AUTO_INCREMENT PRIMARY KEY, reg_no VARCHAR(50), name VARCHAR(100), semester VARCHAR(50), cr DECIMAL(10,2), courses INT)");
+    $pdo->exec("CREATE TABLE IF NOT EXISTS payments (id INT AUTO_INCREMENT PRIMARY KEY, reg_no VARCHAR(50), name VARCHAR(100), semester VARCHAR(50), amount DECIMAL(10,2), date DATE, bank VARCHAR(100))");
+    $pdo->exec("CREATE TABLE IF NOT EXISTS discounts (id INT AUTO_INCREMENT PRIMARY KEY, reg_no VARCHAR(50), name VARCHAR(100), term VARCHAR(50), discount DECIMAL(10,2))");
+    $pdo->exec("CREATE TABLE IF NOT EXISTS other_charges (id INT AUTO_INCREMENT PRIMARY KEY, reg_no VARCHAR(50), name VARCHAR(100), semester VARCHAR(50), fee_name VARCHAR(100), amount DECIMAL(10,2))");
+    $pdo->exec("CREATE TABLE IF NOT EXISTS users (id INT AUTO_INCREMENT PRIMARY KEY, username VARCHAR(50) UNIQUE, password VARCHAR(255), role VARCHAR(20), permissions TEXT)");
+    $pdo->exec("CREATE TABLE IF NOT EXISTS banks (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(100) UNIQUE, account_no VARCHAR(100))");
+
+    // Seed Admin if missing
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM users WHERE username = 'admin'");
+    $stmt->execute();
+    if ($stmt->fetchColumn() == 0) {
+        $pdo->exec("INSERT INTO users (username, password, role, permissions) VALUES ('admin', '123', 'admin', '[\"all\"]')");
+    }
+
 } catch (\PDOException $e) {
     echo json_encode(['status' => 'error', 'message' => 'DB Connection Failed: ' . $e->getMessage()]);
     exit;
@@ -25,10 +43,9 @@ try {
 
 // --- HELPER: Date Formatter ---
 function formatDateForDB($dateString) {
-    if (empty($dateString)) return date('Y-m-d'); // Default to today if empty
-    // Convert strings like '20-Nov-25' to '2025-11-20'
+    if (empty($dateString)) return date('Y-m-d');
     $timestamp = strtotime($dateString);
-    if ($timestamp === false) return date('Y-m-d'); // Fallback
+    if ($timestamp === false) return date('Y-m-d');
     return date('Y-m-d', $timestamp);
 }
 
@@ -47,7 +64,8 @@ if ($method === 'GET') {
             'payments'    => $pdo->query("SELECT * FROM payments")->fetchAll(),
             'discounts'   => $pdo->query("SELECT * FROM discounts")->fetchAll(),
             'others'      => $pdo->query("SELECT * FROM other_charges")->fetchAll(),
-            'users'       => $pdo->query("SELECT * FROM users")->fetchAll()
+            'users'       => $pdo->query("SELECT * FROM users")->fetchAll(),
+            'banks'       => $pdo->query("SELECT * FROM banks")->fetchAll()
         ];
         
         foreach ($data['users'] as &$u) {
@@ -69,27 +87,38 @@ if ($method === 'POST' && isset($input['action'])) {
 
     try {
         switch ($action) {
+            // --- STUDENTS ---
             case 'save_student':
+                // ENFORCE UPPERCASE REG NO
+                $reg_no = strtoupper($data['reg_no']);
+                
+                // Auto-Detect Degree if empty
+                $degree = $data['degree'];
+                if (empty($degree)) {
+                    if (preg_match('/^([A-Z0-9]+)05/', $reg_no, $matches)) {
+                        $degree = $matches[1];
+                    }
+                }
+
                 $stmt = $pdo->prepare("INSERT INTO students (reg_no, name, degree, batch) VALUES (?, ?, ?, ?) 
                                        ON DUPLICATE KEY UPDATE name=?, degree=?, batch=?");
-                $stmt->execute([$data['reg_no'], $data['name'], $data['degree'], $data['batch'], 
-                                $data['name'], $data['degree'], $data['batch']]);
+                $stmt->execute([$reg_no, $data['name'], $degree, $data['batch'], 
+                                $data['name'], $degree, $data['batch']]);
                 break;
             
-            // FIX: Changed WHERE clause to use 'id' instead of 'reg_no'
             case 'delete_student':
             case 'delete_students':
                 $stmt = $pdo->prepare("DELETE FROM students WHERE id = ?");
                 $stmt->execute([$id]);
                 break;
 
+            // --- FEE STRUCTURE ---
             case 'save_fee':
                 $sql = "INSERT INTO fee_structure (id, degree, batch, per_cr_fee, per_course_fee, reg_fee, other_fee) 
                         VALUES (?, ?, ?, ?, ?, ?, ?) 
                         ON DUPLICATE KEY UPDATE degree=?, batch=?, per_cr_fee=?, per_course_fee=?, reg_fee=?, other_fee=?";
                 $dbId = (is_numeric($id) && $id > 0) ? $id : null;
                 
-                // Sanitize numeric fields to prevent SQL errors on empty strings
                 $per_cr_fee = empty($data['per_cr_fee']) ? 0 : $data['per_cr_fee'];
                 $per_course_fee = empty($data['per_course_fee']) ? 0 : $data['per_course_fee'];
                 $reg_fee = empty($data['reg_fee']) ? 0 : $data['reg_fee'];
@@ -106,17 +135,17 @@ if ($method === 'POST' && isset($input['action'])) {
                 $stmt->execute([$id]);
                 break;
 
+            // --- ENROLLMENTS ---
             case 'save_enrollment':
                 $dbId = (is_numeric($id) && $id > 0) ? $id : null;
-                
-                // Sanitize numeric fields
                 $cr = empty($data['cr']) ? 0 : $data['cr'];
                 $courses = empty($data['courses']) ? 0 : $data['courses'];
+                $reg_no = strtoupper($data['reg_no']);
 
                 $stmt = $pdo->prepare("INSERT INTO enrollments (id, reg_no, name, semester, cr, courses) VALUES (?, ?, ?, ?, ?, ?)
                                        ON DUPLICATE KEY UPDATE reg_no=?, name=?, semester=?, cr=?, courses=?");
-                $stmt->execute([$dbId, $data['reg_no'], $data['name'], $data['semester'], $cr, $courses,
-                                $data['reg_no'], $data['name'], $data['semester'], $cr, $courses]);
+                $stmt->execute([$dbId, $reg_no, $data['name'], $data['semester'], $cr, $courses,
+                                $reg_no, $data['name'], $data['semester'], $cr, $courses]);
                 break;
             
             case 'delete_enrollment':
@@ -125,17 +154,18 @@ if ($method === 'POST' && isset($input['action'])) {
                 $stmt->execute([$id]);
                 break;
 
+            // --- PAYMENTS ---
             case 'save_payment':
                 $dbId = (is_numeric($id) && $id > 0) ? $id : null;
-                
-                // FIX: Apply Date Formatter and Sanitize Amount
                 $formattedDate = formatDateForDB($data['date'] ?? '');
                 $amount = empty($data['amount']) ? 0 : $data['amount'];
+                $reg_no = strtoupper($data['reg_no']);
+                $bank = $data['bank'] ?? '';
 
-                $stmt = $pdo->prepare("INSERT INTO payments (id, reg_no, name, semester, amount, date) VALUES (?, ?, ?, ?, ?, ?)
-                                       ON DUPLICATE KEY UPDATE reg_no=?, name=?, semester=?, amount=?, date=?");
-                $stmt->execute([$dbId, $data['reg_no'], $data['name'], $data['semester'], $amount, $formattedDate,
-                                $data['reg_no'], $data['name'], $data['semester'], $amount, $formattedDate]);
+                $stmt = $pdo->prepare("INSERT INTO payments (id, reg_no, name, semester, amount, date, bank) VALUES (?, ?, ?, ?, ?, ?, ?)
+                                       ON DUPLICATE KEY UPDATE reg_no=?, name=?, semester=?, amount=?, date=?, bank=?");
+                $stmt->execute([$dbId, $reg_no, $data['name'], $data['semester'], $amount, $formattedDate, $bank,
+                                $reg_no, $data['name'], $data['semester'], $amount, $formattedDate, $bank]);
                 break;
             
             case 'delete_payment':
@@ -144,17 +174,17 @@ if ($method === 'POST' && isset($input['action'])) {
                 $stmt->execute([$id]);
                 break;
 
+            // --- DISCOUNTS ---
             case 'save_discount':
                 $dbId = (is_numeric($id) && $id > 0) ? $id : null;
-                
-                // FIX: Sanitize numeric fields by removing % sign
                 $rawDiscount = $data['discount'] ?? 0;
                 $discount = floatval(str_replace('%', '', $rawDiscount));
+                $reg_no = strtoupper($data['reg_no']);
 
                 $stmt = $pdo->prepare("INSERT INTO discounts (id, reg_no, name, term, discount) VALUES (?, ?, ?, ?, ?)
                                        ON DUPLICATE KEY UPDATE reg_no=?, name=?, term=?, discount=?");
-                $stmt->execute([$dbId, $data['reg_no'], $data['name'], $data['term'], $discount,
-                                $data['reg_no'], $data['name'], $data['term'], $discount]);
+                $stmt->execute([$dbId, $reg_no, $data['name'], $data['term'], $discount,
+                                $reg_no, $data['name'], $data['term'], $discount]);
                 break;
             
             case 'delete_discount':
@@ -163,16 +193,16 @@ if ($method === 'POST' && isset($input['action'])) {
                 $stmt->execute([$id]);
                 break;
 
+            // --- OTHER CHARGES ---
             case 'save_other':
                 $dbId = (is_numeric($id) && $id > 0) ? $id : null;
-                
-                // Sanitize numeric fields
                 $amount = empty($data['amount']) ? 0 : $data['amount'];
+                $reg_no = strtoupper($data['reg_no']);
 
                 $stmt = $pdo->prepare("INSERT INTO other_charges (id, reg_no, name, semester, fee_name, amount) VALUES (?, ?, ?, ?, ?, ?)
                                        ON DUPLICATE KEY UPDATE reg_no=?, name=?, semester=?, fee_name=?, amount=?");
-                $stmt->execute([$dbId, $data['reg_no'], $data['name'], $data['semester'], $data['fee_name'], $amount,
-                                $data['reg_no'], $data['name'], $data['semester'], $data['fee_name'], $amount]);
+                $stmt->execute([$dbId, $reg_no, $data['name'], $data['semester'], $data['fee_name'], $amount,
+                                $reg_no, $data['name'], $data['semester'], $data['fee_name'], $amount]);
                 break;
             
             case 'delete_other':
@@ -181,6 +211,21 @@ if ($method === 'POST' && isset($input['action'])) {
                 $stmt->execute([$id]);
                 break;
 
+            // --- BANKS ---
+            case 'save_bank':
+                $dbId = (is_numeric($id) && $id > 0) ? $id : null;
+                $stmt = $pdo->prepare("INSERT INTO banks (id, name, account_no) VALUES (?, ?, ?)
+                                       ON DUPLICATE KEY UPDATE name=?, account_no=?");
+                $stmt->execute([$dbId, $data['name'], $data['account_no'], $data['name'], $data['account_no']]);
+                break;
+
+            case 'delete_bank':
+            case 'delete_banks':
+                 $stmt = $pdo->prepare("DELETE FROM banks WHERE id = ?");
+                 $stmt->execute([$id]);
+                 break;
+
+            // --- USERS ---
             case 'save_user':
                 $dbId = (is_numeric($id) && $id > 0) ? $id : null;
                 $perms = json_encode($data['permissions'] ?? []);
@@ -196,9 +241,10 @@ if ($method === 'POST' && isset($input['action'])) {
                 $stmt->execute([$id]);
                 break;
 
+            // --- BULK OPERATIONS ---
             case 'delete_all':
                 $table = $input['table']; 
-                $allowed = ['students', 'fee_structure', 'enrollments', 'payments', 'discounts', 'other_charges', 'users'];
+                $allowed = ['students', 'fee_structure', 'enrollments', 'payments', 'discounts', 'other_charges', 'users', 'banks'];
                 $map = ['fees' => 'fee_structure', 'others' => 'other_charges'];
                 if(isset($map[$table])) $table = $map[$table];
                 
