@@ -301,13 +301,18 @@
                     
                     if (masterFee) {
                         feeDetails.tuition = cr * parseFloat(masterFee.per_cr_fee || 0);
-                        feeDetails.exam = courses * parseFloat(masterFee.per_course_fee || 0); 
+                        // Exam Fee now includes the 'other' amount from fee structure as per request
+                        feeDetails.exam = (courses * parseFloat(masterFee.per_course_fee || 0)) + parseFloat(masterFee.other_fee || 0); 
                         feeDetails.reg = parseFloat(masterFee.reg_fee || 0);
-                        feeDetails.other = parseFloat(masterFee.other_fee || 0);
+                        // The 'other' slot is now reserved for ad-hoc charges only
+                        feeDetails.other = 0;
                     }
                     const otherCharges = data.others.filter(o => norm(o.reg_no) === cleanReg && (norm(o.semester) === enSem || enSem.includes(norm(o.semester))));
                     const extraCharges = otherCharges.reduce((sum, o) => sum + parseFloat(o.amount || 0), 0);
+                    
+                    // Add extra charges to the 'other' column
                     feeDetails.other += extraCharges;
+                    
                     feeDetails.total = feeDetails.tuition + feeDetails.exam + feeDetails.reg + feeDetails.other;
 
                     const discRecord = data.discounts.find(d => norm(d.reg_no) === cleanReg && norm(d.term) === enSem);
