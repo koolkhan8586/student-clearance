@@ -40,13 +40,13 @@
                 padding: 10px;
                 background: white;
                 /* Scale to fit A4 */
-                transform: scale(0.90); /* Slightly reduced scale to fit columns */
+                transform: scale(0.90); 
                 transform-origin: top left;
             }
              /* Ensure table fits */
             #printableArea table {
                 width: 100%;
-                font-size: 10px; /* Reduced font size for print */
+                font-size: 10px;
                 border-collapse: collapse;
             }
             #printableArea th, #printableArea td {
@@ -58,7 +58,6 @@
                 size: A4;
                 margin: 0;
             }
-            /* Hide non-essential UI elements in print mode just in case */
             .no-print { display: none !important; }
         }
     </style>
@@ -68,16 +67,14 @@
 
     <script type="text/babel">
         const { useState, useEffect } = React;
-        const API_URL = 'api.php'; // Pointing to local PHP API
+        const API_URL = 'api.php'; 
 
-        // --- ICONS (Lucide style SVGs) ---
+        // --- ICONS ---
         const Icon = ({ d, ...props }) => (
             <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d={d} />
             </svg>
         );
-        
-        // Simplified icon definitions mapping to paths or groups
         const Search = (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>;
         const Plus = (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
         const Trash2 = (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>;
@@ -101,7 +98,6 @@
         const CloudUpload = (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19a4 4 0 0 0 4 4h11a4 4 0 0 0 4-4v-2.5"/><line x1="16" y1="16" x2="16" y2="8"/><line x1="12" y1="12" x2="16" y2="8"/><line x1="20" y1="12" x2="16" y2="8"/></svg>;
 
         function App() {
-            // --- STATE MANAGEMENT ---
             const [user, setUser] = useState(null);
             const [activeTab, setActiveTab] = useState('clearance');
             const [data, setData] = useState({
@@ -119,30 +115,38 @@
             const [showPasswordModal, setShowPasswordModal] = useState(false);
             const [passwordData, setPasswordData] = useState({ current: '', new: '', confirm: '' });
 
-            // --- FETCH DATA FROM SERVER ---
+            const TABS = [
+                { id: 'clearance', label: 'Clearance', icon: FileText },
+                { id: 'students', label: 'Students', icon: Users },
+                { id: 'fees', label: 'Fee Structure', icon: DollarSign },
+                { id: 'others', label: 'Other Charges', icon: AlertCircle },
+                { id: 'enrollments', label: 'Enrollments', icon: BookOpen },
+                { id: 'payments', label: 'Payments', icon: CreditCard },
+                { id: 'discounts', label: 'Discounts', icon: Percent }
+            ];
+
+            const availableTabs = user ? (
+                user.role === 'admin' 
+                ? [...TABS, { id: 'users', label: 'Users & Access', icon: Shield }] 
+                : TABS.filter(t => user.permissions.includes(t.id))
+            ) : [];
+
             const refreshData = async () => {
                 try {
                     const res = await fetch(API_URL);
                     const json = await res.json();
                     if(json.students) setData(json);
-                } catch(e) {
-                    console.error("Connection Error:", e);
-                }
+                } catch(e) { console.error("Connection Error:", e); }
             };
 
             useEffect(() => {
                 refreshData();
                 const storedUser = sessionStorage.getItem('feeUser');
                 if(storedUser) setUser(JSON.parse(storedUser));
-                
-                // Load local data just in case API is empty/failed but local has data
                 const local = localStorage.getItem('feeSystemData_v2');
                 if(local) {
                     const parsed = JSON.parse(local);
-                    // Only use local if it has data and state is empty-ish
-                    if(parsed.students && parsed.students.length > 0 && data.students.length === 0) {
-                        setData(parsed);
-                    }
+                    if(parsed.students && parsed.students.length > 0 && data.students.length === 0) setData(parsed);
                 }
             }, []);
 
@@ -151,11 +155,9 @@
                 setTabSearch('');
             }, [activeTab]);
 
-            // --- HELPERS ---
             const norm = (str) => str ? str.toString().toLowerCase().replace(/[^a-z0-9]/g, '') : '';
             const num = (n) => parseFloat(n || 0).toLocaleString('en-US');
 
-            // --- API ACTIONS ---
             const postToApi = async (action, payload = {}) => {
                 try {
                     const res = await fetch(API_URL, {
@@ -164,31 +166,18 @@
                         body: JSON.stringify({ action, ...payload })
                     });
                     const json = await res.json();
-                    if(json.status === 'success') {
-                        refreshData();
-                        return true;
-                    } else {
-                        alert("Error: " + json.message);
-                        return false;
-                    }
-                } catch(e) {
-                    alert("Network Error: Could not connect to API.");
-                    return false;
-                }
+                    if(json.status === 'success') { refreshData(); return true; } 
+                    else { alert("Error: " + json.message); return false; }
+                } catch(e) { alert("Network Error"); return false; }
             };
 
             const syncBrowserDataToDb = async () => {
-                if(!confirm("This will upload all data from your browser storage to the central database. Continue?")) return;
-                
-                // Get data from localStorage
+                if(!confirm("Sync browser data to database?")) return;
                 const local = localStorage.getItem('feeSystemData_v2') || localStorage.getItem('fee_system_local');
-                if(!local) return alert("No local data found to sync.");
-                
+                if(!local) return alert("No local data found.");
                 const localData = JSON.parse(local);
                 const categories = ['students', 'fees', 'enrollments', 'payments', 'discounts', 'others'];
                 let count = 0;
-
-                // Simple sequential upload (could be optimized with bulk API)
                 for (const cat of categories) {
                      const items = localData[cat] || [];
                      for (const item of items) {
@@ -198,11 +187,10 @@
                          count++;
                      }
                 }
-                alert(`Sync Complete! Uploaded/Checked ${count} records.`);
+                alert(`Sync Complete! Uploaded ${count} records.`);
                 refreshData();
             };
 
-            // --- AUTH LOGIC ---
             const handleLogin = (e) => {
                 e.preventDefault();
                 const found = data.users.find(u => u.username === loginData.username && u.password === loginData.password);
@@ -212,9 +200,7 @@
                     setLoginData({ username: '', password: '' });
                     if(found.role === 'admin' || found.permissions.includes('clearance')) setActiveTab('clearance');
                     else if(found.permissions.length > 0) setActiveTab(found.permissions[0]);
-                } else {
-                    alert("Invalid Credentials");
-                }
+                } else { alert("Invalid Credentials"); }
             };
 
             const handleLogout = () => {
@@ -228,26 +214,22 @@
                 e.preventDefault();
                 if (passwordData.current !== user.password) return alert("Incorrect current password!");
                 if (passwordData.new !== passwordData.confirm) return alert("New passwords do not match!");
-                
                 const success = await postToApi('save_user', { data: { ...user, password: passwordData.new }, id: user.id });
                 if(success) {
                     alert("Password changed successfully!");
                     setShowPasswordModal(false);
                     setPasswordData({ current: '', new: '', confirm: '' });
-                    // Update local user object
                     const updatedUser = { ...user, password: passwordData.new };
                     setUser(updatedUser);
                     sessionStorage.setItem('feeUser', JSON.stringify(updatedUser));
                 }
             };
 
-            // --- CORE LOGIC ---
             const generateReport = () => {
                 if (!searchReg) return;
                 const cleanReg = norm(searchReg);
                 const student = data.students.find(s => norm(s.reg_no) === cleanReg);
                 if (!student) { alert("Student not found!"); setClearanceResult(null); return; }
-                
                 const masterFee = data.fees.find(f => norm(f.degree) === norm(student.degree) && norm(f.batch) === norm(student.batch));
                 
                 const studentEnrollments = data.enrollments.filter(e => norm(e.reg_no) === cleanReg).map(en => {
@@ -298,22 +280,18 @@
             const handleSave = async (e) => {
                 e.preventDefault();
                 const newData = { ...formData };
-                // Calculate Fee Totals
                 if (modalType === 'fees') {
                     const cr = parseFloat(newData.cr || 0); const rate = parseFloat(newData.per_cr_fee || 0);
                     const courses = parseFloat(newData.total_courses || 0); const examRate = parseFloat(newData.per_course_fee || 0);
                     newData.tuition_fee = cr * rate; newData.exam_fee = courses * examRate;
                     newData.total_fee = newData.tuition_fee + newData.exam_fee + parseFloat(newData.reg_fee||0) + parseFloat(newData.other_fee||0);
                 }
-                // Auto-fetch name
                 if ((modalType === 'payments' || modalType === 'others') && !newData.name) {
                     const s = data.students.find(st => norm(st.reg_no) === norm(newData.reg_no));
                     if(s) newData.name = s.name;
                 }
-                
                 let actionType = modalType.slice(0, -1);
                 if(modalType === 'others') actionType = 'other';
-                
                 const success = await postToApi(`save_${actionType}`, { data: newData, id: editingId });
                 if(success) { setShowModal(false); setFormData({}); setEditingId(null); }
             };
@@ -325,9 +303,8 @@
                 setShowModal(true);
             };
 
-            // --- FILTER & BULK ---
             const getFilteredData = () => {
-                if (!tabSearch) return data[activeTab];
+                if (!tabSearch) return data[activeTab] || [];
                 return data[activeTab].filter(item => Object.values(item).some(val => String(val).toLowerCase().includes(tabSearch.toLowerCase())));
             };
             const handleSelectAll = (e) => {
@@ -342,7 +319,7 @@
             const deleteSelected = async () => {
                 if (!confirm(`Delete ${selectedIds.size} records?`)) return;
                 for (let id of selectedIds) {
-                    let type = activeTab; // e.g. students
+                    let type = activeTab;
                     if(type === 'others') type = 'other'; 
                     await postToApi(`delete_${type.slice(0,-1)}`, { id });
                 }
@@ -437,7 +414,6 @@
                             if (val && val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1);
                             obj[h] = val;
                         });
-                        // Import one by one to DB
                         await postToApi(`save_${actionType}`, { data: obj });
                     }
                     alert(`Imported ${rows.length - 1} records!`);
@@ -446,8 +422,6 @@
                 reader.readAsText(file);
             };
             
-            const TABS = [{ id: 'clearance', label: 'Clearance', icon: FileText }, { id: 'students', label: 'Students', icon: Users }, { id: 'fees', label: 'Fee Structure', icon: DollarSign }, { id: 'others', label: 'Other Charges', icon: AlertCircle }, { id: 'enrollments', label: 'Enrollments', icon: BookOpen }, { id: 'payments', label: 'Payments', icon: CreditCard }, { id: 'discounts', label: 'Discounts', icon: Percent }];
-            const availableTabs = user ? (user.role === 'admin' ? [...TABS, { id: 'users', label: 'Users & Access', icon: Shield }] : TABS.filter(t => user.permissions.includes(t.id))) : [];
             const filteredData = getFilteredData();
 
             // --- VIEW ---
@@ -500,6 +474,7 @@
                     </div>
 
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                        {/* CLEARANCE REPORT UI */}
                         {activeTab === 'clearance' && (
                             <div className="space-y-6">
                                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 no-print">
@@ -551,8 +526,8 @@
                                 )}
                             </div>
                         )}
-                        
-                        {/* GENERIC DATA TABLE UI */}
+
+                        {/* OTHER TABS UI */}
                         {activeTab !== 'clearance' && (
                             <div>
                                 <div className="flex flex-col gap-4 mb-6 no-print">
@@ -593,7 +568,7 @@
                                                         </td>
                                                     </tr>
                                                 ))}
-                                                {filteredData.length === 0 && <tr><td colSpan="10" className="p-8 text-center text-gray-400">No records found on this device. Data is saved locally in browser. Use Export/Import to move data.</td></tr>}
+                                                {filteredData.length === 0 && <tr><td colSpan="10" className="p-8 text-center text-gray-400">No records found.</td></tr>}
                                             </tbody>
                                         </table>
                                     </div>
@@ -612,8 +587,34 @@
                                     {modalType === 'payments' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={e => setFormData({...formData, reg_no: e.target.value})} /><input required placeholder="Semester (e.g. Spring 2024)" className="w-full border p-2 rounded" value={formData.semester || ''} onChange={e => setFormData({...formData, semester: e.target.value})} /><input required type="number" placeholder="Amount Paid" className="w-full border p-2 rounded font-bold text-lg" value={formData.amount || ''} onChange={e => setFormData({...formData, amount: e.target.value})} /><input type="date" className="w-full border p-2 rounded" value={formData.date || ''} onChange={e => setFormData({...formData, date: e.target.value})} /></>}
                                     {modalType === 'others' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={e => setFormData({...formData, reg_no: e.target.value})} /><div className="grid grid-cols-2 gap-4"><input required placeholder="Semester" className="w-full border p-2 rounded" value={formData.semester || ''} onChange={e => setFormData({...formData, semester: e.target.value})} /><input required placeholder="Fee Name (e.g. Late Fine)" className="w-full border p-2 rounded" value={formData.fee_name || ''} onChange={e => setFormData({...formData, fee_name: e.target.value})} /></div><input required type="number" placeholder="Amount" className="w-full border p-2 rounded font-bold text-lg" value={formData.amount || ''} onChange={e => setFormData({...formData, amount: e.target.value})} /></>}
                                     {modalType === 'discounts' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={e => setFormData({...formData, reg_no: e.target.value})} /><input required placeholder="Term" className="w-full border p-2 rounded" value={formData.term || ''} onChange={e => setFormData({...formData, term: e.target.value})} /><input required type="number" placeholder="Discount %" className="w-full border p-2 rounded" value={formData.discount || ''} onChange={e => setFormData({...formData, discount: e.target.value})} /></>}
-                                    {modalType === 'users' && <div className="space-y-4"><input required placeholder="Username" className="w-full border p-2 rounded" value={formData.username || ''} onChange={e => setFormData({...formData, username: e.target.value})} /><input required type="password" placeholder="Password" className="w-full border p-2 rounded" value={formData.password || ''} onChange={e => setFormData({...formData, password: e.target.value})} /><select className="w-full border p-2 rounded bg-white" value={formData.role || 'user'} onChange={e => setFormData({...formData, role: e.target.value})}><option value="user">Regular User</option><option value="admin">Administrator</option></select></div>}
-                                    <div className="flex justify-end gap-3 mt-6"><button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 bg-gray-100 rounded hover:bg-gray-200 font-bold">Cancel</button><button type="submit" className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-bold">Save Record</button></div>
+                                    {modalType === 'users' && (
+                                        <div className="space-y-4">
+                                            <input required placeholder="Username" className="w-full border p-2 rounded" value={formData.username || ''} onChange={e => setFormData({...formData, username: e.target.value})} />
+                                            <input required type="password" placeholder="Password" className="w-full border p-2 rounded" value={formData.password || ''} onChange={e => setFormData({...formData, password: e.target.value})} />
+                                            <select className="w-full border p-2 rounded bg-white" value={formData.role || 'user'} onChange={e => setFormData({...formData, role: e.target.value})}>
+                                                <option value="user">Regular User</option>
+                                                <option value="admin">Administrator</option>
+                                            </select>
+                                            {formData.role !== 'admin' && (
+                                                <div className="bg-gray-50 p-3 rounded border">
+                                                    <label className="block text-xs font-bold text-gray-500 mb-2 uppercase">Tab Access Permissions</label>
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        {TABS.map(t => (
+                                                            <label key={t.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                                                                <input type="checkbox" checked={(formData.permissions || []).includes(t.id)} onChange={() => togglePermission(t.id)} />
+                                                                {t.label}
+                                                            </label>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    <div className="flex justify-end gap-3 mt-6">
+                                        <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 bg-gray-100 rounded hover:bg-gray-200 font-bold">Cancel</button>
+                                        <button type="submit" className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-bold">Save Record</button>
+                                    </div>
                                 </form>
                             </div>
                         </div>
