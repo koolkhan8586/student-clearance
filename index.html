@@ -39,8 +39,8 @@
                 margin: 0;
                 padding: 10px;
                 background: white;
-                /* Scale to fit A4 */
-                transform: scale(0.90); /* Slightly reduced scale to fit columns */
+                /* Scale to fit A4 perfectly including Balance column */
+                transform: scale(0.85); 
                 transform-origin: top left;
             }
              /* Ensure table fits */
@@ -162,9 +162,6 @@
                         banks: Array.isArray(json.banks) ? json.banks : []
                     };
                     
-                    // Fallback to local storage if API fails completely (offline support)
-                    // REMOVED FOR NOW TO PREVENT CONFLICTS AS REQUESTED
-                    
                     setData(safeData);
 
                 } catch(e) { 
@@ -191,6 +188,32 @@
 
             const norm = (str) => str ? str.toString().toLowerCase().replace(/[^a-z0-9]/g, '') : '';
             const num = (n) => parseFloat(n || 0).toLocaleString('en-US');
+
+            // --- FILTERING & SORTING LOGIC ---
+            // Calculate filtered data ONCE per render to avoid reference mismatch
+            const getFilteredData = () => {
+                let result = (data[activeTab] || []); 
+                if (tabSearch) {
+                    result = result.filter(item => Object.values(item).some(val => String(val || '').toLowerCase().includes(tabSearch.toLowerCase())));
+                }
+                if (sortConfig.key) {
+                    result = [...result].sort((a, b) => {
+                        let valA = a[sortConfig.key]?.toString().toLowerCase() || '';
+                        let valB = b[sortConfig.key]?.toString().toLowerCase() || '';
+                        const numA = parseFloat(valA); const numB = parseFloat(valB);
+                        if (!isNaN(numA) && !isNaN(numB) && isFinite(valA) && isFinite(valB)) {
+                             return sortConfig.direction === 'asc' ? numA - numB : numB - numA;
+                        }
+                        if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+                        if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+                        return 0;
+                    });
+                }
+                return result;
+            };
+
+            // Capture the result of the filter in a constant for this render cycle
+            const filteredData = getFilteredData();
 
             const postToApi = async (action, payload = {}) => {
                 try {
@@ -270,28 +293,6 @@
                 setSortConfig({ key, direction });
             };
 
-            // --- PROCESSING ---
-            const getProcessedData = () => {
-                // Safeguard against undefined activeTab
-                let result = (data[activeTab] || []); 
-                if (tabSearch) {
-                    result = result.filter(item => Object.values(item).some(val => String(val || '').toLowerCase().includes(tabSearch.toLowerCase())));
-                }
-                if (sortConfig.key) {
-                    result = [...result].sort((a, b) => {
-                        let valA = a[sortConfig.key]?.toString().toLowerCase() || '';
-                        let valB = b[sortConfig.key]?.toString().toLowerCase() || '';
-                        const numA = parseFloat(valA); const numB = parseFloat(valB);
-                        if (!isNaN(numA) && !isNaN(numB) && isFinite(valA) && isFinite(valB)) {
-                             return sortConfig.direction === 'asc' ? numA - numB : numB - numA;
-                        }
-                        if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
-                        if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
-                        return 0;
-                    });
-                }
-                return result;
-            };
 
             // --- CORE LOGIC ---
             const generateReport = () => {
@@ -444,7 +445,7 @@
 
             // --- FILTER & BULK ---
             const handleSelectAll = (e) => {
-                if (e.target.checked) setSelectedIds(new Set(processedData.map(i => i.id || i.reg_no)));
+                if (e.target.checked) setSelectedIds(new Set(filteredData.map(i => i.id || i.reg_no)));
                 else setSelectedIds(new Set());
             };
             const handleSelectRow = (id) => {
@@ -529,8 +530,6 @@
                 link.click();
                 document.body.removeChild(link);
             };
-            
-            const processedData = getProcessedData();
 
             // --- VIEW ---
             if (!user) {
@@ -609,6 +608,9 @@
                                                 <div className="flex justify-between border-b border-gray-200 py-1"><span className="font-bold text-gray-600">Batch / Session:</span><span className="text-gray-900">{clearanceResult.student.batch}</span></div>
                                                 <div className="flex justify-between border-b border-gray-200 py-1"><span className="font-bold text-gray-600">Rate (Per Cr. Hr):</span><span className="text-gray-900">{clearanceResult.masterFee ? num(clearanceResult.masterFee.per_cr_fee) : '-'}</span></div>
                                             </div>
+                                            {!clearanceResult.masterFeeFound && (
+                                                <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4"><p className="text-sm text-yellow-700"><strong>Warning:</strong> No matching Fee Structure found for {clearanceResult.student.degree} {clearanceResult.student.batch}.</p></div>
+                                            )}
                                             <div className="overflow-x-auto">
                                                 <table className="w-full text-xs">
                                                     <thead className="bg-gray-100 text-gray-900 font-bold uppercase">
