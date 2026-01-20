@@ -35,33 +35,30 @@
                 left: 0;
                 top: 0;
                 width: 100%;
-                height: 100%;
                 margin: 0;
-                padding: 15px;
+                padding: 0; /* Remove padding to maximize space */
                 background: white;
-                /* Scale to fit A4 */
-                transform: scale(0.95); /* Slightly larger scale, better fit */
-                transform-origin: top left;
             }
-             /* Ensure table fits */
+            
+            /* Specific print styling for the table */
             #printableArea table {
                 width: 100%;
-                font-size: 11px; /* Slightly larger font */
+                font-size: 10px; /* reduced font size for print */
                 border-collapse: collapse;
-                table-layout: fixed;
             }
             #printableArea th, #printableArea td {
-                padding: 6px; /* Increased padding */
+                padding: 4px; /* compact padding */
                 border: 1px solid #9ca3af;
                 word-wrap: break-word;
             }
-            
+
+            /* Hide elements that shouldn't print but might be caught by general rules */
+            .no-print { display: none !important; }
+
             @page {
                 size: A4 portrait;
-                margin: 5mm;
+                margin: 10mm; /* Standard margin */
             }
-            /* Hide non-essential UI elements in print mode just in case */
-            .no-print { display: none !important; }
         }
     </style>
 </head>
@@ -79,7 +76,7 @@
             </svg>
         );
         
-        // Simplified icon definitions
+        // Simplified icon definitions mapping to paths or groups
         const Search = (p) => <Icon {...p}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></Icon>;
         const Plus = (p) => <Icon {...p}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></Icon>;
         const Trash2 = (p) => <Icon {...p}><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></Icon>;
@@ -628,6 +625,9 @@
                                                 <div className="flex justify-between border-b border-gray-200 py-1"><span className="font-bold text-gray-600">Batch / Session:</span><span className="text-gray-900">{clearanceResult.student.batch}</span></div>
                                                 <div className="flex justify-between border-b border-gray-200 py-1"><span className="font-bold text-gray-600">Rate (Per Cr. Hr):</span><span className="text-gray-900">{clearanceResult.masterFee ? num(clearanceResult.masterFee.per_cr_fee) : '-'}</span></div>
                                             </div>
+                                            {!clearanceResult.masterFeeFound && (
+                                                <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4"><p className="text-sm text-yellow-700"><strong>Warning:</strong> No matching Fee Structure found for {clearanceResult.student.degree} {clearanceResult.student.batch}.</p></div>
+                                            )}
                                             <div className="overflow-x-auto">
                                                 <table className="w-full text-xs">
                                                     <thead className="bg-gray-100 text-gray-900 font-bold uppercase">
