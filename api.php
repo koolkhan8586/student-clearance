@@ -147,8 +147,9 @@ if ($method === 'POST' && isset($input['action'])) {
             case 'save_discount':
                 $dbId = (is_numeric($id) && $id > 0) ? $id : null;
                 
-                // Sanitize numeric fields
-                $discount = empty($data['discount']) ? 0 : $data['discount'];
+                // FIX: Sanitize numeric fields by removing % sign
+                $rawDiscount = $data['discount'] ?? 0;
+                $discount = floatval(str_replace('%', '', $rawDiscount));
 
                 $stmt = $pdo->prepare("INSERT INTO discounts (id, reg_no, name, term, discount) VALUES (?, ?, ?, ?, ?)
                                        ON DUPLICATE KEY UPDATE reg_no=?, name=?, term=?, discount=?");
