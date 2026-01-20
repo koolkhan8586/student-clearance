@@ -125,7 +125,7 @@
             
             const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
             const [uploadStatus, setUploadStatus] = useState({ active: false, current: 0, total: 0 });
-            const [importTerm, setImportTerm] = useState(''); // NEW: For default import semester
+            const [importTerm, setImportTerm] = useState(''); 
 
             const TABS = [
                 { id: 'clearance', label: 'Clearance', icon: FileText },
@@ -471,6 +471,10 @@
                     
                     setUploadStatus({ active: true, current: 0, total: rows.length - 1 });
 
+                    // IMPROVED: Duplicate Check Logic
+                    const existingData = data[type] || [];
+                    const newItems = [];
+                    
                     for (let i = 1; i < rows.length; i++) {
                         const values = rows[i].split(',');
                         const obj = {};
@@ -494,11 +498,43 @@
                              obj.amount = obj.amount.replace(/[^0-9.-]/g, '');
                         }
 
-                        await postToApi(`save_${actionType}`, { data: obj });
-                        setUploadStatus(prev => ({ ...prev, current: i }));
+                        // DUPLICATE CHECK: Skip if Reg No & Semester/Term match existing
+                        const isDuplicate = existingData.some(existing => 
+                            norm(existing.reg_no) === norm(obj.reg_no) &&
+                            (
+                                (existing.semester && norm(existing.semester) === norm(obj.semester)) ||
+                                (existing.term && norm(existing.term) === norm(obj.term))
+                            )
+                        );
+
+                        if (!isDuplicate) {
+                            newItems.push(obj);
+                        }
                     }
+                    
+                    // Upload only NEW items
+                    if (newItems.length === 0) {
+                        setUploadStatus({ active: false, current: 0, total: 0 });
+                        alert("No new records found. All items in the file were duplicates.");
+                        e.target.value = null;
+                        return;
+                    }
+
+                    if (confirm(`Found ${rows.length - 1} records. ${rows.length - 1 - newItems.length} are duplicates. Import ${newItems.length} new records?`)) {
+                         // Reset progress for actual upload
+                         setUploadStatus({ active: true, current: 0, total: newItems.length });
+                         let uploadedCount = 0;
+                         for (const item of newItems) {
+                            await postToApi(`save_${actionType}`, { data: item });
+                            uploadedCount++;
+                            setUploadStatus(prev => ({ ...prev, current: uploadedCount }));
+                         }
+                         alert(`Successfully imported ${uploadedCount} new records!`);
+                    } else {
+                        alert("Import cancelled.");
+                    }
+
                     setUploadStatus({ active: false, current: 0, total: 0 });
-                    alert(`Imported ${rows.length - 1} records!`);
                     e.target.value = null;
                 };
                 reader.readAsText(file);
