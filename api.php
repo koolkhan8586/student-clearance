@@ -6,8 +6,8 @@ header("Content-Type: application/json");
 // --- DATABASE CONFIGURATION ---
 $host = 'localhost';
 $db   = 'fee_system';
-$user = 'koolkhan';
-$pass = 'Mangohair@197'; // <--- ENTER YOUR DATABASE PASSWORD HERE IF SET
+$user = 'root';
+$pass = ''; // <--- ENTER YOUR DATABASE PASSWORD HERE IF SET
 
 $dsn = "mysql:host=$host;dbname=$db;charset=utf8mb4";
 $options = [
@@ -28,6 +28,13 @@ try {
     $pdo->exec("CREATE TABLE IF NOT EXISTS other_charges (id INT AUTO_INCREMENT PRIMARY KEY, reg_no VARCHAR(50), name VARCHAR(100), semester VARCHAR(50), fee_name VARCHAR(100), amount DECIMAL(10,2))");
     $pdo->exec("CREATE TABLE IF NOT EXISTS users (id INT AUTO_INCREMENT PRIMARY KEY, username VARCHAR(50) UNIQUE, password VARCHAR(255), role VARCHAR(20), permissions TEXT)");
     $pdo->exec("CREATE TABLE IF NOT EXISTS banks (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(100) UNIQUE, account_no VARCHAR(100))");
+
+    // --- AUTO-FIX DATABASE SCHEMA (Add missing columns for existing users) ---
+    try {
+        $pdo->query("SELECT bank FROM payments LIMIT 1");
+    } catch (Exception $e) {
+        $pdo->exec("ALTER TABLE payments ADD COLUMN bank VARCHAR(100)");
+    }
 
     // Seed Admin if missing
     $stmt = $pdo->prepare("SELECT COUNT(*) FROM users WHERE username = 'admin'");
