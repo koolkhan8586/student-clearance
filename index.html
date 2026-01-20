@@ -144,58 +144,32 @@
                 : TABS.filter(t => user.permissions.includes(t.id))
             ) : [];
 
+            // FETCH DATA FROM SERVER
             const refreshData = async () => {
                 try {
                     const res = await fetch(API_URL);
                     const json = await res.json();
-                    if(json.students) {
-                        setData({
-                            students: json.students || [],
-                            fees: json.fees || [],
-                            enrollments: json.enrollments || [],
-                            payments: json.payments || [],
-                            discounts: json.discounts || [],
-                            others: json.others || [],
-                            users: json.users || [],
-                            banks: json.banks || []
-                        });
-                    }
-                } catch(e) { console.error("Connection Error:", e); }
+                    // DATA SANITIZATION: Force arrays even if missing
+                    setData({
+                        students: json.students || [],
+                        fees: json.fees || [],
+                        enrollments: json.enrollments || [],
+                        payments: json.payments || [],
+                        discounts: json.discounts || [],
+                        others: json.others || [],
+                        users: json.users || [],
+                        banks: json.banks || []
+                    });
+                } catch(e) { 
+                    console.error("Connection Error:", e); 
+                }
             };
 
             useEffect(() => {
                 refreshData();
                 const storedUser = sessionStorage.getItem('feeUser');
                 if(storedUser) setUser(JSON.parse(storedUser));
-                
-                // DATA RECOVERY: Load from LocalStorage if DB is empty but Local has data
-                const local = localStorage.getItem('feeSystemData_v2');
-                if(local) {
-                    try {
-                        const parsed = JSON.parse(local);
-                        // Ensure all arrays exist to prevent white screen crashes
-                        const safeData = {
-                            students: parsed.students || [],
-                            fees: parsed.fees || [],
-                            enrollments: parsed.enrollments || [],
-                            payments: parsed.payments || [],
-                            discounts: parsed.discounts || [],
-                            others: parsed.others || [],
-                            users: parsed.users || [],
-                            banks: parsed.banks || []
-                        };
-                        
-                        // Seed default admin if totally empty
-                        if (safeData.users.length === 0) {
-                             safeData.users = [{ id: 'admin', username: 'admin', password: '123', role: 'admin', permissions: ['all'] }];
-                        }
-                        
-                        // Use local data if state is empty
-                        if(data.students.length === 0 && safeData.students.length > 0) {
-                            setData(safeData);
-                        }
-                    } catch(e) { console.error("Data Load Error", e); }
-                }
+                // REMOVED LOCAL STORAGE LOADING TO FORCE DB USAGE AND PREVENT CRASHES
             }, []);
 
             useEffect(() => {
@@ -312,11 +286,11 @@
             const generateReport = () => {
                 if (!searchReg) return;
                 const cleanReg = norm(searchReg);
-                const student = data.students.find(s => norm(s.reg_no) === cleanReg);
+                const student = data.students?.find(s => norm(s.reg_no) === cleanReg);
                 if (!student) { alert("Student not found!"); setClearanceResult(null); return; }
-                const masterFee = data.fees.find(f => norm(f.degree) === norm(student.degree) && norm(f.batch) === norm(student.batch));
+                const masterFee = data.fees?.find(f => norm(f.degree) === norm(student.degree) && norm(f.batch) === norm(student.batch));
                 
-                const studentEnrollments = data.enrollments.filter(e => norm(e.reg_no) === cleanReg).map(en => {
+                const studentEnrollments = data.enrollments?.filter(e => norm(e.reg_no) === cleanReg).map(en => {
                     const enSem = norm(en.semester);
                     const cr = parseFloat(en.cr || 0);
                     const courses = parseFloat(en.courses || 0);
@@ -328,27 +302,27 @@
                         feeDetails.reg = 0; 
                         feeDetails.other = 0;
                     }
-                    const otherCharges = data.others.filter(o => norm(o.reg_no) === cleanReg && (norm(o.semester) === enSem || enSem.includes(norm(o.semester))));
+                    const otherCharges = data.others?.filter(o => norm(o.reg_no) === cleanReg && (norm(o.semester) === enSem || enSem.includes(norm(o.semester)))) || [];
                     const extraCharges = otherCharges.reduce((sum, o) => sum + parseFloat(o.amount || 0), 0);
                     
                     feeDetails.other += extraCharges;
                     feeDetails.total = feeDetails.tuition + feeDetails.exam + feeDetails.other;
 
-                    const discRecord = data.discounts.find(d => norm(d.reg_no) === cleanReg && norm(d.term) === enSem);
+                    const discRecord = data.discounts?.find(d => norm(d.reg_no) === cleanReg && norm(d.term) === enSem);
                     const discPct = discRecord ? parseFloat(discRecord.discount || 0) : 0;
                     const discAmt = (feeDetails.tuition * discPct) / 100;
                     
                     const netFee = feeDetails.total - discAmt;
                     
-                    const payments = data.payments.filter(p => {
+                    const payments = data.payments?.filter(p => {
                         if (norm(p.reg_no) !== cleanReg) return false;
                         const pSem = norm(p.semester);
                         return pSem === enSem || (enSem.includes(pSem) && pSem.length > 3) || (pSem.includes(enSem) && enSem.length > 3);
-                    });
+                    }) || [];
                     const totalPaid = payments.reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
                     const balance = netFee - totalPaid;
                     return { ...en, ...feeDetails, discPct, discAmt, netFee, totalPaid, balance };
-                });
+                }) || [];
 
                 const summary = studentEnrollments.reduce((acc, curr) => ({
                     total: acc.total + curr.total, fa: acc.fa + curr.discAmt,
@@ -382,7 +356,7 @@
                 let actionType = modalType.slice(0, -1);
                 if(modalType === 'others') actionType = 'other';
                 const success = await postToApi(`save_${actionType}`, { data: newData, id: editingId });
-                if(success) { setShowModal(false); setFormData({}); setEditingId(null); }
+                if(success) { setShowModal(false); setFormData({}); setEditingId(null); refreshData(); }
             };
             
             const openModal = (type, item = null) => {
@@ -503,7 +477,7 @@
                     case 'payments': return ['reg_no', 'name', 'semester', 'amount', 'date', 'bank'];
                     case 'discounts': return ['reg_no', 'name', 'term', 'discount'];
                     case 'others': return ['reg_no', 'name', 'semester', 'fee_name', 'amount'];
-                    case 'users': return ['username', 'role', 'permissions']; // REMOVED PASSWORD FROM HEADERS
+                    case 'users': return ['username', 'password', 'role', 'permissions']; // REMOVED PASSWORD FROM HEADERS
                     case 'banks': return ['name', 'account_no'];
                     default: return [];
                 }
@@ -715,7 +689,7 @@
                                     <select className="w-full border p-2 rounded bg-white" value={formData.bank || ''} onChange={e => setFormData({...formData, bank: e.target.value})}>
                                         <option value="">Select Bank</option>
                                         <option value="Cash">Cash</option>
-                                        {data.banks.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
+                                        {data.banks?.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
                                     </select>
                                     </>}
                                     {modalType === 'others' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={e => setFormData({...formData, reg_no: e.target.value})} /><div className="grid grid-cols-2 gap-4"><input required placeholder="Semester" className="w-full border p-2 rounded" value={formData.semester || ''} onChange={e => setFormData({...formData, semester: e.target.value})} /><input required placeholder="Fee Name (e.g. Late Fine)" className="w-full border p-2 rounded" value={formData.fee_name || ''} onChange={e => setFormData({...formData, fee_name: e.target.value})} /></div><input required type="number" placeholder="Amount" className="w-full border p-2 rounded font-bold text-lg" value={formData.amount || ''} onChange={e => setFormData({...formData, amount: e.target.value})} /></>}
