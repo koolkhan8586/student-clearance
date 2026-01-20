@@ -100,6 +100,7 @@
         const Key = (p) => <Icon {...p}><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></Icon>;
         const CloudUpload = (p) => <Icon {...p}><path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19a4 4 0 0 0 4 4h11a4 4 0 0 0 4-4v-2.5"/><line x1="16" y1="16" x2="16" y2="8"/><line x1="12" y1="12" x2="16" y2="8"/><line x1="20" y1="12" x2="16" y2="8"/></Icon>;
         const ArrowUpDown = (p) => <Icon {...p}><path d="M7 15l5 5 5-5"/><path d="M7 9l5-5 5 5"/></Icon>;
+        const RefreshCw = (p) => <Icon {...p}><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></Icon>;
 
         function App() {
             const [user, setUser] = useState(null);
@@ -160,11 +161,6 @@
                 refreshData();
                 const storedUser = sessionStorage.getItem('feeUser');
                 if(storedUser) setUser(JSON.parse(storedUser));
-                const local = localStorage.getItem('feeSystemData_v2');
-                if(local) {
-                    const parsed = JSON.parse(local);
-                    if(parsed.students && parsed.students.length > 0 && data.students.length === 0) setData(parsed);
-                }
             }, []);
 
             useEffect(() => {
@@ -316,8 +312,10 @@
 
                 const summary = studentEnrollments.reduce((acc, curr) => ({
                     total: acc.total + curr.total, fa: acc.fa + curr.discAmt,
-                    paid: acc.paid + curr.totalPaid, balance: acc.balance + curr.balance
-                }), { total: 0, fa: 0, paid: 0, balance: 0 });
+                    paid: acc.paid + curr.totalPaid, balance: acc.balance + curr.balance,
+                    cr: acc.cr + (parseFloat(curr.cr) || 0), // Added Total Cr
+                    courses: acc.courses + (parseFloat(curr.courses) || 0) // Added Total Courses
+                }), { total: 0, fa: 0, paid: 0, balance: 0, cr: 0, courses: 0 });
 
                 setClearanceResult({ student, rows: studentEnrollments, summary, masterFeeFound: !!masterFee, masterFee });
             };
@@ -554,15 +552,18 @@
                                             <div className="overflow-x-auto">
                                                 <table className="w-full text-xs">
                                                     <thead className="bg-gray-100 text-gray-900 font-bold uppercase">
-                                                        <tr><th className="p-2 border">Sem</th><th className="p-2 border text-center">Cr</th><th className="p-2 border text-center">Sub</th><th className="p-2 border text-right">Tuition</th><th className="p-2 border text-right">Exam</th><th className="p-2 border text-right">Reg</th><th className="p-2 border text-right">Other</th><th className="p-2 border text-right bg-gray-50">Total</th><th className="p-2 border text-center">Disc %</th><th className="p-2 border text-right">Disc Amt</th><th className="p-2 border text-right">Net Fee</th><th className="p-2 border text-right text-green-700">Paid</th><th className="p-2 border text-right">Balance</th></tr>
+                                                        <tr><th className="p-2 border">Sem</th><th className="p-2 border text-center">Sub</th><th className="p-2 border text-center">Cr</th><th className="p-2 border text-right">Tuition</th><th className="p-2 border text-right">Exam</th><th className="p-2 border text-right">Reg</th><th className="p-2 border text-right">Other</th><th className="p-2 border text-right bg-gray-50">Total</th><th className="p-2 border text-center">Disc %</th><th className="p-2 border text-right">Disc Amt</th><th className="p-2 border text-right">Net Fee</th><th className="p-2 border text-right text-green-700">Paid</th><th className="p-2 border text-right">Balance</th></tr>
                                                     </thead>
                                                     <tbody className="divide-y divide-gray-200">
                                                         {clearanceResult.rows.map((row, idx) => (
                                                             <tr key={idx} className="hover:bg-gray-50">
-                                                                <td className="p-2 border font-medium">{row.semester}</td><td className="p-2 border text-center">{row.cr}</td><td className="p-2 border text-center">{row.courses}</td><td className="p-2 border text-right text-gray-600">{num(row.tuition)}</td><td className="p-2 border text-right text-gray-600">{num(row.exam)}</td><td className="p-2 border text-right text-gray-600">{num(row.reg)}</td><td className="p-2 border text-right text-gray-600">{num(row.other)}</td><td className="p-2 border text-right font-bold bg-gray-50">{num(row.total)}</td><td className="p-2 border text-center text-gray-500">{row.discPct > 0 ? `${row.discPct}%` : '-'}</td><td className="p-2 border text-right text-gray-500">{row.discAmt > 0 ? num(row.discAmt) : '-'}</td><td className="p-2 border text-right font-bold">{num(row.netFee)}</td><td className="p-2 border text-right font-bold text-green-600">{num(row.totalPaid)}</td><td className={`p-2 border text-right font-bold ${row.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>{num(row.balance)}</td>
+                                                                <td className="p-2 border font-medium">{row.semester}</td>
+                                                                <td className="p-2 border text-center">{row.courses}</td>
+                                                                <td className="p-2 border text-center">{row.cr}</td>
+                                                                <td className="p-2 border text-right text-gray-600">{num(row.tuition)}</td><td className="p-2 border text-right text-gray-600">{num(row.exam)}</td><td className="p-2 border text-right text-gray-600">{num(row.reg)}</td><td className="p-2 border text-right text-gray-600">{num(row.other)}</td><td className="p-2 border text-right font-bold bg-gray-50">{num(row.total)}</td><td className="p-2 border text-center text-gray-500">{row.discPct > 0 ? `${row.discPct}%` : '-'}</td><td className="p-2 border text-right text-gray-500">{row.discAmt > 0 ? num(row.discAmt) : '-'}</td><td className="p-2 border text-right font-bold">{num(row.netFee)}</td><td className="p-2 border text-right font-bold text-green-600">{num(row.totalPaid)}</td><td className={`p-2 border text-right font-bold ${row.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>{num(row.balance)}</td>
                                                             </tr>
                                                         ))}
-                                                        <tr className="bg-gray-800 text-white font-bold"><td colSpan="7" className="p-3 text-right uppercase tracking-wider">Grand Totals</td><td className="p-3 text-right">{num(clearanceResult.summary.total)}</td><td className="p-3 text-center">-</td><td className="p-3 text-right">{num(clearanceResult.summary.fa)}</td><td className="p-3 text-right">{num(clearanceResult.summary.total - clearanceResult.summary.fa)}</td><td className="p-3 text-right text-green-400">{num(clearanceResult.summary.paid)}</td><td className={`p-3 text-right ${clearanceResult.summary.balance > 0 ? 'text-red-400' : 'text-green-400'}`}>{num(clearanceResult.summary.balance)}</td></tr>
+                                                        <tr className="bg-gray-800 text-white font-bold"><td colSpan="2" className="p-3 text-right uppercase tracking-wider">Grand Totals</td><td className="p-3 text-center">{clearanceResult.summary.courses}</td><td className="p-3 text-center">{clearanceResult.summary.cr}</td><td colSpan="4"></td><td className="p-3 text-right">{num(clearanceResult.summary.total)}</td><td className="p-3 text-center">-</td><td className="p-3 text-right">{num(clearanceResult.summary.fa)}</td><td className="p-3 text-right">{num(clearanceResult.summary.total - clearanceResult.summary.fa)}</td><td className="p-3 text-right text-green-400">{num(clearanceResult.summary.paid)}</td><td className={`p-3 text-right ${clearanceResult.summary.balance > 0 ? 'text-red-400' : 'text-green-400'}`}>{num(clearanceResult.summary.balance)}</td></tr>
                                                     </tbody>
                                                 </table>
                                             </div>
@@ -580,11 +581,14 @@
                         {activeTab !== 'clearance' && (
                             <div>
                                 <div className="flex flex-col gap-4 mb-6 no-print">
-                                    <div className="flex justify-between items-center"><h2 className="text-2xl font-bold text-gray-800 capitalize">{activeTab} Directory <span className="ml-2 text-sm bg-gray-200 text-gray-700 py-1 px-3 rounded-full">{data[activeTab]?.length || 0}</span></h2><div className="flex gap-2">{(user.role === 'admin' || user.permissions.includes(activeTab)) && <button onClick={() => openModal(activeTab)} className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700 transition flex items-center gap-2"><Plus className="h-5 w-5" /> Add New</button>}</div></div>
+                                    <div className="flex justify-between items-center"><h2 className="text-2xl font-bold text-gray-800 capitalize">{activeTab} Directory <span className="ml-2 text-sm bg-gray-200 text-gray-700 py-1 px-3 rounded-full">{data[activeTab]?.length || 0}</span></h2><div className="flex gap-2">{(user.role === 'admin' || user.permissions.includes(activeTab)) && <button onClick={() => openModal(activeTab)} className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700 transition flex items-center gap-2 shadow-sm"><Plus className="h-5 w-5" /> Add New</button>}</div></div>
+                                    
+                                    {/* Action Buttons: Refresh, Delete, Import etc */}
                                     <div className="bg-white p-3 rounded-xl border border-gray-200 flex flex-wrap gap-3 items-center justify-between shadow-sm">
                                         <div className="relative flex-grow max-w-md"><Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" /><input type="text" value={tabSearch} onChange={(e) => setTabSearch(e.target.value)} placeholder={`Filter ${activeTab}...`} className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" /></div>
                                         <div className="flex gap-2">
-                                            {selectedIds.size > 0 && <button onClick={deleteSelected} className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm font-bold hover:bg-red-100 flex items-center gap-2"><Trash2 className="h-4 w-4" /> Delete ({selectedIds.size})</button>}
+                                            <button onClick={refreshData} className="bg-gray-100 border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-200" title="Refresh Data"><Icon><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></Icon></button>
+                                            {selectedIds.size > 0 && <button onClick={deleteSelected} className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm font-bold hover:bg-red-100 flex items-center gap-2 animate-pulse"><Trash2 className="h-4 w-4" /> Delete ({selectedIds.size})</button>}
                                             {(activeTab === 'enrollments' || activeTab === 'payments' || activeTab === 'others') && <button onClick={deleteBySemester} className="bg-orange-50 border border-orange-200 text-orange-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-orange-100 flex items-center gap-2"><CalendarX className="h-4 w-4" /> Del Sem</button>}
                                             {user.role === 'admin' && <button onClick={deleteAllInTab} className="bg-white border border-red-200 text-red-600 px-3 py-2 rounded-lg text-sm font-medium hover:bg-red-50 flex items-center gap-2"><XSquare className="h-4 w-4" /> Delete All</button>}
                                             <div className="h-8 w-px bg-gray-300 mx-1"></div>
