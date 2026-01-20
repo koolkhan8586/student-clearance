@@ -123,7 +123,6 @@
             const [passwordData, setPasswordData] = useState({ current: '', new: '', confirm: '' });
             
             const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
-            // NEW: State for Import Preview
             const [importPreview, setImportPreview] = useState({ show: false, total: 0, newItems: [], duplicates: [], type: '' });
             const [uploadStatus, setUploadStatus] = useState({ active: false, current: 0, total: 0 });
             const [importTerm, setImportTerm] = useState(''); 
@@ -168,10 +167,34 @@
                 refreshData();
                 const storedUser = sessionStorage.getItem('feeUser');
                 if(storedUser) setUser(JSON.parse(storedUser));
+                
+                // DATA RECOVERY: Load from LocalStorage if DB is empty but Local has data
                 const local = localStorage.getItem('feeSystemData_v2');
                 if(local) {
-                    const parsed = JSON.parse(local);
-                    if(parsed.students && parsed.students.length > 0 && data.students.length === 0) setData(parsed);
+                    try {
+                        const parsed = JSON.parse(local);
+                        // Ensure all arrays exist to prevent white screen crashes
+                        const safeData = {
+                            students: parsed.students || [],
+                            fees: parsed.fees || [],
+                            enrollments: parsed.enrollments || [],
+                            payments: parsed.payments || [],
+                            discounts: parsed.discounts || [],
+                            others: parsed.others || [],
+                            users: parsed.users || [],
+                            banks: parsed.banks || []
+                        };
+                        
+                        // Seed default admin if totally empty
+                        if (safeData.users.length === 0) {
+                             safeData.users = [{ id: 'admin', username: 'admin', password: '123', role: 'admin', permissions: ['all'] }];
+                        }
+                        
+                        // Use local data if state is empty
+                        if(data.students.length === 0 && safeData.students.length > 0) {
+                            setData(safeData);
+                        }
+                    } catch(e) { console.error("Data Load Error", e); }
                 }
             }, []);
 
@@ -480,7 +503,7 @@
                     case 'payments': return ['reg_no', 'name', 'semester', 'amount', 'date', 'bank'];
                     case 'discounts': return ['reg_no', 'name', 'term', 'discount'];
                     case 'others': return ['reg_no', 'name', 'semester', 'fee_name', 'amount'];
-                    case 'users': return ['username', 'password', 'role', 'permissions'];
+                    case 'users': return ['username', 'role', 'permissions']; // REMOVED PASSWORD FROM HEADERS
                     case 'banks': return ['name', 'account_no'];
                     default: return [];
                 }
@@ -654,6 +677,8 @@
                                                 {filteredData.map((item, idx) => (
                                                     <tr key={item.id || idx} className={`hover:bg-gray-50 transition ${selectedIds.has(item.id || item.reg_no) ? 'bg-blue-50' : ''}`}>
                                                         <td className="p-4"><input type="checkbox" checked={selectedIds.has(item.id || item.reg_no)} onChange={() => handleSelectRow(item.id || item.reg_no)} className="rounded" /></td>
+                                                        
+                                                        {/* SPECIFIC ROW RENDERING BASED ON ACTIVE TAB */}
                                                         {activeTab === 'students' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4 font-bold">{item.name}</td><td className="p-4"><span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-bold">{item.degree}</span></td><td className="p-4 text-gray-500">{item.batch}</td></>}
                                                         {activeTab === 'fees' && <><td className="p-4 font-bold">{item.degree}</td><td className="p-4 text-gray-600">{item.batch}</td><td className="p-4 text-right text-gray-500">{num(item.per_cr_fee)}</td><td className="p-4 text-right font-bold text-green-700">{num(item.per_course_fee)}</td><td className="p-4 text-right text-gray-500">{num(item.reg_fee)}</td><td className="p-4 text-right text-gray-500">{num(item.other_fee)}</td></>}
                                                         {activeTab === 'enrollments' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4"><span className="bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-xs font-bold">{item.semester}</span></td><td className="p-4">{item.cr}</td><td className="p-4">{item.courses}</td></>}
@@ -662,6 +687,7 @@
                                                         {activeTab === 'discounts' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4 text-gray-500">{item.term}</td><td className="p-4 text-right font-bold text-purple-600">{item.discount}%</td></>}
                                                         {activeTab === 'users' && <><td className="p-4 font-bold">{item.username}</td><td className="p-4 capitalize">{item.role}</td><td className="p-4 text-xs max-w-xs truncate">{item.role === 'admin' ? 'Full Access' : (Array.isArray(item.permissions) ? item.permissions.join(', ') : '')}</td></>}
                                                         {activeTab === 'banks' && <><td className="p-4 font-bold">{item.name}</td><td className="p-4 font-mono text-gray-600">{item.account_no}</td></>}
+                                                        
                                                         <td className="p-4 text-center flex justify-center gap-2">
                                                             <button onClick={() => openModal(activeTab, item)} className="p-2 text-blue-600 hover:bg-blue-50 rounded"><i className="fas fa-edit"></i> Edit</button>
                                                             <button onClick={() => handleDelete(activeTab, item.id)} className="p-2 text-red-600 hover:bg-red-50 rounded"><Trash2 className="h-4 w-4" /></button>
