@@ -303,7 +303,8 @@
                         feeDetails.tuition = cr * parseFloat(masterFee.per_cr_fee || 0);
                         // Exam Fee now includes the 'other' amount from fee structure as per request
                         feeDetails.exam = (courses * parseFloat(masterFee.per_course_fee || 0)) + parseFloat(masterFee.other_fee || 0); 
-                        feeDetails.reg = parseFloat(masterFee.reg_fee || 0);
+                        // REG FEE REMOVED FROM LOGIC AS REQUESTED
+                        feeDetails.reg = 0; 
                         // The 'other' slot is now reserved for ad-hoc charges only
                         feeDetails.other = 0;
                     }
@@ -313,7 +314,8 @@
                     // Add extra charges to the 'other' column
                     feeDetails.other += extraCharges;
                     
-                    feeDetails.total = feeDetails.tuition + feeDetails.exam + feeDetails.reg + feeDetails.other;
+                    // Removed reg from total calculation
+                    feeDetails.total = feeDetails.tuition + feeDetails.exam + feeDetails.other;
 
                     const discRecord = data.discounts.find(d => norm(d.reg_no) === cleanReg && norm(d.term) === enSem);
                     const discPct = discRecord ? parseFloat(discRecord.discount || 0) : 0;
@@ -632,15 +634,15 @@
                                             <div className="overflow-x-auto">
                                                 <table className="w-full text-xs">
                                                     <thead className="bg-gray-100 text-gray-900 font-bold uppercase">
-                                                        <tr><th className="p-2 border">Sem</th><th className="p-2 border text-center">Sub</th><th className="p-2 border text-center">Cr</th><th className="p-2 border text-right">Tuition</th><th className="p-2 border text-right">Exam</th><th className="p-2 border text-right">Reg</th><th className="p-2 border text-right">Other</th><th className="p-2 border text-right bg-gray-50">Total</th><th className="p-2 border text-center">Disc %</th><th className="p-2 border text-right">Disc Amt</th><th className="p-2 border text-right">Net Fee</th><th className="p-2 border text-right text-green-700">Paid</th><th className="p-2 border text-right">Balance</th></tr>
+                                                        <tr><th className="p-2 border">Sem</th><th className="p-2 border text-center">Sub</th><th className="p-2 border text-center">Cr</th><th className="p-2 border text-right">Tuition</th><th className="p-2 border text-right">Exam</th><th className="p-2 border text-right">Other</th><th className="p-2 border text-right bg-gray-50">Total</th><th className="p-2 border text-center">Disc %</th><th className="p-2 border text-right">Disc Amt</th><th className="p-2 border text-right">Net Fee</th><th className="p-2 border text-right text-green-700">Paid</th><th className="p-2 border text-right">Balance</th><th className="p-2 border text-center">Bank</th></tr>
                                                     </thead>
                                                     <tbody className="divide-y divide-gray-200">
                                                         {clearanceResult.rows.map((row, idx) => (
                                                             <tr key={idx} className="hover:bg-gray-50">
-                                                                <td className="p-2 border font-medium">{row.semester}</td><td className="p-2 border text-center">{row.courses}</td><td className="p-2 border text-center">{row.cr}</td><td className="p-2 border text-right text-gray-600">{num(row.tuition)}</td><td className="p-2 border text-right text-gray-600">{num(row.exam)}</td><td className="p-2 border text-right text-gray-600">{num(row.reg)}</td><td className="p-2 border text-right text-gray-600">{num(row.other)}</td><td className="p-2 border text-right font-bold bg-gray-50">{num(row.total)}</td><td className="p-2 border text-center text-gray-500">{row.discPct > 0 ? `${row.discPct}%` : '-'}</td><td className="p-2 border text-right text-gray-500">{row.discAmt > 0 ? num(row.discAmt) : '-'}</td><td className="p-2 border text-right font-bold">{num(row.netFee)}</td><td className="p-2 border text-right font-bold text-green-600">{num(row.totalPaid)}</td><td className={`p-2 border text-right font-bold ${row.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>{num(row.balance)}</td>
+                                                                <td className="p-2 border font-medium">{row.semester}</td><td className="p-2 border text-center">{row.courses}</td><td className="p-2 border text-center">{row.cr}</td><td className="p-2 border text-right text-gray-600">{num(row.tuition)}</td><td className="p-2 border text-right text-gray-600">{num(row.exam)}</td><td className="p-2 border text-right text-gray-600">{num(row.other)}</td><td className="p-2 border text-right font-bold bg-gray-50">{num(row.total)}</td><td className="p-2 border text-center text-gray-500">{row.discPct > 0 ? `${row.discPct}%` : '-'}</td><td className="p-2 border text-right text-gray-500">{row.discAmt > 0 ? num(row.discAmt) : '-'}</td><td className="p-2 border text-right font-bold">{num(row.netFee)}</td><td className="p-2 border text-right font-bold text-green-600">{num(row.totalPaid)}</td><td className={`p-2 border text-right font-bold ${row.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>{num(row.balance)}</td><td className="p-2 border text-center text-xs">{row.bank || '-'}</td>
                                                             </tr>
                                                         ))}
-                                                        <tr className="bg-gray-800 text-white font-bold"><td className="p-3"></td><td className="p-3 text-center">{clearanceResult.summary.courses}</td><td className="p-3 text-center">{clearanceResult.summary.cr}</td><td colSpan="4"></td><td className="p-3 text-right">{num(clearanceResult.summary.total)}</td><td className="p-3 text-center">-</td><td className="p-3 text-right">{num(clearanceResult.summary.fa)}</td><td className="p-3 text-right">{num(clearanceResult.summary.total - clearanceResult.summary.fa)}</td><td className="p-3 text-right text-green-400">{num(clearanceResult.summary.paid)}</td><td className={`p-3 text-right ${clearanceResult.summary.balance > 0 ? 'text-red-400' : 'text-green-400'}`}>{num(clearanceResult.summary.balance)}</td></tr>
+                                                        <tr className="bg-gray-800 text-white font-bold"><td className="p-3"></td><td className="p-3 text-center">{clearanceResult.summary.courses}</td><td className="p-3 text-center">{clearanceResult.summary.cr}</td><td colSpan="3"></td><td className="p-3 text-right">{num(clearanceResult.summary.total)}</td><td className="p-3 text-center">-</td><td className="p-3 text-right">{num(clearanceResult.summary.fa)}</td><td className="p-3 text-right">{num(clearanceResult.summary.total - clearanceResult.summary.fa)}</td><td className="p-3 text-right text-green-400">{num(clearanceResult.summary.paid)}</td><td className={`p-3 text-right ${clearanceResult.summary.balance > 0 ? 'text-red-400' : 'text-green-400'}`}>{num(clearanceResult.summary.balance)}</td><td></td></tr>
                                                     </tbody>
                                                 </table>
                                             </div>
