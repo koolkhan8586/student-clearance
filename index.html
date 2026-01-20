@@ -161,6 +161,11 @@
                 refreshData();
                 const storedUser = sessionStorage.getItem('feeUser');
                 if(storedUser) setUser(JSON.parse(storedUser));
+                const local = localStorage.getItem('feeSystemData_v2');
+                if(local) {
+                    const parsed = JSON.parse(local);
+                    if(parsed.students && parsed.students.length > 0 && data.students.length === 0) setData(parsed);
+                }
             }, []);
 
             useEffect(() => {
@@ -557,10 +562,7 @@
                                                     <tbody className="divide-y divide-gray-200">
                                                         {clearanceResult.rows.map((row, idx) => (
                                                             <tr key={idx} className="hover:bg-gray-50">
-                                                                <td className="p-2 border font-medium">{row.semester}</td>
-                                                                <td className="p-2 border text-center">{row.courses}</td>
-                                                                <td className="p-2 border text-center">{row.cr}</td>
-                                                                <td className="p-2 border text-right text-gray-600">{num(row.tuition)}</td><td className="p-2 border text-right text-gray-600">{num(row.exam)}</td><td className="p-2 border text-right text-gray-600">{num(row.reg)}</td><td className="p-2 border text-right text-gray-600">{num(row.other)}</td><td className="p-2 border text-right font-bold bg-gray-50">{num(row.total)}</td><td className="p-2 border text-center text-gray-500">{row.discPct > 0 ? `${row.discPct}%` : '-'}</td><td className="p-2 border text-right text-gray-500">{row.discAmt > 0 ? num(row.discAmt) : '-'}</td><td className="p-2 border text-right font-bold">{num(row.netFee)}</td><td className="p-2 border text-right font-bold text-green-600">{num(row.totalPaid)}</td><td className={`p-2 border text-right font-bold ${row.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>{num(row.balance)}</td>
+                                                                <td className="p-2 border font-medium">{row.semester}</td><td className="p-2 border text-center">{row.courses}</td><td className="p-2 border text-center">{row.cr}</td><td className="p-2 border text-right text-gray-600">{num(row.tuition)}</td><td className="p-2 border text-right text-gray-600">{num(row.exam)}</td><td className="p-2 border text-right text-gray-600">{num(row.reg)}</td><td className="p-2 border text-right text-gray-600">{num(row.other)}</td><td className="p-2 border text-right font-bold bg-gray-50">{num(row.total)}</td><td className="p-2 border text-center text-gray-500">{row.discPct > 0 ? `${row.discPct}%` : '-'}</td><td className="p-2 border text-right text-gray-500">{row.discAmt > 0 ? num(row.discAmt) : '-'}</td><td className="p-2 border text-right font-bold">{num(row.netFee)}</td><td className="p-2 border text-right font-bold text-green-600">{num(row.totalPaid)}</td><td className={`p-2 border text-right font-bold ${row.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>{num(row.balance)}</td>
                                                             </tr>
                                                         ))}
                                                         <tr className="bg-gray-800 text-white font-bold"><td colSpan="2" className="p-3 text-right uppercase tracking-wider">Grand Totals</td><td className="p-3 text-center">{clearanceResult.summary.courses}</td><td className="p-3 text-center">{clearanceResult.summary.cr}</td><td colSpan="4"></td><td className="p-3 text-right">{num(clearanceResult.summary.total)}</td><td className="p-3 text-center">-</td><td className="p-3 text-right">{num(clearanceResult.summary.fa)}</td><td className="p-3 text-right">{num(clearanceResult.summary.total - clearanceResult.summary.fa)}</td><td className="p-3 text-right text-green-400">{num(clearanceResult.summary.paid)}</td><td className={`p-3 text-right ${clearanceResult.summary.balance > 0 ? 'text-red-400' : 'text-green-400'}`}>{num(clearanceResult.summary.balance)}</td></tr>
