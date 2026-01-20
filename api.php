@@ -75,7 +75,10 @@ if ($method === 'POST' && isset($input['action'])) {
                 $stmt->execute([$data['reg_no'], $data['name'], $data['degree'], $data['batch'], 
                                 $data['name'], $data['degree'], $data['batch']]);
                 break;
+            
+            // FIX: Added 'delete_students' case
             case 'delete_student':
+            case 'delete_students':
                 $stmt = $pdo->prepare("DELETE FROM students WHERE reg_no = ?");
                 $stmt->execute([$id]);
                 break;
@@ -96,7 +99,10 @@ if ($method === 'POST' && isset($input['action'])) {
                 $stmt->execute([$dbId, $data['degree'], $data['batch'], $per_cr_fee, $per_course_fee, $reg_fee, $other_fee,
                                 $data['degree'], $data['batch'], $per_cr_fee, $per_course_fee, $reg_fee, $other_fee]);
                 break;
+            
+            // FIX: Added plural case
             case 'delete_fee':
+            case 'delete_fees':
                 $stmt = $pdo->prepare("DELETE FROM fee_structure WHERE id = ?");
                 $stmt->execute([$id]);
                 break;
@@ -113,7 +119,10 @@ if ($method === 'POST' && isset($input['action'])) {
                 $stmt->execute([$dbId, $data['reg_no'], $data['name'], $data['semester'], $cr, $courses,
                                 $data['reg_no'], $data['name'], $data['semester'], $cr, $courses]);
                 break;
+            
+            // FIX: Added plural case
             case 'delete_enrollment':
+            case 'delete_enrollments':
                 $stmt = $pdo->prepare("DELETE FROM enrollments WHERE id = ?");
                 $stmt->execute([$id]);
                 break;
@@ -130,7 +139,10 @@ if ($method === 'POST' && isset($input['action'])) {
                 $stmt->execute([$dbId, $data['reg_no'], $data['name'], $data['semester'], $amount, $formattedDate,
                                 $data['reg_no'], $data['name'], $data['semester'], $amount, $formattedDate]);
                 break;
+            
+            // FIX: Added plural case
             case 'delete_payment':
+            case 'delete_payments':
                 $stmt = $pdo->prepare("DELETE FROM payments WHERE id = ?");
                 $stmt->execute([$id]);
                 break;
@@ -147,7 +159,7 @@ if ($method === 'POST' && isset($input['action'])) {
                                 $data['reg_no'], $data['name'], $data['term'], $discount]);
                 break;
             
-            // FIX: Added 'delete_discounts' to handle plural form from frontend
+            // FIX: Added 'delete_discounts'
             case 'delete_discount':
             case 'delete_discounts': 
                 $stmt = $pdo->prepare("DELETE FROM discounts WHERE id = ?");
@@ -165,7 +177,10 @@ if ($method === 'POST' && isset($input['action'])) {
                 $stmt->execute([$dbId, $data['reg_no'], $data['name'], $data['semester'], $data['fee_name'], $amount,
                                 $data['reg_no'], $data['name'], $data['semester'], $data['fee_name'], $amount]);
                 break;
+            
+            // FIX: Added plural case
             case 'delete_other':
+            case 'delete_others':
                 $stmt = $pdo->prepare("DELETE FROM other_charges WHERE id = ?");
                 $stmt->execute([$id]);
                 break;
@@ -178,7 +193,10 @@ if ($method === 'POST' && isset($input['action'])) {
                 $stmt->execute([$dbId, $data['username'], $data['password'], $data['role'], $perms,
                                 $data['username'], $data['password'], $data['role'], $perms]);
                 break;
+            
+            // FIX: Added plural case
             case 'delete_user':
+            case 'delete_users':
                 $stmt = $pdo->prepare("DELETE FROM users WHERE id = ?");
                 $stmt->execute([$id]);
                 break;
