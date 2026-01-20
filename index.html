@@ -316,7 +316,10 @@
 
                     const discRecord = data.discounts.find(d => norm(d.reg_no) === cleanReg && norm(d.term) === enSem);
                     const discPct = discRecord ? parseFloat(discRecord.discount || 0) : 0;
-                    const discAmt = (feeDetails.total * discPct) / 100;
+                    
+                    // MODIFIED: Calculate discount on Tuition Fee ONLY
+                    const discAmt = (feeDetails.tuition * discPct) / 100;
+                    
                     const netFee = feeDetails.total - discAmt;
                     
                     const payments = data.payments.filter(p => {
