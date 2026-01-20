@@ -37,28 +37,28 @@
                 width: 100%;
                 height: 100%;
                 margin: 0;
-                padding: 15px;
+                padding: 10px;
                 background: white;
                 /* Scale to fit A4 */
-                transform: scale(0.95); /* Slightly larger scale, better fit */
+                transform: scale(0.95); /* Slightly reduced scale to fit columns */
                 transform-origin: top left;
             }
              /* Ensure table fits */
             #printableArea table {
                 width: 100%;
-                font-size: 11px; /* Slightly larger font */
+                font-size: 11px; /* Reduced font size for print */
                 border-collapse: collapse;
-                table-layout: fixed; /* Force column widths to respect container */
+                table-layout: fixed;
             }
             #printableArea th, #printableArea td {
-                padding: 6px; /* Increased padding */
-                border: 1px solid #9ca3af; /* Darker border for print */
-                word-wrap: break-word; /* Prevent overflow */
+                padding: 4px;
+                border: 1px solid #9ca3af;
+                word-wrap: break-word;
             }
             
             @page {
                 size: A4 portrait;
-                margin: 5mm; /* Small margin */
+                margin: 5mm;
             }
             /* Hide non-essential UI elements in print mode just in case */
             .no-print { display: none !important; }
@@ -124,8 +124,8 @@
             const [passwordData, setPasswordData] = useState({ current: '', new: '', confirm: '' });
             
             const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
-            
             const [uploadStatus, setUploadStatus] = useState({ active: false, current: 0, total: 0 });
+            const [importTerm, setImportTerm] = useState(''); // NEW: For default import semester
 
             const TABS = [
                 { id: 'clearance', label: 'Clearance', icon: FileText },
@@ -135,7 +135,7 @@
                 { id: 'enrollments', label: 'Enrollments', icon: BookOpen },
                 { id: 'payments', label: 'Payments', icon: CreditCard },
                 { id: 'discounts', label: 'Discounts', icon: Percent },
-                { id: 'banks', label: 'Banks', icon: Landmark } // NEW TAB
+                { id: 'banks', label: 'Banks', icon: Landmark } 
             ];
 
             const availableTabs = user ? (
@@ -179,6 +179,7 @@
                 setSelectedIds(new Set());
                 setTabSearch('');
                 setSortConfig({ key: null, direction: 'asc' }); 
+                setImportTerm(''); // Reset import term on tab change
             }, [activeTab]);
 
             const norm = (str) => str ? str.toString().toLowerCase().replace(/[^a-z0-9]/g, '') : '';
@@ -204,7 +205,7 @@
                 const localData = JSON.parse(local);
                 const categories = ['students', 'fees', 'enrollments', 'payments', 'discounts', 'others', 'banks'];
                 let count = 0;
-                setUploadStatus({ active: true, current: 0, total: 100 }); // Approximate
+                setUploadStatus({ active: true, current: 0, total: 100 }); 
                 for (const cat of categories) {
                      const items = localData[cat] || [];
                      for (const item of items) {
@@ -330,8 +331,8 @@
                 const summary = studentEnrollments.reduce((acc, curr) => ({
                     total: acc.total + curr.total, fa: acc.fa + curr.discAmt,
                     paid: acc.paid + curr.totalPaid, balance: acc.balance + curr.balance,
-                    cr: acc.cr + (parseFloat(curr.cr) || 0), // Added Total Cr
-                    courses: acc.courses + (parseFloat(curr.courses) || 0) // Added Total Courses
+                    cr: acc.cr + (parseFloat(curr.cr) || 0), 
+                    courses: acc.courses + (parseFloat(curr.courses) || 0)
                 }), { total: 0, fa: 0, paid: 0, balance: 0, cr: 0, courses: 0 });
 
                 setClearanceResult({ student, rows: studentEnrollments, summary, masterFeeFound: !!masterFee, masterFee });
@@ -410,7 +411,7 @@
                     case 'students': return ['reg_no', 'name', 'degree', 'batch'];
                     case 'fees': return ['degree', 'batch', 'per_cr_fee', 'per_course_fee', 'reg_fee', 'other_fee'];
                     case 'enrollments': return ['reg_no', 'name', 'semester', 'cr', 'courses'];
-                    case 'payments': return ['reg_no', 'name', 'semester', 'amount', 'date', 'bank']; // Added Bank
+                    case 'payments': return ['reg_no', 'name', 'semester', 'amount', 'date', 'bank'];
                     case 'discounts': return ['reg_no', 'name', 'term', 'discount'];
                     case 'others': return ['reg_no', 'name', 'semester', 'fee_name', 'amount'];
                     case 'users': return ['username', 'password', 'role', 'permissions'];
@@ -467,6 +468,8 @@
                     
                     let actionType = type.slice(0, -1);
                     if(type === 'others') actionType = 'other';
+                    
+                    setUploadStatus({ active: true, current: 0, total: rows.length - 1 });
 
                     for (let i = 1; i < rows.length; i++) {
                         const values = rows[i].split(',');
@@ -476,8 +479,20 @@
                             if (val && val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1);
                             obj[h] = val;
                         });
+                        
+                        // NEW: Auto-assign semester from input if available
+                        if(importTerm) {
+                            if(type === 'enrollments' || type === 'payments' || type === 'others') {
+                                obj.semester = importTerm;
+                            } else if(type === 'discounts') {
+                                obj.term = importTerm;
+                            }
+                        }
+
                         await postToApi(`save_${actionType}`, { data: obj });
+                        setUploadStatus(prev => ({ ...prev, current: i }));
                     }
+                    setUploadStatus({ active: false, current: 0, total: 0 });
                     alert(`Imported ${rows.length - 1} records!`);
                     e.target.value = null;
                 };
@@ -564,6 +579,9 @@
                                                 <div className="flex justify-between border-b border-gray-200 py-1"><span className="font-bold text-gray-600">Batch / Session:</span><span className="text-gray-900">{clearanceResult.student.batch}</span></div>
                                                 <div className="flex justify-between border-b border-gray-200 py-1"><span className="font-bold text-gray-600">Rate (Per Cr. Hr):</span><span className="text-gray-900">{clearanceResult.masterFee ? num(clearanceResult.masterFee.per_cr_fee) : '-'}</span></div>
                                             </div>
+                                            {!clearanceResult.masterFeeFound && (
+                                                <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4"><p className="text-sm text-yellow-700"><strong>Warning:</strong> No matching Fee Structure found for {clearanceResult.student.degree} {clearanceResult.student.batch}.</p></div>
+                                            )}
                                             <div className="overflow-x-auto">
                                                 <table className="w-full text-xs">
                                                     <thead className="bg-gray-100 text-gray-900 font-bold uppercase">
@@ -572,7 +590,7 @@
                                                     <tbody className="divide-y divide-gray-200">
                                                         {clearanceResult.rows.map((row, idx) => (
                                                             <tr key={idx} className="hover:bg-gray-50">
-                                                                <td className="p-2 border font-medium">{row.semester}</td><td className="p-2 border text-center">{row.courses}</td><td className="p-2 border text-center">{row.cr}</td><td className="p-2 border text-right text-gray-600">{num(row.tuition)}</td><td className="p-2 border text-right text-gray-600">{num(row.exam)}</td><td className="p-2 border text-right text-gray-600">{num(row.reg)}</td><td className="p-2 border text-right text-gray-600">{num(row.other)}</td><td className="p-2 border text-right font-bold bg-gray-50">{num(row.total)}</td><td className="p-2 border text-center text-gray-500">{row.discPct > 0 ? `${row.discPct}%` : '-'}</td><td className="p-2 border text-right text-gray-500">{row.discAmt > 0 ? num(row.discAmt) : '-'}</td><td className="p-2 border text-right font-bold">{num(row.netFee)}</td><td className="p-2 border text-right font-bold text-green-600">{num(row.totalPaid)}</td><td className={`p-2 border text-right font-bold ${row.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>{num(row.balance)}</td><td className="p-2 border text-center text-xs">{row.bank}</td>
+                                                                <td className="p-2 border font-medium">{row.semester}</td><td className="p-2 border text-center">{row.courses}</td><td className="p-2 border text-center">{row.cr}</td><td className="p-2 border text-right text-gray-600">{num(row.tuition)}</td><td className="p-2 border text-right text-gray-600">{num(row.exam)}</td><td className="p-2 border text-right text-gray-600">{num(row.reg)}</td><td className="p-2 border text-right text-gray-600">{num(row.other)}</td><td className="p-2 border text-right font-bold bg-gray-50">{num(row.total)}</td><td className="p-2 border text-center text-gray-500">{row.discPct > 0 ? `${row.discPct}%` : '-'}</td><td className="p-2 border text-right text-gray-500">{row.discAmt > 0 ? num(row.discAmt) : '-'}</td><td className="p-2 border text-right font-bold">{num(row.netFee)}</td><td className="p-2 border text-right font-bold text-green-600">{num(row.totalPaid)}</td><td className={`p-2 border text-right font-bold ${row.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>{num(row.balance)}</td><td className="p-2 border text-center text-xs">{row.bank || '-'}</td>
                                                             </tr>
                                                         ))}
                                                         <tr className="bg-gray-800 text-white font-bold"><td className="p-3"></td><td className="p-3 text-center">{clearanceResult.summary.courses}</td><td className="p-3 text-center">{clearanceResult.summary.cr}</td><td colSpan="4"></td><td className="p-3 text-right">{num(clearanceResult.summary.total)}</td><td className="p-3 text-center">-</td><td className="p-3 text-right">{num(clearanceResult.summary.fa)}</td><td className="p-3 text-right">{num(clearanceResult.summary.total - clearanceResult.summary.fa)}</td><td className="p-3 text-right text-green-400">{num(clearanceResult.summary.paid)}</td><td className={`p-3 text-right ${clearanceResult.summary.balance > 0 ? 'text-red-400' : 'text-green-400'}`}>{num(clearanceResult.summary.balance)}</td><td></td></tr>
@@ -599,6 +617,19 @@
                                     <div className="bg-white p-3 rounded-xl border border-gray-200 flex flex-wrap gap-3 items-center justify-between shadow-sm">
                                         <div className="relative flex-grow max-w-md"><Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" /><input type="text" value={tabSearch} onChange={(e) => setTabSearch(e.target.value)} placeholder={`Filter ${activeTab}...`} className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" /></div>
                                         <div className="flex gap-2">
+                                            
+                                            {/* NEW: Default Import Term Input */}
+                                            {(activeTab === 'enrollments' || activeTab === 'payments' || activeTab === 'discounts' || activeTab === 'others') && (
+                                                <input 
+                                                    type="text" 
+                                                    value={importTerm} 
+                                                    onChange={(e) => setImportTerm(e.target.value)} 
+                                                    placeholder="Default Semester (Import)" 
+                                                    className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-48 focus:ring-2 focus:ring-blue-500 outline-none"
+                                                    title="Records without a semester in the CSV will use this value"
+                                                />
+                                            )}
+
                                             <button onClick={refreshData} className="bg-gray-100 border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-200" title="Refresh Data"><Icon><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></Icon></button>
                                             {selectedIds.size > 0 && <button onClick={deleteSelected} className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm font-bold hover:bg-red-100 flex items-center gap-2 animate-pulse"><Trash2 className="h-4 w-4" /> Delete ({selectedIds.size})</button>}
                                             {(activeTab === 'enrollments' || activeTab === 'payments' || activeTab === 'others') && <button onClick={deleteBySemester} className="bg-orange-50 border border-orange-200 text-orange-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-orange-100 flex items-center gap-2"><CalendarX className="h-4 w-4" /> Del Sem</button>}
@@ -703,6 +734,18 @@
                                     <div><label className="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label><input required type="password" value={passwordData.confirm} onChange={e => setPasswordData({...passwordData, confirm: e.target.value})} className="w-full border p-2 rounded" /></div>
                                     <div className="flex justify-end gap-3 mt-4"><button type="button" onClick={() => {setShowPasswordModal(false); setPasswordData({current:'',new:'',confirm:''})}} className="px-4 py-2 bg-gray-100 rounded hover:bg-gray-200 font-bold">Cancel</button><button type="submit" className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-bold">Update</button></div>
                                 </form>
+                            </div>
+                        </div>
+                    )}
+                    {/* IMPORT PROGRESS BAR */}
+                    {uploadStatus.active && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+                            <div className="bg-white p-6 rounded-xl shadow-xl w-80 text-center">
+                                <h3 className="font-bold text-lg mb-2">Importing Data...</h3>
+                                <div className="w-full bg-gray-200 rounded-full h-4 mb-2">
+                                    <div className="bg-blue-600 h-4 rounded-full transition-all duration-300" style={{ width: `${(uploadStatus.current / uploadStatus.total) * 100}%` }}></div>
+                                </div>
+                                <p className="text-sm text-gray-600">{uploadStatus.current} / {uploadStatus.total}</p>
                             </div>
                         </div>
                     )}
