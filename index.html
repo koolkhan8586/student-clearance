@@ -542,6 +542,8 @@
                 link.click();
                 document.body.removeChild(link);
             };
+            
+            const processedData = getProcessedData();
 
             // --- VIEW ---
             if (!user) {
@@ -593,7 +595,6 @@
                     </div>
 
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                        {/* CLEARANCE REPORT UI */}
                         {activeTab === 'clearance' && (
                             <div className="space-y-6">
                                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 no-print">
