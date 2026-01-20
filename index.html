@@ -103,12 +103,13 @@
         const CloudUpload = (p) => <Icon {...p}><path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19a4 4 0 0 0 4 4h11a4 4 0 0 0 4-4v-2.5"/><line x1="16" y1="16" x2="16" y2="8"/><line x1="12" y1="12" x2="16" y2="8"/><line x1="20" y1="12" x2="16" y2="8"/></Icon>;
         const ArrowUpDown = (p) => <Icon {...p}><path d="M7 15l5 5 5-5"/><path d="M7 9l5-5 5 5"/></Icon>;
         const RefreshCw = (p) => <Icon {...p}><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></Icon>;
+        const Landmark = (p) => <Icon {...p}><line x1="3" y1="22" x2="21" y2="22" /><line x1="6" y1="18" x2="6" y2="11" /><line x1="10" y1="18" x2="10" y2="11" /><line x1="14" y1="18" x2="14" y2="11" /><line x1="18" y1="18" x2="18" y2="11" /><polygon points="12 2 20 7 4 7" /></Icon>;
 
         function App() {
             const [user, setUser] = useState(null);
             const [activeTab, setActiveTab] = useState('clearance');
             const [data, setData] = useState({
-                students: [], fees: [], enrollments: [], payments: [], discounts: [], others: [], users: []
+                students: [], fees: [], enrollments: [], payments: [], discounts: [], others: [], users: [], banks: []
             });
             const [searchReg, setSearchReg] = useState('');
             const [tabSearch, setTabSearch] = useState('');
@@ -122,10 +123,9 @@
             const [showPasswordModal, setShowPasswordModal] = useState(false);
             const [passwordData, setPasswordData] = useState({ current: '', new: '', confirm: '' });
             
-            // New state for upload progress
-            const [uploadStatus, setUploadStatus] = useState({ active: false, current: 0, total: 0 });
-            
             const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+            
+            const [uploadStatus, setUploadStatus] = useState({ active: false, current: 0, total: 0 });
 
             const TABS = [
                 { id: 'clearance', label: 'Clearance', icon: FileText },
@@ -134,7 +134,8 @@
                 { id: 'others', label: 'Other Charges', icon: AlertCircle },
                 { id: 'enrollments', label: 'Enrollments', icon: BookOpen },
                 { id: 'payments', label: 'Payments', icon: CreditCard },
-                { id: 'discounts', label: 'Discounts', icon: Percent }
+                { id: 'discounts', label: 'Discounts', icon: Percent },
+                { id: 'banks', label: 'Banks', icon: Landmark } // NEW TAB
             ];
 
             const availableTabs = user ? (
@@ -156,7 +157,8 @@
                             payments: json.payments || [],
                             discounts: json.discounts || [],
                             others: json.others || [],
-                            users: json.users || []
+                            users: json.users || [],
+                            banks: json.banks || []
                         });
                     }
                 } catch(e) { console.error("Connection Error:", e); }
@@ -200,15 +202,9 @@
                 const local = localStorage.getItem('feeSystemData_v2') || localStorage.getItem('fee_system_local');
                 if(!local) return alert("No local data found.");
                 const localData = JSON.parse(local);
-                const categories = ['students', 'fees', 'enrollments', 'payments', 'discounts', 'others'];
+                const categories = ['students', 'fees', 'enrollments', 'payments', 'discounts', 'others', 'banks'];
                 let count = 0;
-                
-                // Calculate total for progress bar (rough estimate, as categories might vary)
-                let totalItems = 0;
-                categories.forEach(c => totalItems += (localData[c] || []).length);
-                
-                setUploadStatus({ active: true, current: 0, total: totalItems });
-
+                setUploadStatus({ active: true, current: 0, total: 100 }); // Approximate
                 for (const cat of categories) {
                      const items = localData[cat] || [];
                      for (const item of items) {
@@ -216,11 +212,10 @@
                          if(cat === 'others') actionType = 'other';
                          await postToApi(`save_${actionType}`, { data: item });
                          count++;
-                         setUploadStatus(prev => ({ ...prev, current: count }));
                      }
                 }
                 setUploadStatus({ active: false, current: 0, total: 0 });
-                alert(`Sync Complete! Uploaded ${count} records.`);
+                alert(`Sync Complete! Uploaded/Checked ${count} records.`);
                 refreshData();
             };
 
@@ -415,10 +410,11 @@
                     case 'students': return ['reg_no', 'name', 'degree', 'batch'];
                     case 'fees': return ['degree', 'batch', 'per_cr_fee', 'per_course_fee', 'reg_fee', 'other_fee'];
                     case 'enrollments': return ['reg_no', 'name', 'semester', 'cr', 'courses'];
-                    case 'payments': return ['reg_no', 'name', 'semester', 'amount', 'date'];
+                    case 'payments': return ['reg_no', 'name', 'semester', 'amount', 'date', 'bank']; // Added Bank
                     case 'discounts': return ['reg_no', 'name', 'term', 'discount'];
                     case 'others': return ['reg_no', 'name', 'semester', 'fee_name', 'amount'];
                     case 'users': return ['username', 'password', 'role', 'permissions'];
+                    case 'banks': return ['name', 'account_no'];
                     default: return [];
                 }
             };
@@ -471,9 +467,6 @@
                     
                     let actionType = type.slice(0, -1);
                     if(type === 'others') actionType = 'other';
-                    
-                    // Progress tracking
-                    setUploadStatus({ active: true, current: 0, total: rows.length - 1 });
 
                     for (let i = 1; i < rows.length; i++) {
                         const values = rows[i].split(',');
@@ -484,9 +477,7 @@
                             obj[h] = val;
                         });
                         await postToApi(`save_${actionType}`, { data: obj });
-                        setUploadStatus(prev => ({ ...prev, current: i }));
                     }
-                    setUploadStatus({ active: false, current: 0, total: 0 });
                     alert(`Imported ${rows.length - 1} records!`);
                     e.target.value = null;
                 };
@@ -573,22 +564,18 @@
                                                 <div className="flex justify-between border-b border-gray-200 py-1"><span className="font-bold text-gray-600">Batch / Session:</span><span className="text-gray-900">{clearanceResult.student.batch}</span></div>
                                                 <div className="flex justify-between border-b border-gray-200 py-1"><span className="font-bold text-gray-600">Rate (Per Cr. Hr):</span><span className="text-gray-900">{clearanceResult.masterFee ? num(clearanceResult.masterFee.per_cr_fee) : '-'}</span></div>
                                             </div>
-                                            {!clearanceResult.masterFeeFound && (
-                                                <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4"><p className="text-sm text-yellow-700"><strong>Warning:</strong> No matching Fee Structure found for {clearanceResult.student.degree} {clearanceResult.student.batch}.</p></div>
-                                            )}
                                             <div className="overflow-x-auto">
                                                 <table className="w-full text-xs">
                                                     <thead className="bg-gray-100 text-gray-900 font-bold uppercase">
-                                                        <tr><th className="p-2 border">Sem</th><th className="p-2 border text-center">Sub</th><th className="p-2 border text-center">Cr</th><th className="p-2 border text-right">Tuition</th><th className="p-2 border text-right">Exam</th><th className="p-2 border text-right">Reg</th><th className="p-2 border text-right">Other</th><th className="p-2 border text-right bg-gray-50">Total</th><th className="p-2 border text-center">Disc %</th><th className="p-2 border text-right">Disc Amt</th><th className="p-2 border text-right">Net Fee</th><th className="p-2 border text-right text-green-700">Paid</th><th className="p-2 border text-right">Balance</th></tr>
+                                                        <tr><th className="p-2 border">Sem</th><th className="p-2 border text-center">Sub</th><th className="p-2 border text-center">Cr</th><th className="p-2 border text-right">Tuition</th><th className="p-2 border text-right">Exam</th><th className="p-2 border text-right">Reg</th><th className="p-2 border text-right">Other</th><th className="p-2 border text-right bg-gray-50">Total</th><th className="p-2 border text-center">Disc %</th><th className="p-2 border text-right">Disc Amt</th><th className="p-2 border text-right">Net Fee</th><th className="p-2 border text-right text-green-700">Paid</th><th className="p-2 border text-right">Balance</th><th className="p-2 border text-center">Bank</th></tr>
                                                     </thead>
                                                     <tbody className="divide-y divide-gray-200">
                                                         {clearanceResult.rows.map((row, idx) => (
                                                             <tr key={idx} className="hover:bg-gray-50">
-                                                                <td className="p-2 border font-medium">{row.semester}</td><td className="p-2 border text-center">{row.courses}</td><td className="p-2 border text-center">{row.cr}</td><td className="p-2 border text-right text-gray-600">{num(row.tuition)}</td><td className="p-2 border text-right text-gray-600">{num(row.exam)}</td><td className="p-2 border text-right text-gray-600">{num(row.reg)}</td><td className="p-2 border text-right text-gray-600">{num(row.other)}</td><td className="p-2 border text-right font-bold bg-gray-50">{num(row.total)}</td><td className="p-2 border text-center text-gray-500">{row.discPct > 0 ? `${row.discPct}%` : '-'}</td><td className="p-2 border text-right text-gray-500">{row.discAmt > 0 ? num(row.discAmt) : '-'}</td><td className="p-2 border text-right font-bold">{num(row.netFee)}</td><td className="p-2 border text-right font-bold text-green-600">{num(row.totalPaid)}</td><td className={`p-2 border text-right font-bold ${row.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>{num(row.balance)}</td>
+                                                                <td className="p-2 border font-medium">{row.semester}</td><td className="p-2 border text-center">{row.courses}</td><td className="p-2 border text-center">{row.cr}</td><td className="p-2 border text-right text-gray-600">{num(row.tuition)}</td><td className="p-2 border text-right text-gray-600">{num(row.exam)}</td><td className="p-2 border text-right text-gray-600">{num(row.reg)}</td><td className="p-2 border text-right text-gray-600">{num(row.other)}</td><td className="p-2 border text-right font-bold bg-gray-50">{num(row.total)}</td><td className="p-2 border text-center text-gray-500">{row.discPct > 0 ? `${row.discPct}%` : '-'}</td><td className="p-2 border text-right text-gray-500">{row.discAmt > 0 ? num(row.discAmt) : '-'}</td><td className="p-2 border text-right font-bold">{num(row.netFee)}</td><td className="p-2 border text-right font-bold text-green-600">{num(row.totalPaid)}</td><td className={`p-2 border text-right font-bold ${row.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>{num(row.balance)}</td><td className="p-2 border text-center text-xs">{row.bank}</td>
                                                             </tr>
                                                         ))}
-                                                        {clearanceResult.rows.length === 0 && <tr><td colSpan="13" className="p-4 text-center text-gray-400 italic">No enrollment records found.</td></tr>}
-                                                        <tr className="bg-gray-800 text-white font-bold"><td className="p-3"></td><td className="p-3 text-center">{clearanceResult.summary.courses}</td><td className="p-3 text-center">{clearanceResult.summary.cr}</td><td colSpan="4"></td><td className="p-3 text-right">{num(clearanceResult.summary.total)}</td><td className="p-3 text-center">-</td><td className="p-3 text-right">{num(clearanceResult.summary.fa)}</td><td className="p-3 text-right">{num(clearanceResult.summary.total - clearanceResult.summary.fa)}</td><td className="p-3 text-right text-green-400">{num(clearanceResult.summary.paid)}</td><td className={`p-3 text-right ${clearanceResult.summary.balance > 0 ? 'text-red-400' : 'text-green-400'}`}>{num(clearanceResult.summary.balance)}</td></tr>
+                                                        <tr className="bg-gray-800 text-white font-bold"><td className="p-3"></td><td className="p-3 text-center">{clearanceResult.summary.courses}</td><td className="p-3 text-center">{clearanceResult.summary.cr}</td><td colSpan="4"></td><td className="p-3 text-right">{num(clearanceResult.summary.total)}</td><td className="p-3 text-center">-</td><td className="p-3 text-right">{num(clearanceResult.summary.fa)}</td><td className="p-3 text-right">{num(clearanceResult.summary.total - clearanceResult.summary.fa)}</td><td className="p-3 text-right text-green-400">{num(clearanceResult.summary.paid)}</td><td className={`p-3 text-right ${clearanceResult.summary.balance > 0 ? 'text-red-400' : 'text-green-400'}`}>{num(clearanceResult.summary.balance)}</td><td></td></tr>
                                                     </tbody>
                                                 </table>
                                             </div>
@@ -617,9 +604,9 @@
                                             {(activeTab === 'enrollments' || activeTab === 'payments' || activeTab === 'others') && <button onClick={deleteBySemester} className="bg-orange-50 border border-orange-200 text-orange-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-orange-100 flex items-center gap-2"><CalendarX className="h-4 w-4" /> Del Sem</button>}
                                             {user.role === 'admin' && <button onClick={deleteAllInTab} className="bg-white border border-red-200 text-red-600 px-3 py-2 rounded-lg text-sm font-medium hover:bg-red-50 flex items-center gap-2"><XSquare className="h-4 w-4" /> Delete All</button>}
                                             <div className="h-8 w-px bg-gray-300 mx-1"></div>
-                                            <button onClick={() => downloadSample(activeTab)} className="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2"><FileSpreadsheet className="h-4 w-4" /></button>
+                                            <button onClick={() => downloadSample(activeTab)} className="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2"><FileSpreadsheet className="h-4 w-4" /> Sample</button>
                                             <label className="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 cursor-pointer flex items-center gap-2"><Download className="h-4 w-4" /><input type="file" onChange={(e) => handleImport(e, activeTab)} className="hidden" accept=".csv" /></label>
-                                            <button onClick={() => handleExport(activeTab)} className="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2"><Upload className="h-4 w-4" /></button>
+                                            <button onClick={() => handleExport(activeTab)} className="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2"><Upload className="h-4 w-4" /> Export</button>
                                         </div>
                                     </div>
                                 </div>
@@ -636,10 +623,11 @@
                                                         {activeTab === 'students' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4 font-bold">{item.name}</td><td className="p-4"><span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-bold">{item.degree}</span></td><td className="p-4 text-gray-500">{item.batch}</td></>}
                                                         {activeTab === 'fees' && <><td className="p-4 font-bold">{item.degree}</td><td className="p-4 text-gray-600">{item.batch}</td><td className="p-4 text-right text-gray-500">{num(item.per_cr_fee)}</td><td className="p-4 text-right font-bold text-green-700">{num(item.per_course_fee)}</td><td className="p-4 text-right text-gray-500">{num(item.reg_fee)}</td><td className="p-4 text-right text-gray-500">{num(item.other_fee)}</td></>}
                                                         {activeTab === 'enrollments' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4"><span className="bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-xs font-bold">{item.semester}</span></td><td className="p-4">{item.cr}</td><td className="p-4">{item.courses}</td></>}
-                                                        {activeTab === 'payments' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4"><span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-bold">{item.semester}</span></td><td className="p-4 text-right font-bold">{num(item.amount)}</td><td className="p-4">{item.date}</td></>}
+                                                        {activeTab === 'payments' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4"><span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-bold">{item.semester}</span></td><td className="p-4 text-right font-bold">{num(item.amount)}</td><td className="p-4">{item.date}</td><td className="p-4">{item.bank}</td></>}
                                                         {activeTab === 'others' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4 text-gray-600">{item.semester}</td><td className="p-4"><span className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs font-bold">{item.fee_name}</span></td><td className="p-4 text-right font-bold">{num(item.amount)}</td></>}
                                                         {activeTab === 'discounts' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4 text-gray-500">{item.term}</td><td className="p-4 text-right font-bold text-purple-600">{item.discount}%</td></>}
                                                         {activeTab === 'users' && <><td className="p-4 font-bold">{item.username}</td><td className="p-4">****</td><td className="p-4 capitalize">{item.role}</td><td className="p-4 text-xs max-w-xs truncate">{item.role === 'admin' ? 'Full Access' : (Array.isArray(item.permissions) ? item.permissions.join(', ') : item.permissions)}</td></>}
+                                                        {activeTab === 'banks' && <><td className="p-4 font-bold">{item.name}</td><td className="p-4 text-gray-600 font-mono">{item.account_no}</td></>}
                                                         <td className="p-4 text-center flex justify-center gap-2">
                                                             <button onClick={() => openModal(activeTab, item)} className="p-2 text-blue-600 hover:bg-blue-50 rounded"><i className="fas fa-edit"></i> Edit</button>
                                                             <button onClick={() => handleDelete(activeTab, item.id)} className="p-2 text-red-600 hover:bg-red-50 rounded"><Trash2 className="h-4 w-4" /></button>
@@ -662,9 +650,17 @@
                                     {modalType === 'students' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={e => setFormData({...formData, reg_no: e.target.value})} /><input required placeholder="Full Name" className="w-full border p-2 rounded" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} /><div className="grid grid-cols-2 gap-4"><input placeholder="Degree (e.g. BSCAF)" className="w-full border p-2 rounded" value={formData.degree || ''} onChange={e => setFormData({...formData, degree: e.target.value})} /><input placeholder="Batch (e.g. Fall 2023)" className="w-full border p-2 rounded" value={formData.batch || ''} onChange={e => setFormData({...formData, batch: e.target.value})} /></div></>}
                                     {modalType === 'fees' && <><div className="bg-blue-50 p-3 rounded text-xs text-blue-800 mb-2"><strong>Note:</strong> Fee Structure applies to ALL semesters for this Degree & Batch.</div><div className="grid grid-cols-2 gap-4"><input required placeholder="Degree" className="w-full border p-2 rounded" value={formData.degree || ''} onChange={e => setFormData({...formData, degree: e.target.value})} /><input required placeholder="Batch" className="w-full border p-2 rounded" value={formData.batch || ''} onChange={e => setFormData({...formData, batch: e.target.value})} /></div><div className="grid grid-cols-2 gap-4"><input type="number" placeholder="Fee Per Credit Hour" className="w-full border p-2 rounded" value={formData.per_cr_fee || ''} onChange={e => setFormData({...formData, per_cr_fee: e.target.value})} /><input type="number" placeholder="Fee Per Subject/Course" className="w-full border p-2 rounded" value={formData.per_course_fee || ''} onChange={e => setFormData({...formData, per_course_fee: e.target.value})} /></div><div className="grid grid-cols-2 gap-4"><input type="number" placeholder="Registration Fee (Semester)" className="w-full border p-2 rounded" value={formData.reg_fee || ''} onChange={e => setFormData({...formData, reg_fee: e.target.value})} /><input type="number" placeholder="Other Charges (Semester)" className="w-full border p-2 rounded" value={formData.other_fee || ''} onChange={e => setFormData({...formData, other_fee: e.target.value})} /></div></>}
                                     {modalType === 'enrollments' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={e => setFormData({...formData, reg_no: e.target.value})} /><input placeholder="Student Name" className="w-full border p-2 rounded" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} /><input required placeholder="Semester (e.g. Spring 2024)" className="w-full border p-2 rounded" value={formData.semester || ''} onChange={e => setFormData({...formData, semester: e.target.value})} /><div className="grid grid-cols-2 gap-4"><input type="number" placeholder="Credit Hours" className="w-full border p-2 rounded" value={formData.cr || ''} onChange={e => setFormData({...formData, cr: e.target.value})} /><input type="number" placeholder="No. of Courses" className="w-full border p-2 rounded" value={formData.courses || ''} onChange={e => setFormData({...formData, courses: e.target.value})} /></div></>}
-                                    {modalType === 'payments' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={e => setFormData({...formData, reg_no: e.target.value})} /><input required placeholder="Semester (e.g. Spring 2024)" className="w-full border p-2 rounded" value={formData.semester || ''} onChange={e => setFormData({...formData, semester: e.target.value})} /><input required type="number" placeholder="Amount Paid" className="w-full border p-2 rounded font-bold text-lg" value={formData.amount || ''} onChange={e => setFormData({...formData, amount: e.target.value})} /><input type="date" className="w-full border p-2 rounded" value={formData.date || ''} onChange={e => setFormData({...formData, date: e.target.value})} /></>}
+                                    {modalType === 'payments' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={e => setFormData({...formData, reg_no: e.target.value})} /><input required placeholder="Semester (e.g. Spring 2024)" className="w-full border p-2 rounded" value={formData.semester || ''} onChange={e => setFormData({...formData, semester: e.target.value})} /><input required type="number" placeholder="Amount Paid" className="w-full border p-2 rounded font-bold text-lg" value={formData.amount || ''} onChange={e => setFormData({...formData, amount: e.target.value})} /><input type="date" className="w-full border p-2 rounded" value={formData.date || ''} onChange={e => setFormData({...formData, date: e.target.value})} />
+                                    <label className="block text-sm font-bold text-gray-700 mt-2 mb-1">Payment Through (Bank)</label>
+                                    <select className="w-full border p-2 rounded bg-white" value={formData.bank || ''} onChange={e => setFormData({...formData, bank: e.target.value})}>
+                                        <option value="">Select Bank</option>
+                                        <option value="Cash">Cash</option>
+                                        {data.banks.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
+                                    </select>
+                                    </>}
                                     {modalType === 'others' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={e => setFormData({...formData, reg_no: e.target.value})} /><div className="grid grid-cols-2 gap-4"><input required placeholder="Semester" className="w-full border p-2 rounded" value={formData.semester || ''} onChange={e => setFormData({...formData, semester: e.target.value})} /><input required placeholder="Fee Name (e.g. Late Fine)" className="w-full border p-2 rounded" value={formData.fee_name || ''} onChange={e => setFormData({...formData, fee_name: e.target.value})} /></div><input required type="number" placeholder="Amount" className="w-full border p-2 rounded font-bold text-lg" value={formData.amount || ''} onChange={e => setFormData({...formData, amount: e.target.value})} /></>}
                                     {modalType === 'discounts' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={e => setFormData({...formData, reg_no: e.target.value})} /><input required placeholder="Term" className="w-full border p-2 rounded" value={formData.term || ''} onChange={e => setFormData({...formData, term: e.target.value})} /><input required type="number" placeholder="Discount %" className="w-full border p-2 rounded" value={formData.discount || ''} onChange={e => setFormData({...formData, discount: e.target.value})} /></>}
+                                    {modalType === 'banks' && <><input required placeholder="Bank Name" className="w-full border p-2 rounded" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} /><input placeholder="Account Number (Optional)" className="w-full border p-2 rounded" value={formData.account_no || ''} onChange={e => setFormData({...formData, account_no: e.target.value})} /></>}
                                     {modalType === 'users' && (
                                         <div className="space-y-4">
                                             <input required placeholder="Username" className="w-full border p-2 rounded" value={formData.username || ''} onChange={e => setFormData({...formData, username: e.target.value})} />
@@ -707,18 +703,6 @@
                                     <div><label className="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label><input required type="password" value={passwordData.confirm} onChange={e => setPasswordData({...passwordData, confirm: e.target.value})} className="w-full border p-2 rounded" /></div>
                                     <div className="flex justify-end gap-3 mt-4"><button type="button" onClick={() => {setShowPasswordModal(false); setPasswordData({current:'',new:'',confirm:''})}} className="px-4 py-2 bg-gray-100 rounded hover:bg-gray-200 font-bold">Cancel</button><button type="submit" className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-bold">Update</button></div>
                                 </form>
-                            </div>
-                        </div>
-                    )}
-                    {/* IMPORT PROGRESS BAR */}
-                    {uploadStatus.active && (
-                        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-                            <div className="bg-white p-6 rounded-xl shadow-xl w-80 text-center">
-                                <h3 className="font-bold text-lg mb-2">Importing Data...</h3>
-                                <div className="w-full bg-gray-200 rounded-full h-4 mb-2">
-                                    <div className="bg-blue-600 h-4 rounded-full transition-all duration-300" style={{ width: `${(uploadStatus.current / uploadStatus.total) * 100}%` }}></div>
-                                </div>
-                                <p className="text-sm text-gray-600">{uploadStatus.current} / {uploadStatus.total}</p>
                             </div>
                         </div>
                     )}
