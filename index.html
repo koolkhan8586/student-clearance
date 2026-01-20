@@ -48,17 +48,17 @@
                 width: 100%;
                 font-size: 11px; /* Slightly larger font */
                 border-collapse: collapse;
-                table-layout: fixed; /* Force column widths to respect container */
+                table-layout: fixed;
             }
             #printableArea th, #printableArea td {
                 padding: 6px; /* Increased padding */
-                border: 1px solid #9ca3af; /* Darker border for print */
-                word-wrap: break-word; /* Prevent overflow */
+                border: 1px solid #9ca3af;
+                word-wrap: break-word;
             }
             
             @page {
                 size: A4 portrait;
-                margin: 5mm; /* Small margin */
+                margin: 5mm;
             }
             /* Hide non-essential UI elements in print mode just in case */
             .no-print { display: none !important; }
@@ -476,11 +476,12 @@
                     const newItems = [];
                     
                     for (let i = 1; i < rows.length; i++) {
-                        const values = rows[i].split(',');
+                        // Regex to split by comma ONLY if not inside quotes
+                        const values = rows[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
                         const obj = {};
                         headers.forEach((h, index) => {
-                            let val = values[index];
-                            if (val && val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1);
+                            let val = values[index] ? values[index].trim() : '';
+                            if (val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1);
                             obj[h] = val;
                         });
                         
