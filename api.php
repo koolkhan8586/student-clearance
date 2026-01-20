@@ -146,7 +146,10 @@ if ($method === 'POST' && isset($input['action'])) {
                 $stmt->execute([$dbId, $data['reg_no'], $data['name'], $data['term'], $discount,
                                 $data['reg_no'], $data['name'], $data['term'], $discount]);
                 break;
+            
+            // FIX: Added 'delete_discounts' to handle plural form from frontend
             case 'delete_discount':
+            case 'delete_discounts': 
                 $stmt = $pdo->prepare("DELETE FROM discounts WHERE id = ?");
                 $stmt->execute([$id]);
                 break;
