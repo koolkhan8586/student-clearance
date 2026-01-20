@@ -149,19 +149,30 @@
                 try {
                     const res = await fetch(API_URL);
                     const json = await res.json();
-                    // DATA SANITIZATION: Force arrays even if missing
-                    setData({
-                        students: json.students || [],
-                        fees: json.fees || [],
-                        enrollments: json.enrollments || [],
-                        payments: json.payments || [],
-                        discounts: json.discounts || [],
-                        others: json.others || [],
-                        users: json.users || [],
-                        banks: json.banks || []
-                    });
+                    
+                    // SAFEGUARD: Ensure all arrays exist, defaulting to [] if API returns partial data or error
+                    const safeData = {
+                        students: Array.isArray(json.students) ? json.students : [],
+                        fees: Array.isArray(json.fees) ? json.fees : [],
+                        enrollments: Array.isArray(json.enrollments) ? json.enrollments : [],
+                        payments: Array.isArray(json.payments) ? json.payments : [],
+                        discounts: Array.isArray(json.discounts) ? json.discounts : [],
+                        others: Array.isArray(json.others) ? json.others : [],
+                        users: Array.isArray(json.users) ? json.users : [],
+                        banks: Array.isArray(json.banks) ? json.banks : []
+                    };
+                    
+                    // Fallback to local storage if API fails completely (offline support)
+                    // REMOVED FOR NOW TO PREVENT CONFLICTS AS REQUESTED
+                    
+                    setData(safeData);
+
                 } catch(e) { 
-                    console.error("Connection Error:", e); 
+                    console.error("Connection Error:", e);
+                    // On error, prevent crash by initializing empty state
+                    setData({
+                        students: [], fees: [], enrollments: [], payments: [], discounts: [], others: [], users: [], banks: []
+                    });
                 }
             };
 
@@ -169,7 +180,6 @@
                 refreshData();
                 const storedUser = sessionStorage.getItem('feeUser');
                 if(storedUser) setUser(JSON.parse(storedUser));
-                // REMOVED LOCAL STORAGE LOADING TO FORCE DB USAGE AND PREVENT CRASHES
             }, []);
 
             useEffect(() => {
@@ -262,9 +272,10 @@
 
             // --- PROCESSING ---
             const getProcessedData = () => {
-                let result = data[activeTab] || []; 
+                // Safeguard against undefined activeTab
+                let result = (data[activeTab] || []); 
                 if (tabSearch) {
-                    result = result.filter(item => Object.values(item).some(val => String(val).toLowerCase().includes(tabSearch.toLowerCase())));
+                    result = result.filter(item => Object.values(item).some(val => String(val || '').toLowerCase().includes(tabSearch.toLowerCase())));
                 }
                 if (sortConfig.key) {
                     result = [...result].sort((a, b) => {
