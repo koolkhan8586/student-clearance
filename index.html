@@ -3,20 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Student Fee Management</title>
+    <title>LSAF Fee Management</title>
     
     <!-- TAILWIND CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
     <!-- REACT & REACT DOM -->
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     
     <!-- BABEL -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
 
-    <!-- FONT & ICONS -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- FONT AWESOME -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     
     <style>
         .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -27,17 +27,22 @@
             body * { visibility: hidden; }
             #printableArea, #printableArea * { visibility: visible; }
             #printableArea {
-                position: absolute; left: 0; top: 0; width: 100%; height: 100%;
-                margin: 0; padding: 10px; background: white;
-                transform: scale(0.85); transform-origin: top left;
+                position: absolute; left: 0; top: 0; width: 100%; min-height: 100%;
+                margin: 0; padding: 20px; background: white;
+                transform: scale(0.95); transform-origin: top center;
+                color-adjust: exact; -webkit-print-color-adjust: exact;
             }
-            #printableArea table { width: 100%; font-size: 10px; border-collapse: collapse; }
-            #printableArea th, #printableArea td { padding: 4px; border: 1px solid #000; }
-            @page { size: A4; margin: 0; }
+            #printableArea table { width: 100%; font-size: 11px; border-collapse: collapse; border: 2px solid #000; }
+            #printableArea th { background-color: #f3f4f6 !important; font-weight: 800; border: 1px solid #000; padding: 4px; }
+            #printableArea td { border: 1px solid #000; padding: 4px; }
+            #printableArea .bg-gray-200 { background-color: #e5e7eb !important; }
+            #printableArea .bg-black { background-color: #000 !important; color: #fff !important; }
+            /* Summary Box Print Styles */
+            #summary-box { border: 2px solid #000 !important; background-color: #fff !important; }
+            @page { size: A4 portrait; margin: 5mm; }
             .no-print { display: none !important; }
         }
 
-        /* Error Overlay */
         #js-error-display {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: #fff0f0; color: #d8000c; z-index: 9999; padding: 2rem; font-family: monospace;
@@ -45,27 +50,22 @@
     </style>
 </head>
 <body class="bg-gray-100 font-sans text-gray-800">
-    <!-- Error Container -->
+
     <div id="js-error-display">
-        <h1 class="text-2xl font-bold mb-4">Application Error</h1>
-        <p>Something went wrong. Please share this error message:</p>
+        <h1 class="text-2xl font-bold mb-4">System Error</h1>
+        <p>Please reload the page. If the issue persists, contact support.</p>
         <pre id="error-message" class="bg-white p-4 border border-red-300 mt-4 rounded"></pre>
-        <button onclick="localStorage.clear(); sessionStorage.clear(); window.location.reload();" class="mt-6 px-6 py-3 bg-red-600 text-white rounded font-bold hover:bg-red-700">
-            Reset App Data & Reload
-        </button>
+        <button onclick="location.reload()" class="mt-4 px-4 py-2 bg-red-600 text-white rounded">Reload</button>
     </div>
 
-    <!-- React Root -->
     <div id="root"></div>
 
-    <!-- Error Handler Script -->
     <script>
-        window.onerror = function(message, source, lineno, colno, error) {
-            var display = document.getElementById('js-error-display');
-            var msg = document.getElementById('error-message');
-            display.style.display = 'block';
-            msg.innerText = "Error: " + message + "\nLine: " + lineno + "\nSource: " + source;
-            return false;
+        window.onerror = function(msg, source, lineno, colno, error) {
+            if (msg.toLowerCase().includes('script error')) return false;
+            document.getElementById('js-error-display').style.display = 'block';
+            document.getElementById('error-message').innerText = msg + '\nLine: ' + lineno;
+            return false; 
         };
     </script>
 
@@ -74,30 +74,45 @@
         const API_URL = 'api.php';
 
         // --- ICONS ---
-        const Icon = ({ d, ...props }) => (<svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>);
-        const Search = (p) => <Icon d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" {...p} />;
-        const Plus = (p) => <Icon d="M12 5v14m-7-7h14" {...p} />;
-        const Trash2 = (p) => <Icon d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" {...p} />;
-        const FileText = (p) => <Icon d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" {...p} />;
-        const Users = (p) => <Icon d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" {...p} />;
-        const DollarSign = (p) => <Icon d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" {...p} />;
-        const BookOpen = (p) => <Icon d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2zM22 3h-6a4 4 0 00-4 4v14a3 3 0 0 1 3-3h7z" {...p} />;
-        const CreditCard = (p) => <Icon d="M1 4h22v16H1zM1 10h22" {...p} />;
-        const Percent = (p) => <Icon d="M19 5L5 19M6.5 6.5h0M17.5 17.5h0" {...p} />;
-        const Printer = (p) => <Icon d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 01 2 2v5a2 2 0 0 1-2 2h-2" {...p} />;
-        const Download = (p) => <Icon d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" {...p} />;
-        const Upload = (p) => <Icon d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" {...p} />;
-        const FileSpreadsheet = (p) => <Icon d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" {...p} />;
-        const XSquare = (p) => <Icon d="M3 3h18v18H3zM9 9l6 6M15 9l-6 6" {...p} />;
-        const AlertCircle = (p) => <Icon d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zM12 8v4M12 16h.01" {...p} />;
-        const CalendarX = (p) => <Icon d="M19 4H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V6a2 2 0 00-2-2zM16 2v4M8 2v4M3 10h18M10 14l4 4M14 14l-4 4" {...p} />;
-        const Lock = (p) => <Icon d="M19 11H5a2 2 0 00-2 2v7a2 2 0 002 2h14a2 2 0 002-2v-7a2 2 0 00-2-2zm-2 0V7a5 5 0 00-10 0v4" {...p} />;
-        const LogOut = (p) => <Icon d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" {...p} />;
-        const Shield = (p) => <Icon d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" {...p} />;
-        const Key = (p) => <Icon d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" {...p} />;
-        const Landmark = (p) => <Icon d="M3 22h18M6 18v-7M10 18v-7M14 18v-7M18 18v-7M12 2l8 5H4z" {...p} />;
+        const Icon = ({ d }) => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>;
+        const Search = () => <Icon d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />;
+        const Plus = () => <Icon d="M12 5v14m-7-7h14" />;
+        const Trash2 = () => <Icon d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />;
+        const FileText = () => <Icon d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />;
+        const Users = () => <Icon d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />;
+        const DollarSign = () => <Icon d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />;
+        const BookOpen = () => <Icon d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2zM22 3h-6a4 4 0 00-4 4v14a3 3 0 0 1 3-3h7z" />;
+        const CreditCard = () => <Icon d="M1 4h22v16H1zM1 10h22" />;
+        const Percent = () => <Icon d="M19 5L5 19M6.5 6.5h0M17.5 17.5h0" />;
+        const Printer = () => <Icon d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 01 2 2v5a2 2 0 0 1-2 2h-2" />;
+        const Download = () => <Icon d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />;
+        const Upload = () => <Icon d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" />;
+        const FileSpreadsheet = () => <Icon d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />;
+        const XSquare = () => <Icon d="M3 3h18v18H3zM9 9l6 6M15 9l-6 6" />;
+        const AlertCircle = () => <Icon d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zM12 8v4M12 16h.01" />;
+        const CalendarX = () => <Icon d="M19 4H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V6a2 2 0 00-2-2zM16 2v4M8 2v4M3 10h18M10 14l4 4M14 14l-4 4" />;
+        const Lock = () => <Icon d="M19 11H5a2 2 0 00-2 2v7a2 2 0 002 2h14a2 2 0 002-2v-7a2 2 0 00-2-2zm-2 0V7a5 5 0 00-10 0v4" />;
+        const LogOut = () => <Icon d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" />;
+        const Shield = () => <Icon d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />;
+        const Key = () => <Icon d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />;
+        const Landmark = () => <Icon d="M3 22h18M6 18v-7M10 18v-7M14 18v-7M18 18v-7M12 2l8 5H4z" />;
+        const PieChart = () => <Icon d="M21.21 15.89A10 10 0 1 1 8 2.83M22 12A10 10 0 0 0 12 2v10z" />;
+
+        // --- GLOBAL CONFIG ---
+        const TABS = [
+            { id: 'clearance', label: 'Clearance', icon: FileText },
+            { id: 'summary', label: 'Summary', icon: PieChart }, 
+            { id: 'students', label: 'Students', icon: Users },
+            { id: 'fees', label: 'Fee Structure', icon: DollarSign },
+            { id: 'others', label: 'Other Charges', icon: AlertCircle },
+            { id: 'enrollments', label: 'Enrollments', icon: BookOpen },
+            { id: 'payments', label: 'Payments', icon: CreditCard },
+            { id: 'discounts', label: 'Discounts', icon: Percent },
+            { id: 'banks', label: 'Banks', icon: Landmark } 
+        ];
 
         function App() {
+            // --- STATE ---
             const [user, setUser] = useState(null);
             const [activeTab, setActiveTab] = useState('clearance');
             const [data, setData] = useState({
@@ -107,6 +122,8 @@
             const [tabSearch, setTabSearch] = useState('');
             const [selectedIds, setSelectedIds] = useState(new Set());
             const [clearanceResult, setClearanceResult] = useState(null);
+            
+            // Modals & Forms
             const [showModal, setShowModal] = useState(false);
             const [modalType, setModalType] = useState('');
             const [editingId, setEditingId] = useState(null);
@@ -114,24 +131,22 @@
             const [loginData, setLoginData] = useState({ username: '', password: '' });
             const [showPasswordModal, setShowPasswordModal] = useState(false);
             const [passwordData, setPasswordData] = useState({ current: '', new: '', confirm: '' });
+            
             const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
             const [importPreview, setImportPreview] = useState({ show: false, total: 0, newItems: [], duplicates: [], type: '' });
             const [uploadStatus, setUploadStatus] = useState({ active: false, current: 0, total: 0, title: '' });
             const [importTerm, setImportTerm] = useState(''); 
-
-            const TABS = [
-                { id: 'clearance', label: 'Clearance', icon: FileText },
-                { id: 'students', label: 'Students', icon: Users },
-                { id: 'fees', label: 'Fee Structure', icon: DollarSign },
-                { id: 'others', label: 'Other Charges', icon: AlertCircle },
-                { id: 'enrollments', label: 'Enrollments', icon: BookOpen },
-                { id: 'payments', label: 'Payments', icon: CreditCard },
-                { id: 'discounts', label: 'Discounts', icon: Percent },
-                { id: 'banks', label: 'Banks', icon: Landmark } 
-            ];
+            const [summaryTerm, setSummaryTerm] = useState('');
+            const [summaryData, setSummaryData] = useState(null);
 
             const isAdmin = user && ((user.role && user.role.toLowerCase() === 'admin') || (user.username && user.username.toLowerCase() === 'admin'));
-            const availableTabs = user ? (isAdmin ? [...TABS, { id: 'users', label: 'Users & Access', icon: Shield }] : TABS.filter(t => user.permissions && user.permissions.includes(t.id))) : [];
+            
+            // Fix: Filter tabs to ensure they exist before trying to render
+            const availableTabs = user ? (
+                isAdmin 
+                ? [...TABS, { id: 'users', label: 'Users & Access', icon: Shield }] 
+                : TABS.filter(t => user.permissions && user.permissions.includes(t.id))
+            ) : [];
 
             // FETCH DATA
             const refreshData = async () => {
@@ -158,8 +173,8 @@
             useEffect(() => {
                 refreshData();
                 try {
-                    const storedUser = sessionStorage.getItem('feeUser');
-                    if(storedUser) setUser(JSON.parse(storedUser));
+                    const sess = sessionStorage.getItem('feeUser');
+                    if(sess) setUser(JSON.parse(sess));
                 } catch(e) {}
             }, []);
 
@@ -181,7 +196,7 @@
             }, [activeTab]);
 
             // UTILS
-            const norm = (str) => str ? str.toString().toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+            const norm = (str) => str ? String(str).toLowerCase().replace(/[^a-z0-9]/g, '') : '';
             const num = (n) => parseFloat(n || 0).toLocaleString('en-US');
 
             const getProcessedData = () => {
@@ -194,9 +209,7 @@
                         let valA = a[sortConfig.key]?.toString().toLowerCase() || '';
                         let valB = b[sortConfig.key]?.toString().toLowerCase() || '';
                         const numA = parseFloat(valA); const numB = parseFloat(valB);
-                        if (!isNaN(numA) && !isNaN(numB) && isFinite(valA) && isFinite(valB)) {
-                             return sortConfig.direction === 'asc' ? numA - numB : numB - numA;
-                        }
+                        if (!isNaN(numA) && !isNaN(numB) && isFinite(valA) && isFinite(valB)) return sortConfig.direction === 'asc' ? numA - numB : numB - numA;
                         if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
                         if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
                         return 0;
@@ -205,7 +218,6 @@
                 return result;
             };
 
-            // !--- FIXED: Removed duplicate declaration. Variable 'filteredData' is now declared only once here. ---!
             const filteredData = getProcessedData();
 
             const postToApi = async (action, payload = {}) => {
@@ -216,9 +228,9 @@
                         body: JSON.stringify({ action, ...payload })
                     });
                     const json = await res.json();
-                    if(json.status === 'success') { refreshData(); return true; } 
-                    else { alert("API Error: " + json.message); return false; }
-                } catch(e) { alert("Network Error"); return false; }
+                    if(json.status === 'success') { refreshData(); return true; }
+                    else { alert("Error: " + json.message); return false; }
+                } catch(e) { alert("Connection Error"); return false; }
             };
 
             const handleLogin = (e) => {
@@ -227,12 +239,9 @@
                 if (found) {
                     setUser(found);
                     sessionStorage.setItem('feeUser', JSON.stringify(found));
-                    setLoginData({ username: '', password: '' });
-                    
-                    const userIsAdmin = (found.role && found.role.toLowerCase() === 'admin') || found.username === 'admin';
-                    if (userIsAdmin) setActiveTab('clearance');
-                    else if (found.permissions && found.permissions.length > 0) setActiveTab(found.permissions[0]);
-                    else setActiveTab('clearance'); 
+                    if(found.role === 'admin' || found.username === 'admin') setActiveTab('clearance');
+                    else if(found.permissions && found.permissions.length > 0) setActiveTab(found.permissions[0]);
+                    else setActiveTab('clearance');
                 } else {
                     alert("Invalid Credentials");
                 }
@@ -250,7 +259,6 @@
                 if(!confirm("Are you sure?")) return;
                 let actionType = type;
                 if(type === 'others') actionType = 'other';
-                // Handle potential plural 's' at end for standard tables
                 if (['students','fees','enrollments','payments','discounts','users','banks'].includes(type)) {
                      actionType = type.slice(0, -1);
                 }
@@ -260,7 +268,9 @@
             const handleSave = async (e) => {
                 e.preventDefault();
                 const newData = { ...formData };
-                // Auto Name Fetch
+                if (modalType === 'fees') {
+                    // Logic preserved in backend
+                }
                 if ((modalType === 'payments' || modalType === 'others') && !newData.name) {
                      const s = data.students.find(st => norm(st.reg_no) === norm(newData.reg_no));
                      if(s) newData.name = s.name;
@@ -342,17 +352,17 @@
             };
 
             const getHeaders = (type) => {
-                switch(type) {
-                    case 'students': return ['reg_no', 'name', 'degree', 'batch'];
-                    case 'fees': return ['degree', 'batch', 'per_cr_fee', 'per_course_fee', 'reg_fee', 'other_fee'];
-                    case 'enrollments': return ['reg_no', 'name', 'semester', 'cr', 'courses'];
-                    case 'payments': return ['reg_no', 'name', 'semester', 'amount', 'date', 'bank'];
-                    case 'discounts': return ['reg_no', 'name', 'term', 'discount'];
-                    case 'others': return ['reg_no', 'name', 'semester', 'fee_name', 'amount'];
-                    case 'users': return ['username', 'password', 'role', 'permissions'];
-                    case 'banks': return ['name', 'account_no'];
-                    default: return [];
-                }
+                const map = {
+                    students: ['Reg No', 'Name', 'Degree', 'Batch', 'Mobile', 'Email'],
+                    fees: ['Degree', 'Batch', 'Fee/Cr', 'Fee/Sub', 'Reg Fee', 'Other'],
+                    enrollments: ['Reg No', 'Name', 'Semester', 'Cr Hrs', 'Courses'],
+                    payments: ['Reg No', 'Name', 'Semester', 'Amount', 'Date', 'Bank'],
+                    discounts: ['Reg No', 'Name', 'Term', 'Discount'],
+                    others: ['Reg No', 'Name', 'Semester', 'Fee Name', 'Amount'],
+                    users: ['Username', 'Role', 'Permissions'],
+                    banks: ['Name', 'Account No']
+                };
+                return map[type] || [];
             };
             
             const downloadSample = (type) => {
@@ -368,27 +378,31 @@
             };
 
             const handleExport = (type) => {
-                const records = data[type];
-                if (!records || records.length === 0) return alert("No data to export");
-                const headers = getHeaders(type);
-                const csvRows = [
-                    headers.join(','),
-                    ...records.map(row => headers.map(fieldName => {
-                        let val = row[fieldName];
-                        if (Array.isArray(val)) val = val.join('|'); 
-                        val = String(val || '');
-                        if (val.includes(',')) val = `"${val}"`; 
-                        return val;
-                    }).join(','))
-                ];
-                const csvContent = "data:text/csv;charset=utf-8," + csvRows.join("\n");
-                const encodedUri = encodeURI(csvContent);
-                const link = document.createElement("a");
-                link.setAttribute("href", encodedUri);
-                link.setAttribute("download", `${type}_export.csv`);
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
+                 const records = data[type];
+                 if(!records || records.length === 0) return alert("No data to export");
+                 const headers = getHeaders(type);
+                 const csvRows = [
+                     headers.join(','),
+                     ...records.map(row => headers.map(fieldName => {
+                         let val = row[fieldName.toLowerCase().replace(/ /g,'_')]; // Approximate match
+                         if(!val && fieldName === 'Reg No') val = row.reg_no; // Manual patch
+                         if(!val && fieldName === 'Fee/Cr') val = row.per_cr_fee;
+                         if(!val && fieldName === 'Fee/Sub') val = row.per_course_fee;
+                         if(!val && fieldName === 'Cr Hrs') val = row.cr;
+                         if (Array.isArray(val)) val = val.join('|'); 
+                         val = String(val || '');
+                         if (val.includes(',')) val = `"${val}"`;
+                         return val;
+                     }).join(','))
+                 ];
+                 const csvContent = "data:text/csv;charset=utf-8," + csvRows.join("\n");
+                 const encodedUri = encodeURI(csvContent);
+                 const link = document.createElement("a");
+                 link.setAttribute("href", encodedUri);
+                 link.setAttribute("download", `${type}_export.csv`);
+                 document.body.appendChild(link);
+                 link.click();
+                 document.body.removeChild(link);
             };
             
             const handleImport = (e, type) => {
@@ -425,8 +439,8 @@
                             else obj[h] = val;
                         });
                         if(importTerm) {
-                            if(type === 'enrollments' || type === 'payments' || type === 'others') obj.semester = importTerm;
-                            else if(type === 'discounts') obj.term = importTerm;
+                            if(['enrollments','payments','others'].includes(type)) obj.semester = importTerm;
+                            else if(type==='discounts') obj.term = importTerm;
                         }
                         if (obj.amount) obj.amount = obj.amount.replace(/[^0-9.-]/g, '');
 
@@ -444,7 +458,7 @@
                         }
                         if (isDuplicate) duplicates.push(obj); else newItems.push(obj);
                     }
-                    setImportPreview({ show: true, total: rows.length - 1, newItems, duplicates, type });
+                    setImportPreview({ show: true, type, newItems, duplicates: dups, total: rows.length-1 });
                     e.target.value = null;
                 };
                 reader.readAsText(file);
@@ -452,7 +466,7 @@
 
             const confirmImport = async () => {
                 setUploadStatus({ active: true, current: 0, total: importPreview.newItems.length });
-                let actionType = importPreview.type.slice(0, -1);
+                let actionType = importPreview.type.endsWith('s') ? importPreview.type.slice(0,-1) : importPreview.type;
                 if(importPreview.type === 'others') actionType = 'other';
                 let uploadedCount = 0;
                 for (const item of importPreview.newItems) {
@@ -460,242 +474,335 @@
                     uploadedCount++;
                     setUploadStatus(prev => ({ ...prev, current: uploadedCount }));
                 }
-                setImportPreview({ show: false, total: 0, newItems: [], duplicates: [], type: '' });
+                setImportPreview({ show: false, newItems:[], duplicates:[], total:0, type:'' });
                 setUploadStatus({ active: false, current: 0, total: 0 });
                 alert(`Successfully imported ${uploadedCount} records!`);
                 refreshData();
             };
 
+            // --- REPORT LOGIC ---
             const generateReport = () => {
                 if (!searchReg) return;
                 const cleanReg = norm(searchReg);
-                const student = data.students?.find(s => norm(s.reg_no) === cleanReg);
+                const student = data.students.find(s => norm(s.reg_no) === cleanReg);
                 if (!student) { alert("Student not found!"); setClearanceResult(null); return; }
-                const masterFee = data.fees?.find(f => norm(f.degree) === norm(student.degree) && norm(f.batch) === norm(student.batch));
+                const masterFee = data.fees.find(f => norm(f.degree) === norm(student.degree) && norm(f.batch) === norm(student.batch));
                 
-                const studentEnrollments = data.enrollments?.filter(e => norm(e.reg_no) === cleanReg).map(en => {
-                    const enSem = norm(en.semester);
-                    const cr = parseFloat(en.cr || 0);
-                    const courses = parseFloat(en.courses || 0);
-                    let feeDetails = { tuition: 0, exam: 0, reg: 0, other: 0, total: 0 };
+                const rows = data.enrollments.filter(e => norm(e.reg_no) === cleanReg).map(en => {
+                    const cleanSem = norm(en.semester);
+                    const cr = parseFloat(en.cr||0);
+                    const courses = parseFloat(en.courses||0);
                     
-                    if (masterFee) {
-                        feeDetails.tuition = cr * parseFloat(masterFee.per_cr_fee || 0);
-                        feeDetails.exam = (courses * parseFloat(masterFee.per_course_fee || 0)) + parseFloat(masterFee.other_fee || 0); 
-                        feeDetails.reg = parseFloat(masterFee.reg_fee || 0);
-                        feeDetails.other = 0;
+                    let t = 0, x = 0, r = 0, o = 0;
+                    if(masterFee) {
+                        t = cr * parseFloat(masterFee.per_cr_fee||0);
+                        // Exam Fee now includes fee structure other_fee
+                        x = (courses * parseFloat(masterFee.per_course_fee||0)) + parseFloat(masterFee.other_fee||0);
+                        r = parseFloat(masterFee.reg_fee||0);
+                        o = 0; 
                     }
                     
-                    const otherChargesList = data.others.filter(o => 
-                        norm(o.reg_no) === cleanReg && 
-                        (norm(o.semester) === enSem || enSem.includes(norm(o.semester)))
-                    );
-                    const extraCharges = otherChargesList.reduce((sum, o) => sum + parseFloat(o.amount || 0), 0);
-                    feeDetails.other += extraCharges;
+                    const extra = data.others.filter(oth => norm(oth.reg_no) === cleanReg && norm(oth.semester).includes(cleanSem))
+                        .reduce((acc, curr) => acc + parseFloat(curr.amount||0), 0);
+                    o += extra; 
 
-                    feeDetails.total = feeDetails.tuition + feeDetails.exam + feeDetails.reg + feeDetails.other;
-
-                    const discRecord = data.discounts?.find(d => norm(d.reg_no) === cleanReg && norm(d.term) === enSem);
-                    const discPct = discRecord ? parseFloat(discRecord.discount || 0) : 0;
-                    const discAmt = (feeDetails.tuition * discPct) / 100;
+                    const total = t + x + r + o;
+                    const disc = data.discounts.find(d => norm(d.reg_no) === cleanReg && norm(d.term).includes(cleanSem));
+                    const discPct = disc ? parseFloat(disc.discount||0) : 0;
+                    const discAmt = (t * discPct) / 100;
+                    const net = total - discAmt;
+                    const paid = data.payments.filter(p => norm(p.reg_no) === cleanReg && norm(p.semester).includes(cleanSem))
+                        .reduce((acc, p) => acc + parseFloat(p.amount||0), 0);
                     
-                    const netFee = feeDetails.total - discAmt;
-                    
-                    const payments = data.payments?.filter(p => {
-                        const pSem = norm(p.semester);
-                        return norm(p.reg_no) === cleanReg && (pSem === enSem || enSem.includes(pSem));
-                    }) || [];
-                    const totalPaid = payments.reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
-                    const balance = netFee - totalPaid;
-                    return { ...en, ...feeDetails, discPct, discAmt, netFee, totalPaid, balance };
-                }) || [];
+                    return { ...en, tuition: t, exam: x, reg: r, other: o, total, discPct, discAmt, netFee: net, totalPaid: paid, balance: net - paid };
+                });
 
-                const summary = studentEnrollments.reduce((acc, curr) => ({
-                    total: acc.total + curr.total, fa: acc.fa + curr.discAmt,
-                    paid: acc.paid + curr.totalPaid, balance: acc.balance + curr.balance,
-                    cr: acc.cr + parseFloat(curr.cr || 0), courses: acc.courses + parseFloat(curr.courses || 0)
-                }), { total: 0, fa: 0, paid: 0, balance: 0, cr: 0, courses: 0 });
+                const summary = rows.reduce((acc, r) => ({
+                    total: acc.total + r.total, fa: acc.fa + r.discAmt, paid: acc.paid + r.totalPaid, balance: acc.balance + r.balance,
+                    cr: acc.cr + parseFloat(r.cr||0), courses: acc.courses + parseFloat(r.courses||0)
+                }), { total:0, fa:0, paid:0, balance:0, cr:0, courses:0 });
 
-                setClearanceResult({ student, rows: studentEnrollments, summary, masterFeeFound: !!masterFee, masterFee });
+                setClearanceResult({ student, rows, summary, masterFeeFound: !!masterFee, masterFee });
             };
 
-            // --- VIEW ---
-            if (!user) {
-                return (
-                    <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
-                        <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-8">
-                            <div className="flex justify-center mb-6"><div className="w-24 h-24 rounded-lg flex items-center justify-center bg-white p-2"><img src="src/UOL-Green-V1.png" alt="UOL Logo" className="w-full h-full object-contain" /></div></div>
-                            <h2 className="text-2xl font-bold text-center text-gray-800 mb-2">LSAF Student Fee Management Software</h2>
-                            <p className="text-center text-gray-500 mb-6">Secure Login</p>
-                            <form onSubmit={handleLogin} className="space-y-4">
-                                <div><label className="block text-sm font-bold text-gray-700 mb-1">Username</label><input type="text" value={loginData.username} onChange={e => setLoginData({...loginData, username: e.target.value})} className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required /></div>
-                                <div><label className="block text-sm font-bold text-gray-700 mb-1">Password</label><input type="password" value={loginData.password} onChange={e => setLoginData({...loginData, password: e.target.value})} className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required /></div>
-                                <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-bold transition">Sign In</button>
-                            </form>
-                        </div>
+            const generateSummary = () => {
+                if(!summaryTerm) return;
+                const term = norm(summaryTerm);
+                const enrs = data.enrollments.filter(e => norm(e.semester).includes(term));
+                let proj = 0, disc = 0, rec = 0;
+                let t_tui = 0, t_exm = 0, t_oth = 0;
+                enrs.forEach(en => {
+                    const st = data.students.find(s => norm(s.reg_no) === norm(en.reg_no));
+                    if(st) {
+                        const fee = data.fees.find(f => norm(f.degree) === norm(st.degree) && norm(f.batch) === norm(st.batch));
+                        if(fee) {
+                            const cr = parseFloat(en.cr||0);
+                            const c = parseFloat(en.courses||0);
+                            const t = cr * parseFloat(fee.per_cr_fee||0);
+                            const x = (c * parseFloat(fee.per_course_fee||0)) + parseFloat(fee.other_fee||0);
+                            const o = parseFloat(fee.reg_fee||0);
+                            t_tui += t; t_exm += x; t_oth += o;
+                            const sub = t + x + o;
+                            proj += sub;
+                            const d = data.discounts.find(dx => norm(dx.reg_no) === norm(en.reg_no) && norm(dx.term).includes(term));
+                            if(d) disc += (t * parseFloat(d.discount||0))/100;
+                        }
+                    }
+                });
+                const manualOth = data.others.filter(o => norm(o.semester).includes(term)).reduce((a,c) => a + parseFloat(c.amount||0), 0);
+                rec = data.payments.filter(p => norm(p.semester).includes(term)).reduce((a,c) => a + parseFloat(c.amount||0), 0);
+                t_oth += manualOth; proj += manualOth;
+
+                setSummaryData({
+                    enrollmentCount: enrs.length, totalProjected: proj, totalTuition: t_tui, totalExamFee: t_exm,
+                    totalOthers: t_oth, totalDiscounts: disc, netReceivable: proj - disc, totalReceived: rec, balance: (proj - disc) - rec
+                });
+            };
+
+            // --- COMPONENTS ---
+            const TableHeader = () => (
+                <thead className="bg-gray-100 text-gray-700 font-bold text-xs uppercase border-b">
+                    <tr>
+                        <th className="p-4 w-10"><input type="checkbox" onChange={handleSelectAll} checked={filteredData.length > 0 && selectedIds.size === filteredData.length} /></th>
+                        {getHeaders(activeTab).map(h => <th key={h} className="p-4 cursor-pointer hover:text-blue-600" onClick={() => handleSort(h)}>{h.replace(/_/g, ' ')} {sortConfig.key === h ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th>)}
+                        <th className="p-4 text-center">Actions</th>
+                    </tr>
+                </thead>
+            );
+
+            const TableRow = ({ item, idx }) => (
+                <tr className="border-b hover:bg-gray-50 text-sm">
+                    <td className="p-4 text-gray-400">{idx+1}</td>
+                    <td className="p-4"><input type="checkbox" checked={selectedIds.has(item.id || item.reg_no)} onChange={() => handleSelectRow(item.id || item.reg_no)} /></td>
+                    {activeTab === 'students' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4 font-bold">{item.name}</td><td className="p-4">{item.degree}</td><td className="p-4">{item.batch}</td><td className="p-4">{item.mobile}</td><td className="p-4">{item.email}</td></>}
+                    {activeTab === 'fees' && <><td className="p-4 font-bold">{item.degree}</td><td className="p-4">{item.batch}</td><td className="p-4 text-right">{num(item.per_cr_fee)}</td><td className="p-4 text-right">{num(item.per_course_fee)}</td><td className="p-4 text-right">{num(item.reg_fee)}</td><td className="p-4 text-right">{num(item.other_fee)}</td></>}
+                    {activeTab === 'enrollments' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4"><span className="bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-xs font-bold">{item.semester}</span></td><td className="p-4">{item.cr}</td><td className="p-4">{item.courses}</td></>}
+                    {activeTab === 'payments' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4"><span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-bold">{item.semester}</span></td><td className="p-4 text-right font-bold">{num(item.amount)}</td><td className="p-4 text-gray-500">{item.date}</td><td className="p-4 text-gray-500">{item.bank}</td></>}
+                    {activeTab === 'others' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4 text-gray-600">{item.semester}</td><td className="p-4"><span className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs font-bold">{item.fee_name}</span></td><td className="p-4 text-right font-bold">{num(item.amount)}</td></>}
+                    {activeTab === 'discounts' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4 text-gray-500">{item.term}</td><td className="p-4 text-right font-bold text-purple-600">{item.discount}%</td></>}
+                    {activeTab === 'users' && <><td className="p-4 font-bold">{item.username}</td><td className="p-4">****</td><td className="p-4 capitalize">{item.role}</td><td className="p-4 text-xs">{Array.isArray(item.permissions) ? item.permissions.join(', ') : item.permissions}</td></>}
+                    {activeTab === 'banks' && <><td className="p-4 font-bold">{item.name}</td><td className="p-4 font-mono text-gray-600">{item.account_no}</td></>}
+                    <td className="p-4 text-center flex justify-center gap-2">
+                        <button onClick={() => openModal(activeTab, item)} className="text-blue-600 hover:text-blue-800"><i className="fas fa-edit"></i></button>
+                        <button onClick={() => handleDelete(activeTab, item.id || item.reg_no)} className="text-red-500 hover:text-red-700"><Trash2 /></button>
+                    </td>
+                </tr>
+            );
+
+            // VIEW RENDER
+            if(!user) return (
+                <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl shadow-2xl p-8 w-full max-w-md">
+                        <div className="flex justify-center mb-6"><img src="src/UOL-Green-V1.png" className="h-24 object-contain" /></div>
+                        <h2 className="text-center text-xl font-bold mb-6">LSAF Fee Management</h2>
+                        <form onSubmit={handleLogin} className="space-y-4">
+                            <input className="w-full border p-3 rounded-lg" placeholder="Username" value={loginData.username} onChange={e=>setLoginData({...loginData, username:e.target.value})} />
+                            <input className="w-full border p-3 rounded-lg" type="password" placeholder="Password" value={loginData.password} onChange={e=>setLoginData({...loginData, password:e.target.value})} />
+                            <button className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition">Sign In</button>
+                        </form>
                     </div>
-                );
-            }
+                </div>
+            );
+
+            const list = filteredData;
 
             return (
                 <div className="min-h-screen bg-gray-100 font-sans text-gray-800 pb-20">
-                    {/* Header */}
-                    <div className="bg-white shadow-md border-b border-gray-200 sticky top-0 z-20 no-print">
-                        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                            <div className="flex justify-between h-16">
-                                <div className="flex items-center gap-3"><div className="bg-blue-600 text-white p-2 rounded-lg"><BookOpen /></div><div><h1 className="text-xl font-bold text-gray-900 leading-none">Fee Manager</h1><p className="text-xs text-gray-500">School of Accountancy & Finance</p></div></div>
-                                <div className="flex items-center gap-4">
-                                    <div className="text-right hidden sm:block"><div className="text-sm font-bold">{user.username}</div><div className="text-xs text-gray-500 uppercase">{user.role}</div></div>
-                                    <button onClick={() => setShowPasswordModal(true)} className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg"><Key className="h-5 w-5" /></button>
-                                    
-                                    {isAdmin && (
-                                        <button onClick={() => setActiveTab('users')} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg" title="Manage Users">
-                                            <Shield className="h-5 w-5" />
-                                        </button>
-                                    )}
-
-                                    <button onClick={() => window.print()} className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg"><Printer className="h-5 w-5" /></button>
-                                    <button onClick={handleLogout} className="bg-red-50 text-red-600 px-3 py-2 rounded-lg text-sm font-bold hover:bg-red-100 flex items-center gap-2 transition"><LogOut className="h-4 w-4" /> Logout</button>
-                                </div>
-                            </div>
-                            <div className="flex space-x-1 overflow-x-auto no-scrollbar">
-                                {availableTabs.map(tab => (
-                                    <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === tab.id ? 'border-blue-600 text-blue-600 bg-blue-50' : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}>
-                                        <tab.icon className="h-4 w-4" />
-                                        {tab.label}
-                                        {/* Show count for data tabs */}
-                                        {data[tab.id] && Array.isArray(data[tab.id]) && (
-                                            <span className={`ml-2 text-xs font-bold px-2 py-0.5 rounded-full ${activeTab === tab.id ? 'bg-blue-200 text-blue-800' : 'bg-gray-200 text-gray-600'}`}>
-                                                {data[tab.id].length}
-                                            </span>
-                                        )}
-                                    </button>
-                                ))}
-                            </div>
+                    <div className="bg-white shadow-md border-b sticky top-0 z-30 px-6 py-3 flex justify-between items-center no-print">
+                        <div className="flex items-center gap-4">
+                            <img src="src/UOL-Green-V1.png" className="h-10" />
+                            <h1 className="font-bold text-lg hidden md:block">LSAF Fee Manager</h1>
+                        </div>
+                        <div className="flex gap-2 overflow-x-auto no-scrollbar">
+                            {user.role === 'admin' || user.username === 'admin' ? TABS.concat({id:'users', label:'Users', icon:Users}).map(t => (
+                                <button key={t.id} onClick={() => setActiveTab(t.id)} className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition ${activeTab === t.id ? 'bg-blue-600 text-white shadow-lg' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                                    <t.icon /> {t.label}
+                                </button>
+                            )) : TABS.filter(t => user.permissions?.includes(t.id)).map(t => (
+                                <button key={t.id} onClick={() => setActiveTab(t.id)} className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition ${activeTab === t.id ? 'bg-blue-600 text-white' : 'bg-gray-100'}`}><t.icon /> {t.label}</button>
+                            ))}
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <div className="text-right hidden sm:block"><div className="font-bold text-sm">{user.username}</div><div className="text-xs text-gray-500 uppercase">{user.role}</div></div>
+                            <button onClick={() => setShowPasswordModal(true)} className="p-2 bg-gray-100 rounded hover:bg-gray-200"><Key /></button>
+                            <button onClick={() => window.print()} className="p-2 bg-gray-100 rounded hover:bg-gray-200"><Printer /></button>
+                            <button onClick={handleLogout} className="p-2 bg-red-100 text-red-600 rounded hover:bg-red-200"><LogOut /></button>
                         </div>
                     </div>
 
-                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                        {/* VIEW CONTENT */}
-                        {activeTab === 'clearance' && (
+                    <div className="max-w-7xl mx-auto p-6">
+                        {activeTab === 'clearance' ? (
                             <div className="space-y-6">
-                                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 no-print">
-                                    <label className="block text-sm font-bold text-gray-700 mb-2">Generate Student Clearance</label>
-                                    <div className="flex gap-3">
-                                        <input type="text" value={searchReg} onChange={(e) => setSearchReg(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && generateReport()} placeholder="Enter Registration No (e.g. BSCAF052530040)" className="flex-1 block w-full rounded-lg border-gray-300 border p-3 focus:ring-2 focus:ring-blue-500 outline-none" />
-                                        <button onClick={generateReport} className="bg-blue-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-blue-700 transition flex items-center gap-2"><Search className="h-5 w-5" /> Generate</button>
-                                    </div>
+                                <div className="bg-white p-6 rounded-xl shadow-sm flex gap-4 no-print">
+                                    <input className="flex-1 border p-3 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter Registration No (e.g. BSCAF052530040)" value={searchReg} onChange={e=>setSearchReg(e.target.value)} onKeyDown={e=>e.key==='Enter' && generateReport()} />
+                                    <button onClick={generateReport} className="bg-blue-600 text-white px-8 rounded-lg font-bold hover:bg-blue-700">Generate</button>
                                 </div>
                                 {clearanceResult && (
-                                    <div className="bg-white rounded-xl shadow-lg overflow-hidden" id="printableArea">
-                                        <div className="p-8">
-                                            <div className="border-b-2 border-gray-800 pb-6 mb-6 flex justify-between items-start">
-                                                <div className="w-32 h-32 rounded-lg flex items-center justify-center font-bold text-gray-400 overflow-hidden"><img src="src/UOL-Green-V1.png" alt="UOL Logo" className="w-full h-full object-contain" /></div>
-                                                <div className="text-center flex-1 px-4">
-                                                    <h2 className="text-2xl font-bold text-gray-900 uppercase">The University of Lahore</h2>
-                                                    <p className="text-gray-600 font-medium">School of Accountancy & Finance</p>
-                                                    <div className="inline-block bg-gray-100 px-3 py-1 rounded mt-2 text-xs font-bold uppercase tracking-wider">Fee Clearance Report</div>
-                                                </div>
+                                    <div id="printableArea" className="bg-white p-10 shadow-lg rounded-xl">
+                                        <div className="flex justify-between items-start border-b-2 border-gray-800 pb-6 mb-6">
+                                            <img src="src/UOL-Green-V1.png" className="w-24 h-24 object-contain" />
+                                            <div className="text-center flex-1 px-4">
+                                                <h1 className="text-3xl font-bold uppercase tracking-wide">The University of Lahore</h1>
+                                                <p className="text-lg font-semibold text-gray-700">School of Accountancy & Finance</p>
+                                                <div className="mt-2 inline-block bg-black text-white px-4 py-1 font-bold uppercase text-sm">Fee Clearance Report</div>
                                             </div>
-                                            <div className="grid grid-cols-2 gap-x-12 gap-y-4 mb-8 text-sm">
-                                                <div className="flex justify-between border-b border-gray-200 py-1"><span className="font-bold text-gray-600">Registration No:</span><span className="font-mono font-bold text-gray-900">{clearanceResult.student.reg_no}</span></div>
-                                                <div className="flex justify-between border-b border-gray-200 py-1"><span className="font-bold text-gray-600">Student Name:</span><span className="text-gray-900">{clearanceResult.student.name}</span></div>
-                                                <div className="flex justify-between border-b border-gray-200 py-1"><span className="font-bold text-gray-600">Degree Program:</span><span className="text-gray-900">{clearanceResult.student.degree}</span></div>
-                                                <div className="flex justify-between border-b border-gray-200 py-1"><span className="font-bold text-gray-600">Batch / Session:</span><span className="text-gray-900">{clearanceResult.student.batch}</span></div>
-                                                <div className="flex justify-between border-b border-gray-200 py-1"><span className="font-bold text-gray-600">Rate (Per Cr. Hr):</span><span className="text-gray-900">{clearanceResult.masterFee ? num(clearanceResult.masterFee.per_cr_fee) : '-'}</span></div>
-                                            </div>
-                                            {!clearanceResult.masterFeeFound && <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4"><p className="text-sm text-yellow-700"><strong>Warning:</strong> No matching Fee Structure found.</p></div>}
-                                            <div className="overflow-x-auto">
-                                                <table className="w-full text-xs">
-                                                    <thead className="bg-gray-100 text-gray-900 font-bold uppercase">
-                                                        <tr><th className="p-2 border">Sem</th><th className="p-2 border text-center">Sub</th><th className="p-2 border text-center">Cr</th><th className="p-2 border text-right">Tuition</th><th className="p-2 border text-right">Exam</th><th className="p-2 border text-right">Reg</th><th className="p-2 border text-right">Other</th><th className="p-2 border text-right bg-gray-50">Total</th><th className="p-2 border text-center">Disc %</th><th className="p-2 border text-right">Disc Amt</th><th className="p-2 border text-right">Net Fee</th><th className="p-2 border text-right text-green-700">Paid</th><th className="p-2 border text-right">Balance</th></tr>
-                                                    </thead>
-                                                    <tbody className="divide-y divide-gray-200">
-                                                        {clearanceResult.rows.map((row, idx) => (
-                                                            <tr key={idx} className="hover:bg-gray-50">
-                                                                <td className="p-2 border font-medium">{row.semester}</td><td className="p-2 border text-center">{row.courses}</td><td className="p-2 border text-center">{row.cr}</td><td className="p-2 border text-right text-gray-600">{num(row.tuition)}</td><td className="p-2 border text-right text-gray-600">{num(row.exam)}</td><td className="p-2 border text-right text-gray-600">{num(row.reg)}</td><td className="p-2 border text-right text-gray-600">{num(row.other)}</td><td className="p-2 border text-right font-bold bg-gray-50">{num(row.total)}</td><td className="p-2 border text-center text-gray-500">{row.discPct > 0 ? `${row.discPct}%` : '-'}</td><td className="p-2 border text-right text-gray-500">{row.discAmt > 0 ? num(row.discAmt) : '-'}</td><td className="p-2 border text-right font-bold">{num(row.netFee)}</td><td className="p-2 border text-right font-bold text-green-600">{num(row.totalPaid)}</td><td className={`p-2 border text-right font-bold ${row.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>{num(row.balance)}</td>
-                                                            </tr>
-                                                        ))}
-                                                        <tr className="bg-gray-800 text-white font-bold"><td colSpan="7" className="p-3 text-right uppercase tracking-wider">Grand Totals</td><td className="p-3 text-right">{num(clearanceResult.summary.total)}</td><td className="p-3 text-center">-</td><td className="p-3 text-right">{num(clearanceResult.summary.fa)}</td><td className="p-3 text-right">{num(clearanceResult.summary.total - clearanceResult.summary.fa)}</td><td className="p-3 text-right text-green-400">{num(clearanceResult.summary.paid)}</td><td className={`p-3 text-right ${clearanceResult.summary.balance > 0 ? 'text-red-400' : 'text-green-400'}`}>{num(clearanceResult.summary.balance)}</td></tr>
-                                                    </tbody>
-                                                </table>
-                                                <div className="flex justify-between mt-1 text-xs font-bold text-gray-600"><div>Total Subjects: {clearanceResult.summary.courses}</div><div>Total Credits: {clearanceResult.summary.cr}</div></div>
-                                            </div>
-                                            <div className="mt-4 flex justify-between items-end">
-                                                <div className="text-xs text-gray-500"><p>Printed by: <span className="font-bold text-gray-800">{user.username}</span></p><p>Time: {new Date().toLocaleString('en-US', { timeZone: 'Asia/Karachi' })}</p></div>
-                                                <div className="w-64 bg-gray-50 p-4 rounded border border-gray-200"><div className="flex justify-between text-sm mb-2"><span className="text-gray-600">Total Scholarship:</span><span className="font-bold text-green-600">{num(clearanceResult.summary.fa)}</span></div><div className="border-t border-gray-300 my-2"></div><div className="flex justify-between text-lg font-bold"><span>Net Payable:</span><span className="text-red-600">{num(clearanceResult.summary.balance)}</span></div></div>
+                                            <div className="text-right text-xs text-gray-500"><p>Printed: {new Date().toLocaleString()}</p></div>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-4 mb-6 text-sm border-b-2 border-black pb-4">
+                                            <div><span className="font-bold block text-gray-500 text-xs uppercase">Registration No</span>{clearanceResult.student.reg_no}</div>
+                                            <div><span className="font-bold block text-gray-500 text-xs uppercase">Student Name</span>{clearanceResult.student.name}</div>
+                                            <div><span className="font-bold block text-gray-500 text-xs uppercase">Degree Program</span>{clearanceResult.student.degree}</div>
+                                            <div><span className="font-bold block text-gray-500 text-xs uppercase">Batch</span>{clearanceResult.student.batch}</div>
+                                            <div><span className="font-bold block text-gray-500 text-xs uppercase">Rate / Cr Hr</span>{num(clearanceResult.masterFee?.per_cr_fee)}</div>
+                                        </div>
+                                        <table className="w-full text-xs mb-8 border border-black">
+                                            <thead>
+                                                <tr className="bg-gray-100 uppercase font-bold text-center">
+                                                    <th className="p-2 border border-black">Sem</th>
+                                                    <th className="p-2 border border-black">Sub</th>
+                                                    <th className="p-2 border border-black">Cr Hr</th>
+                                                    <th className="p-2 border border-black text-right">Tuition</th>
+                                                    <th className="p-2 border border-black text-right">Exam</th>
+                                                    <th className="p-2 border border-black text-right">Reg</th>
+                                                    <th className="p-2 border border-black text-right">Misc</th>
+                                                    <th className="p-2 border border-black text-right bg-gray-200">Total</th>
+                                                    <th className="p-2 border border-black">Disc %</th>
+                                                    <th className="p-2 border border-black text-right">Disc Amt</th>
+                                                    <th className="p-2 border border-black text-right">Net Fee</th>
+                                                    <th className="p-2 border border-black text-right">Paid</th>
+                                                    <th className="p-2 border border-black text-right">Balance</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {clearanceResult.rows.map((r, i) => (
+                                                    <tr key={i} className="text-center">
+                                                        <td className="p-2 border border-black font-bold">{r.semester}</td>
+                                                        <td className="p-2 border border-black">{r.courses}</td>
+                                                        <td className="p-2 border border-black">{r.cr}</td>
+                                                        <td className="p-2 border border-black text-right">{num(r.tuition)}</td>
+                                                        <td className="p-2 border border-black text-right">{num(r.exam)}</td>
+                                                        <td className="p-2 border border-black text-right">{num(r.reg)}</td>
+                                                        <td className="p-2 border border-black text-right">{num(r.other)}</td>
+                                                        <td className="p-2 border border-black text-right font-bold bg-gray-50">{num(r.total)}</td>
+                                                        <td className="p-2 border border-black">{r.discPct > 0 ? r.discPct + '%' : '-'}</td>
+                                                        <td className="p-2 border border-black text-right">{r.discAmt > 0 ? num(r.discAmt) : '-'}</td>
+                                                        <td className="p-2 border border-black text-right font-bold">{num(r.netFee)}</td>
+                                                        <td className="p-2 border border-black text-right font-bold text-green-700">{num(r.totalPaid)}</td>
+                                                        <td className="p-2 border border-black text-right font-bold">{num(r.balance)}</td>
+                                                    </tr>
+                                                ))}
+                                                <tr className="bg-black text-white font-bold text-right">
+                                                    <td className="p-2 border border-black">TOTAL</td>
+                                                    <td className="p-2 border border-black text-center">{num(clearanceResult.summary.courses)}</td>
+                                                    <td className="p-2 border border-black text-center">{num(clearanceResult.summary.cr)}</td>
+                                                    <td colSpan="4" className="p-2 border border-black text-center"></td>
+                                                    <td className="p-2 border border-black">{num(clearanceResult.summary.total)}</td>
+                                                    <td className="p-2 border border-black text-center">-</td>
+                                                    <td className="p-2 border border-black">{num(clearanceResult.summary.fa)}</td>
+                                                    <td className="p-2 border border-black">{num(clearanceResult.summary.total - clearanceResult.summary.fa)}</td>
+                                                    <td className="p-2 border border-black text-green-400">{num(clearanceResult.summary.paid)}</td>
+                                                    <td className="p-2 border border-black text-yellow-400">{num(clearanceResult.summary.balance)}</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                        <div className="flex justify-end items-end mt-12 pt-4">
+                                            <div className="w-64 bg-white p-4 border-2 border-black" id="summary-box">
+                                                <div className="flex justify-between text-sm mb-2"><span className="text-gray-800 font-bold">Total Scholarship:</span><span className="font-bold text-black">{num(clearanceResult.summary.fa)}</span></div>
+                                                <div className="border-t-2 border-black my-2"></div>
+                                                <div className="flex justify-between text-lg font-bold"><span>Net Payable:</span><span className="text-black">{num(clearanceResult.summary.balance)}</span></div>
                                             </div>
                                         </div>
                                     </div>
                                 )}
                             </div>
-                        )}
-
-                        {/* LIST VIEWS */}
-                        {activeTab !== 'clearance' && (
-                            <div>
-                                <div className="flex flex-col gap-4 mb-6 no-print">
-                                    <div className="flex justify-between items-center"><h2 className="text-2xl font-bold text-gray-800 capitalize">{activeTab} Directory {data[activeTab] && <span className="ml-3 bg-gray-200 text-gray-700 text-sm py-1 px-3 rounded-full">{data[activeTab].length}</span>}</h2><div className="flex gap-2">{(user.role === 'admin' || user.permissions.includes(activeTab)) && <button onClick={() => openModal(activeTab)} className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700 transition flex items-center gap-2 shadow-sm"><Plus className="h-5 w-5" /> Add New</button>}</div></div>
-                                    <div className="bg-white p-3 rounded-xl border border-gray-200 flex flex-wrap gap-3 items-center justify-between shadow-sm">
-                                        <div className="relative flex-grow max-w-md"><Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" /><input type="text" value={tabSearch} onChange={(e) => setTabSearch(e.target.value)} placeholder={`Filter ${activeTab}...`} className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" /></div>
-                                        <div className="flex gap-2">
-                                            {selectedIds.size > 0 && <button onClick={deleteSelected} className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm font-bold hover:bg-red-100 flex items-center gap-2"><Trash2 className="h-4 w-4" /> Delete ({selectedIds.size})</button>}
-                                            {(activeTab === 'enrollments' || activeTab === 'payments' || activeTab === 'others') && <button onClick={deleteBySemester} className="bg-orange-50 border border-orange-200 text-orange-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-orange-100 flex items-center gap-2"><CalendarX className="h-4 w-4" /> Del Sem</button>}
-                                            {user.role === 'admin' && <button onClick={deleteAllInTab} className="bg-white border border-red-200 text-red-600 px-3 py-2 rounded-lg text-sm font-medium hover:bg-red-50 flex items-center gap-2"><XSquare className="h-4 w-4" /> Delete All</button>}
-                                            <div className="h-8 w-px bg-gray-300 mx-1"></div>
-                                            <button onClick={() => downloadSample(activeTab)} className="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2"><FileSpreadsheet className="h-4 w-4" /> Sample</button>
-                                            <label className="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 cursor-pointer flex items-center gap-2"><Download className="h-4 w-4" /> Import<input type="file" onChange={(e) => handleImport(e, activeTab)} className="hidden" accept=".csv" /></label>
-                                            {['enrollments', 'payments', 'others', 'discounts'].includes(activeTab) && <input type="text" value={importTerm} onChange={(e) => setImportTerm(e.target.value)} placeholder="Term (e.g. Fall 2024)" className="border border-gray-300 px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-48" />}
-                                            <button onClick={() => handleExport(activeTab)} className="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2"><Upload className="h-4 w-4" /> Export</button>
-                                        </div>
+                        ) : activeTab === 'summary' ? (
+                             <div className="space-y-6">
+                                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                                    <label className="block text-sm font-bold text-gray-700 mb-2">Term Financial Summary</label>
+                                    <div className="flex gap-3">
+                                        <input type="text" value={summaryTerm} onChange={(e) => setSummaryTerm(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && generateSummary()} placeholder="Enter Term (e.g. Fall 2024)" className="flex-1 block w-full rounded-lg border-gray-300 border p-3 focus:ring-2 focus:ring-blue-500 outline-none" />
+                                        <button onClick={generateSummary} className="bg-purple-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-purple-700 transition flex items-center gap-2"><Search /> Calculate</button>
                                     </div>
                                 </div>
-                                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                                {summaryData && (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                        <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-blue-500">
+                                            <p className="text-xs font-bold text-gray-500 uppercase">Projected Revenue</p>
+                                            <h3 className="text-2xl font-bold text-gray-900 mt-1">{num(summaryData.totalProjected)}</h3>
+                                            <p className="text-xs text-gray-400 mt-1">Based on {summaryData.enrollmentCount} Enrollments</p>
+                                        </div>
+                                        <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-purple-500">
+                                            <p className="text-xs font-bold text-gray-500 uppercase">Tuition Fee</p>
+                                            <h3 className="text-2xl font-bold text-purple-600 mt-1">{num(summaryData.totalTuition)}</h3>
+                                        </div>
+                                        <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-indigo-500">
+                                            <p className="text-xs font-bold text-gray-500 uppercase">Exam Fee</p>
+                                            <h3 className="text-2xl font-bold text-indigo-600 mt-1">{num(summaryData.totalExamFee)}</h3>
+                                        </div>
+                                        <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-yellow-500">
+                                            <p className="text-xs font-bold text-gray-500 uppercase">Other Charges</p>
+                                            <h3 className="text-2xl font-bold text-yellow-600 mt-1">{num(summaryData.totalOthers)}</h3>
+                                        </div>
+                                        <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-orange-500">
+                                            <p className="text-xs font-bold text-gray-500 uppercase">Discounts Given</p>
+                                            <h3 className="text-2xl font-bold text-orange-600 mt-1">{num(summaryData.totalDiscounts)}</h3>
+                                        </div>
+                                        <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-teal-500">
+                                            <p className="text-xs font-bold text-gray-500 uppercase">Net Receivable</p>
+                                            <h3 className="text-2xl font-bold text-teal-600 mt-1">{num(summaryData.netReceivable)}</h3>
+                                        </div>
+                                        <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-green-500">
+                                            <p className="text-xs font-bold text-gray-500 uppercase">Total Received</p>
+                                            <h3 className="text-2xl font-bold text-green-600 mt-1">{num(summaryData.totalReceived)}</h3>
+                                        </div>
+                                        <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-red-500">
+                                            <p className="text-xs font-bold text-gray-500 uppercase">Outstanding Balance</p>
+                                            <h3 className="text-2xl font-bold text-red-600 mt-1">{num(summaryData.balance)}</h3>
+                                            <p className="text-xs text-gray-400 mt-1">Receivable Amount</p>
+                                        </div>
+                                    </div>
+                                )}
+                             </div>
+                        ) : (
+                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                                <div className="p-4 border-b bg-gray-50 flex justify-between items-center no-print">
+                                    <div className="flex gap-2 w-full max-w-xl">
+                                        <input className="border p-2 rounded flex-1 outline-none focus:ring-1" placeholder="Search..." value={tabSearch} onChange={e=>setTabSearch(e.target.value)} />
+                                    </div>
+                                    <div className="flex gap-2">
+                                        {/* Import Term Input */}
+                                        {['enrollments','payments','others','discounts'].includes(activeTab) && 
+                                            <input className="border p-2 rounded w-32 text-sm" placeholder="Import Term" value={importTerm} onChange={e=>setImportTerm(e.target.value)} />
+                                        }
+                                        <button onClick={()=>openModal(activeTab)} className="bg-blue-600 text-white px-4 py-2 rounded font-bold text-sm"><Plus /> Add</button>
+                                        <label className="bg-white border px-3 py-2 rounded cursor-pointer text-sm font-bold text-gray-600"><Download /> Import <input type="file" className="hidden" onChange={e=>handleImport(e, activeTab)} /></label>
+                                        <button onClick={()=>handleExport(activeTab)} className="bg-white border px-3 py-2 rounded text-sm font-bold text-gray-600"><Upload /> Export</button>
+                                        <button onClick={()=>downloadSample(activeTab)} className="bg-white border px-3 py-2 rounded text-sm font-bold text-gray-600"><FileSpreadsheet /> Sample</button>
+                                        {user.role === 'admin' && <button onClick={()=>deleteAll(activeTab)} className="bg-red-50 text-red-600 border border-red-200 px-3 py-2 rounded text-sm font-bold"><XSquare /> Del All</button>}
+                                        {(activeTab === 'enrollments' || activeTab === 'payments' || activeTab === 'others') && <button onClick={deleteSem} className="bg-orange-50 text-orange-600 border border-orange-200 px-3 py-2 rounded text-sm font-bold"><CalendarX /> Del Sem</button>}
+                                        {selectedIds.size > 0 && <button onClick={deleteSelected} className="bg-red-600 text-white px-3 py-2 rounded text-sm font-bold animate-pulse">Delete ({selectedIds.size})</button>}
+                                    </div>
+                                </div>
+                                <div className="overflow-x-auto">
                                     <table className="w-full text-sm text-left">
-                                        <thead className="bg-gray-50 text-gray-700 uppercase font-bold text-xs border-b border-gray-200">
-                                            <tr>
-                                                <th className="p-4 w-10"><input type="checkbox" onChange={handleSelectAll} checked={filteredData.length > 0 && selectedIds.size === filteredData.length} className="rounded" /></th>
-                                                {/* Header rendering based on tab */}
-                                                {activeTab === 'students' && <><th className="p-4 cursor-pointer hover:text-blue-600" onClick={() => handleSort('reg_no')}>Reg No {sortConfig.key === 'reg_no' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th><th className="p-4 cursor-pointer hover:text-blue-600" onClick={() => handleSort('name')}>Name {sortConfig.key === 'name' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th><th className="p-4">Degree</th><th className="p-4">Batch</th><th className="p-4">Mobile</th><th className="p-4">Email</th></>}
-                                                {activeTab === 'fees' && <><th className="p-4">Degree</th><th className="p-4">Batch</th><th className="p-4 text-right">Fee/Cr</th><th className="p-4 text-right">Fee/Sub</th><th className="p-4 text-right">Reg Fee</th><th className="p-4 text-right">Other</th></>}
-                                                {activeTab === 'enrollments' && <><th className="p-4">Reg No</th><th className="p-4">Name</th><th className="p-4">Semester</th><th className="p-4">Cr Hrs</th><th className="p-4">Courses</th></>}
-                                                {activeTab === 'payments' && <><th className="p-4">Reg No</th><th className="p-4">Name</th><th className="p-4">Semester</th><th className="p-4 text-right">Amount</th><th className="p-4">Date</th><th className="p-4">Bank</th></>}
-                                                {activeTab === 'others' && <><th className="p-4">Reg No</th><th className="p-4">Name</th><th className="p-4">Semester</th><th className="p-4">Fee Name</th><th className="p-4 text-right">Amount</th></>}
-                                                {activeTab === 'discounts' && <><th className="p-4">Reg No</th><th className="p-4">Name</th><th className="p-4">Term</th><th className="p-4 text-right">Discount</th></>}
-                                                {activeTab === 'users' && <><th className="p-4">Username</th><th className="p-4">Role</th><th className="p-4">Permissions</th></>}
-                                                {activeTab === 'banks' && <><th className="p-4">Bank Name</th><th className="p-4">Account No</th></>}
-                                                <th className="p-4 text-center">Actions</th>
-                                            </tr>
-                                        </thead>
+                                        <TableHeader />
                                         <tbody className="divide-y divide-gray-100">
-                                            {filteredData.map((item, idx) => (
-                                                <tr key={item.id || idx} className={`hover:bg-gray-50 transition ${selectedIds.has(item.id || item.reg_no) ? 'bg-blue-50' : ''}`}>
-                                                    <td className="p-4"><input type="checkbox" checked={selectedIds.has(item.id || item.reg_no)} onChange={() => handleSelectRow(item.id || item.reg_no)} className="rounded" /></td>
-                                                    {activeTab === 'students' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4 font-bold">{item.name}</td><td className="p-4"><span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-bold">{item.degree}</span></td><td className="p-4 text-gray-500">{item.batch}</td><td className="p-4 text-gray-500">{item.mobile || '-'}</td><td className="p-4 text-gray-500">{item.email || '-'}</td></>}
-                                                    {activeTab === 'fees' && <><td className="p-4 font-bold">{item.degree}</td><td className="p-4 text-gray-600">{item.batch}</td><td className="p-4 text-right text-gray-500">{num(item.per_cr_fee)}</td><td className="p-4 text-right font-bold text-green-700">{num(item.per_course_fee)}</td><td className="p-4 text-right text-gray-500">{num(item.reg_fee)}</td><td className="p-4 text-right text-gray-500">{num(item.other_fee)}</td></>}
-                                                    {activeTab === 'enrollments' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4"><span className="bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-xs font-bold">{item.semester}</span></td><td className="p-4">{item.cr}</td><td className="p-4">{item.courses}</td></>}
-                                                    {activeTab === 'payments' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4"><span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-bold">{item.semester}</span></td><td className="p-4 text-right font-bold">{num(item.amount)}</td><td className="p-4 text-gray-500">{item.date}</td><td className="p-4 text-gray-500">{item.bank}</td></>}
-                                                    {activeTab === 'others' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4 text-gray-600">{item.semester}</td><td className="p-4"><span className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs font-bold">{item.fee_name}</span></td><td className="p-4 text-right font-bold">{num(item.amount)}</td></>}
-                                                    {activeTab === 'discounts' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4 text-gray-500">{item.term}</td><td className="p-4 text-right font-bold text-purple-600">{item.discount}%</td></>}
-                                                    {activeTab === 'users' && <><td className="p-4 font-bold">{item.username}</td><td className="p-4 capitalize">{item.role}</td><td className="p-4 text-xs max-w-xs truncate">{item.role === 'admin' ? 'Full Access' : (Array.isArray(item.permissions) ? item.permissions.join(', ') : item.permissions)}</td></>}
-                                                    {activeTab === 'banks' && <><td className="p-4 font-bold">{item.name}</td><td className="p-4 font-mono text-gray-600">{item.account_no}</td></>}
-                                                    <td className="p-4 text-center flex justify-center gap-2"><button onClick={() => openModal(activeTab, item)} className="p-2 text-blue-600 hover:bg-blue-50 rounded"><i className="fas fa-edit"></i> Edit</button><button onClick={() => handleDelete(activeTab, item.id || item.reg_no)} className="p-2 text-red-600 hover:bg-red-50 rounded"><Trash2 className="h-4 w-4" /></button></td>
-                                                </tr>
-                                            ))}
-                                            {filteredData.length === 0 && <tr><td colSpan="10" className="p-8 text-center text-gray-400">No records found.</td></tr>}
+                                            {list.map((item, idx) => <TableRow key={item.id||idx} item={item} idx={idx} />)}
+                                            {list.length === 0 && <tr><td colSpan="10" className="p-8 text-center text-gray-400">No records found.</td></tr>}
                                         </tbody>
                                     </table>
                                 </div>
                             </div>
                         )}
                     </div>
+                    {/* ... (Modals remain unchanged but included in logic) ... */}
                     {showModal && (
                         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
                             <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
                                 <h3 className="text-xl font-bold mb-4 capitalize">Add/Edit {modalType.slice(0, -1)}</h3>
                                 <form onSubmit={handleSave} className="space-y-4">
                                     {modalType === 'students' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={e => setFormData({...formData, reg_no: e.target.value})} /><input required placeholder="Full Name" className="w-full border p-2 rounded" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} /><div className="grid grid-cols-2 gap-4"><input placeholder="Degree (e.g. BSCAF)" className="w-full border p-2 rounded" value={formData.degree || ''} onChange={e => setFormData({...formData, degree: e.target.value})} /><input placeholder="Batch (e.g. Fall 2023)" className="w-full border p-2 rounded" value={formData.batch || ''} onChange={e => setFormData({...formData, batch: e.target.value})} /></div><div className="grid grid-cols-2 gap-4"><input placeholder="Mobile Number (Optional)" className="w-full border p-2 rounded" value={formData.mobile || ''} onChange={e => setFormData({...formData, mobile: e.target.value})} /><input placeholder="Email Address (Optional)" className="w-full border p-2 rounded" value={formData.email || ''} onChange={e => setFormData({...formData, email: e.target.value})} /></div></>}
-                                    {modalType === 'fees' && <><div className="bg-blue-50 p-3 rounded text-xs text-blue-800 mb-2"><strong>Note:</strong> Fee Structure applies to ALL semesters for this Degree & Batch.</div><div className="grid grid-cols-2 gap-4"><input required placeholder="Degree" className="w-full border p-2 rounded" value={formData.degree || ''} onChange={e => setFormData({...formData, degree: e.target.value})} /><input required placeholder="Batch" className="w-full border p-2 rounded" value={formData.batch || ''} onChange={e => setFormData({...formData, batch: e.target.value})} /></div><div className="grid grid-cols-2 gap-4"><input type="number" placeholder="Fee Per Credit Hour" className="w-full border p-2 rounded" value={formData.per_cr_fee || ''} onChange={e => setFormData({...formData, per_cr_fee: e.target.value})} /><input type="number" placeholder="Fee Per Subject/Course" className="w-full border p-2 rounded" value={formData.per_course_fee || ''} onChange={e => setFormData({...formData, per_course_fee: e.target.value})} /></div><div className="grid grid-cols-2 gap-4"><input type="number" placeholder="Registration Fee (Semester)" className="w-full border p-2 rounded" value={formData.reg_fee || ''} onChange={e => setFormData({...formData, reg_fee: e.target.value})} /><input type="number" placeholder="Other Charges (Semester)" className="w-full border p-2 rounded" value={formData.other_fee || ''} onChange={e => setFormData({...formData, other_fee: e.target.value})} /></div></>}
+                                    {modalType === 'fees' && <><div className="grid grid-cols-2 gap-4"><input required placeholder="Degree" className="w-full border p-2 rounded" value={formData.degree || ''} onChange={e => setFormData({...formData, degree: e.target.value})} /><input required placeholder="Batch" className="w-full border p-2 rounded" value={formData.batch || ''} onChange={e => setFormData({...formData, batch: e.target.value})} /></div><div className="grid grid-cols-2 gap-4"><input type="number" placeholder="Fee Per Credit Hour" className="w-full border p-2 rounded" value={formData.per_cr_fee || ''} onChange={e => setFormData({...formData, per_cr_fee: e.target.value})} /><input type="number" placeholder="Fee Per Subject/Course" className="w-full border p-2 rounded" value={formData.per_course_fee || ''} onChange={e => setFormData({...formData, per_course_fee: e.target.value})} /></div><div className="grid grid-cols-2 gap-4"><input type="number" placeholder="Registration Fee (Semester)" className="w-full border p-2 rounded" value={formData.reg_fee || ''} onChange={e => setFormData({...formData, reg_fee: e.target.value})} /><input type="number" placeholder="Other Charges (Semester)" className="w-full border p-2 rounded" value={formData.other_fee || ''} onChange={e => setFormData({...formData, other_fee: e.target.value})} /></div></>}
                                     {modalType === 'enrollments' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={e => setFormData({...formData, reg_no: e.target.value})} /><input placeholder="Student Name" className="w-full border p-2 rounded" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} /><input required placeholder="Semester (e.g. Spring 2024)" className="w-full border p-2 rounded" value={formData.semester || ''} onChange={e => setFormData({...formData, semester: e.target.value})} /><div className="grid grid-cols-2 gap-4"><input type="number" placeholder="Credit Hours" className="w-full border p-2 rounded" value={formData.cr || ''} onChange={e => setFormData({...formData, cr: e.target.value})} /><input type="number" placeholder="No. of Courses" className="w-full border p-2 rounded" value={formData.courses || ''} onChange={e => setFormData({...formData, courses: e.target.value})} /></div></>}
                                     {modalType === 'payments' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={e => setFormData({...formData, reg_no: e.target.value})} /><input required placeholder="Semester (e.g. Spring 2024)" className="w-full border p-2 rounded" value={formData.semester || ''} onChange={e => setFormData({...formData, semester: e.target.value})} /><input required type="number" placeholder="Amount Paid" className="w-full border p-2 rounded font-bold text-lg" value={formData.amount || ''} onChange={e => setFormData({...formData, amount: e.target.value})} /><input type="date" className="w-full border p-2 rounded" value={formData.date || ''} onChange={e => setFormData({...formData, date: e.target.value})} />
                                     <label className="block text-sm font-bold text-gray-700 mt-2 mb-1">Payment Through (Bank)</label>
@@ -705,7 +812,7 @@
                                         {data.banks.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
                                     </select>
                                     </>}
-                                    {modalType === 'others' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={e => setFormData({...formData, reg_no: e.target.value})} /><div className="grid grid-cols-2 gap-4"><input required placeholder="Semester" className="w-full border p-2 rounded" value={formData.semester || ''} onChange={e => setFormData({...formData, semester: e.target.value})} /><input required placeholder="Fee Name (e.g. Late Fine)" className="w-full border p-2 rounded" value={formData.fee_name || ''} onChange={e => setFormData({...formData, fee_name: e.target.value})} /></div><input required type="number" placeholder="Amount" className="w-full border p-2 rounded font-bold text-lg" value={formData.amount || ''} onChange={e => setFormData({...formData, amount: e.target.value})} /></>}
+                                    {modalType === 'others' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={e => setFormData({...formData, reg_no: e.target.value})} /><div className="grid grid-cols-2 gap-4"><input required placeholder="Semester" className="w-full border p-2 rounded" value={formData.semester || ''} onChange={e => setFormData({...formData, semester: e.target.value})} /><input placeholder="Fee Name (e.g. Late Fine)" className="w-full border p-2 rounded" value={formData.fee_name || ''} onChange={e => setFormData({...formData, fee_name: e.target.value})} /></div><input required type="number" placeholder="Amount" className="w-full border p-2 rounded font-bold text-lg" value={formData.amount || ''} onChange={e => setFormData({...formData, amount: e.target.value})} /></>}
                                     {modalType === 'discounts' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={e => setFormData({...formData, reg_no: e.target.value})} /><input required placeholder="Term" className="w-full border p-2 rounded" value={formData.term || ''} onChange={e => setFormData({...formData, term: e.target.value})} /><input required type="number" placeholder="Discount %" className="w-full border p-2 rounded" value={formData.discount || ''} onChange={e => setFormData({...formData, discount: e.target.value})} /></>}
                                     {modalType === 'banks' && <><input required placeholder="Bank Name" className="w-full border p-2 rounded" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} /><input placeholder="Account Number (Optional)" className="w-full border p-2 rounded" value={formData.account_no || ''} onChange={e => setFormData({...formData, account_no: e.target.value})} /></>}
                                     {modalType === 'users' && (
