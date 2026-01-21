@@ -27,17 +27,13 @@
             body * { visibility: hidden; }
             #printableArea, #printableArea * { visibility: visible; }
             #printableArea {
-                position: absolute; left: 0; top: 0; width: 100%; min-height: 100%;
-                margin: 0; padding: 20px; background: white;
-                transform: scale(0.95); transform-origin: top center;
-                color-adjust: exact; -webkit-print-color-adjust: exact;
+                position: absolute; left: 0; top: 0; width: 100%; height: 100%;
+                margin: 0; padding: 10px; background: white;
+                transform: scale(0.85); transform-origin: top left;
             }
-            #printableArea table { width: 100%; font-size: 11px; border-collapse: collapse; border: 2px solid #000; }
-            #printableArea th { background-color: #f3f4f6 !important; font-weight: 800; border: 1px solid #000; padding: 4px; }
-            #printableArea td { border: 1px solid #000; padding: 4px; }
-            #printableArea .bg-gray-200 { background-color: #e5e7eb !important; }
-            #printableArea .bg-black { background-color: #000 !important; color: #fff !important; }
-            @page { size: A4 portrait; margin: 5mm; }
+            #printableArea table { width: 100%; font-size: 10px; border-collapse: collapse; }
+            #printableArea th, #printableArea td { padding: 4px; border: 1px solid #000; }
+            @page { size: A4; margin: 0; }
             .no-print { display: none !important; }
         }
 
@@ -139,10 +135,18 @@
             const [summaryTerm, setSummaryTerm] = useState('');
             const [summaryData, setSummaryData] = useState(null);
 
-            const isAdmin = user && ((user.role && user.role.toLowerCase() === 'admin') || (user.username && user.username.toLowerCase() === 'admin'));
-            const availableTabs = user ? (isAdmin ? [...TABS, { id: 'users', label: 'Users & Access', icon: Shield }] : TABS.filter(t => user.permissions && user.permissions.includes(t.id))) : [];
+            const isAdmin = user && (
+                (user.role && user.role.toLowerCase() === 'admin') || 
+                (user.username && user.username.toLowerCase() === 'admin')
+            );
 
-            // FETCH DATA
+            const availableTabs = user ? (
+                isAdmin 
+                ? [...TABS, { id: 'users', label: 'Users & Access', icon: Shield }] 
+                : TABS.filter(t => user.permissions && user.permissions.includes(t.id))
+            ) : [];
+
+            // --- DATA LOADING ---
             const refreshData = async () => {
                 try {
                     const res = await fetch(API_URL);
@@ -189,30 +193,9 @@
                 setSortConfig({ key: null, direction: 'asc' }); 
             }, [activeTab]);
 
-            // UTILS
+            // --- HELPERS ---
             const norm = (str) => str ? String(str).toLowerCase().replace(/[^a-z0-9]/g, '') : '';
             const num = (n) => parseFloat(n || 0).toLocaleString('en-US');
-
-            const getProcessedData = () => {
-                let result = (data[activeTab] || []); 
-                if (tabSearch) {
-                    result = result.filter(item => Object.values(item).some(val => String(val || '').toLowerCase().includes(tabSearch.toLowerCase())));
-                }
-                if (sortConfig.key) {
-                    result = [...result].sort((a, b) => {
-                        let valA = a[sortConfig.key]?.toString().toLowerCase() || '';
-                        let valB = b[sortConfig.key]?.toString().toLowerCase() || '';
-                        const numA = parseFloat(valA); const numB = parseFloat(valB);
-                        if (!isNaN(numA) && !isNaN(numB) && isFinite(valA) && isFinite(valB)) return sortConfig.direction === 'asc' ? numA - numB : numB - numA;
-                        if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
-                        if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
-                        return 0;
-                    });
-                }
-                return result;
-            };
-
-            const filteredData = getProcessedData();
 
             const postToApi = async (action, payload = {}) => {
                 try {
@@ -222,26 +205,22 @@
                         body: JSON.stringify({ action, ...payload })
                     });
                     const json = await res.json();
-                    if(json.status === 'success') { refreshData(); return true; } 
-                    else { alert("API Error: " + json.message); return false; }
-                } catch(e) { alert("Network Error"); return false; }
+                    if(json.status === 'success') { refreshData(); return true; }
+                    else { alert("Error: " + json.message); return false; }
+                } catch(e) { alert("Connection Error"); return false; }
             };
 
+            // --- AUTH ---
             const handleLogin = (e) => {
                 e.preventDefault();
                 const found = data.users.find(u => u.username === loginData.username && u.password === loginData.password);
-                if (found) {
+                if(found) {
                     setUser(found);
                     sessionStorage.setItem('feeUser', JSON.stringify(found));
-                    setLoginData({ username: '', password: '' });
-                    
-                    const userIsAdmin = (found.role && found.role.toLowerCase() === 'admin') || found.username === 'admin';
-                    if (userIsAdmin) setActiveTab('clearance');
-                    else if (found.permissions && found.permissions.length > 0) setActiveTab(found.permissions[0]);
+                    if(found.role === 'admin' || found.username === 'admin') setActiveTab('clearance');
+                    else if(found.permissions && found.permissions.length > 0) setActiveTab(found.permissions[0]);
                     else setActiveTab('clearance');
-                } else {
-                    alert("Invalid Credentials");
-                }
+                } else alert("Invalid Credentials");
             };
 
             const handleLogout = () => {
@@ -249,42 +228,6 @@
                 sessionStorage.removeItem('feeUser');
                 setClearanceResult(null);
                 setActiveTab('clearance');
-            };
-
-            // CORE ACTIONS
-            const handleDelete = async (type, id) => {
-                if(!confirm("Are you sure?")) return;
-                let actionType = type;
-                if(type === 'others') actionType = 'other';
-                if (['students','fees','enrollments','payments','discounts','users','banks'].includes(type)) {
-                     actionType = type.slice(0, -1);
-                }
-                await postToApi(`delete_${actionType}`, { id });
-            };
-
-            const handleSave = async (e) => {
-                e.preventDefault();
-                const newData = { ...formData };
-                if (modalType === 'fees') {
-                     // Just pass the rates
-                }
-                if ((modalType === 'payments' || modalType === 'others') && !newData.name) {
-                     const s = data.students.find(st => norm(st.reg_no) === norm(newData.reg_no));
-                     if(s) newData.name = s.name;
-                }
-                
-                let actionType = modalType.slice(0, -1);
-                if(modalType === 'others') actionType = 'other';
-                
-                const success = await postToApi(`save_${actionType}`, { data: newData, id: editingId });
-                if(success) { setShowModal(false); setFormData({}); setEditingId(null); }
-            };
-
-            const openModal = (type, item = null) => {
-                setModalType(type);
-                if (item) { setFormData(item); setEditingId(item.id || item.reg_no); } 
-                else { setFormData(type==='users' ? {role:'user', permissions:[]} : {}); setEditingId(null); }
-                setShowModal(true);
             };
 
             const handleChangePassword = async (e) => {
@@ -303,7 +246,28 @@
                 }
             };
             
-             // --- SORTING ---
+            // --- FILTERING & SORTING ---
+            const getProcessedData = () => {
+                let result = (data[activeTab] || []); 
+                if (tabSearch) {
+                    result = result.filter(item => Object.values(item).some(val => String(val || '').toLowerCase().includes(tabSearch.toLowerCase())));
+                }
+                if (sortConfig.key) {
+                    result = [...result].sort((a, b) => {
+                        let valA = a[sortConfig.key]?.toString().toLowerCase() || '';
+                        let valB = b[sortConfig.key]?.toString().toLowerCase() || '';
+                        const numA = parseFloat(valA); const numB = parseFloat(valB);
+                        if (!isNaN(numA) && !isNaN(numB) && isFinite(valA) && isFinite(valB)) return sortConfig.direction === 'asc' ? numA - numB : numB - numA;
+                        if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+                        if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+                        return 0;
+                    });
+                }
+                return result;
+            };
+            
+            const filteredData = getProcessedData();
+
             const handleSort = (key) => {
                 let direction = 'asc';
                 if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
@@ -325,6 +289,8 @@
                 if (newSet.has(id)) newSet.delete(id); else newSet.add(id);
                 setSelectedIds(newSet);
             };
+
+            // --- FIXED: RENAMED FUNCTIONS TO MATCH JSX CALLS ---
             const deleteSelected = async () => {
                 if (!confirm(`Delete ${selectedIds.size} records?`)) return;
                 for (let id of selectedIds) {
@@ -336,17 +302,20 @@
                 setSelectedIds(new Set());
                 refreshData();
             };
-            const deleteAllInTab = async () => {
-                if (!confirm(`Permanently delete ALL ${activeTab} records?`)) return;
-                await postToApi('delete_all', { table: activeTab });
+
+            const deleteAll = async (tab) => {
+                if (!confirm(`Permanently delete ALL ${tab} records?`)) return;
+                await postToApi('delete_all', { table: tab });
                 refreshData();
             };
-            const deleteBySemester = async () => {
+
+            const deleteSem = async () => {
                 const term = prompt("Enter Semester Name to delete:");
                 if (!term) return;
                 await postToApi('delete_semester', { table: activeTab, term });
                 refreshData();
             };
+            // ----------------------------------------------------
 
             const getHeaders = (type) => {
                 const map = {
@@ -375,31 +344,31 @@
             };
 
             const handleExport = (type) => {
-                 const records = data[type] || [];
-                 if(!records.length) return alert("No data to export");
-                 const headers = getHeaders(type);
-                 const csvRows = [
-                     headers.join(','),
-                     ...records.map(row => headers.map(fieldName => {
-                         let val = row[fieldName.toLowerCase().replace(/ /g,'_')]; // Approximate match
-                         if(!val && fieldName === 'Reg No') val = row.reg_no; // Manual patch
-                         if(!val && fieldName === 'Fee/Cr') val = row.per_cr_fee;
-                         if(!val && fieldName === 'Fee/Sub') val = row.per_course_fee;
-                         if(!val && fieldName === 'Cr Hrs') val = row.cr;
-                         if (Array.isArray(val)) val = val.join('|'); 
-                         val = String(val || '');
-                         if (val.includes(',')) val = `"${val}"`;
-                         return val;
-                     }).join(','))
-                 ];
-                 const csvContent = "data:text/csv;charset=utf-8," + csvRows.join("\n");
-                 const encodedUri = encodeURI(csvContent);
-                 const link = document.createElement("a");
-                 link.setAttribute("href", encodedUri);
-                 link.setAttribute("download", `${type}_export.csv`);
-                 document.body.appendChild(link);
-                 link.click();
-                 document.body.removeChild(link);
+                const records = data[type];
+                if (!records || records.length === 0) return alert("No data to export");
+                const headers = getHeaders(type);
+                const csvRows = [
+                    headers.join(','),
+                    ...records.map(row => headers.map(fieldName => {
+                        let val = row[fieldName.toLowerCase().replace(/ /g,'_')]; // Approximate match
+                        if(!val && fieldName === 'Reg No') val = row.reg_no; // Manual patch
+                        if(!val && fieldName === 'Fee/Cr') val = row.per_cr_fee;
+                        if(!val && fieldName === 'Fee/Sub') val = row.per_course_fee;
+                        if(!val && fieldName === 'Cr Hrs') val = row.cr;
+                        if (Array.isArray(val)) val = val.join('|'); 
+                        val = String(val || '');
+                        if (val.includes(',')) val = `"${val}"`;
+                        return val;
+                    }).join(','))
+                ];
+                const csvContent = "data:text/csv;charset=utf-8," + csvRows.join("\n");
+                const encodedUri = encodeURI(csvContent);
+                const link = document.createElement("a");
+                link.setAttribute("href", encodedUri);
+                link.setAttribute("download", `${type}_export.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
             };
             
             const handleImport = (e, type) => {
@@ -493,16 +462,15 @@
                     let t = 0, x = 0, r = 0, o = 0;
                     if(masterFee) {
                         t = cr * parseFloat(masterFee.per_cr_fee||0);
-                        // Exam Fee now includes fee structure 'other' as requested (e.g. combined exam/misc charges)
-                        // AND is multiplied by courses
+                        // Exam Fee logic restored: includes fee structure other_fee
                         x = (courses * parseFloat(masterFee.per_course_fee||0)) + parseFloat(masterFee.other_fee||0);
                         r = parseFloat(masterFee.reg_fee||0);
-                        o = 0; // Fee structure 'other' moved to exam
+                        o = 0; 
                     }
                     
                     const extra = data.others.filter(oth => norm(oth.reg_no) === cleanReg && norm(oth.semester).includes(cleanSem))
                         .reduce((acc, curr) => acc + parseFloat(curr.amount||0), 0);
-                    o += extra; // Manual fines go to 'Misc'
+                    o += extra; 
 
                     const total = t + x + r + o;
                     const disc = data.discounts.find(d => norm(d.reg_no) === cleanReg && norm(d.term).includes(cleanSem));
@@ -537,7 +505,7 @@
                             const cr = parseFloat(en.cr||0);
                             const c = parseFloat(en.courses||0);
                             const t = cr * parseFloat(fee.per_cr_fee||0);
-                            const x = (c * parseFloat(fee.per_course_fee||0)) + parseFloat(fee.other_fee||0); // Exam matches report logic
+                            const x = (c * parseFloat(fee.per_course_fee||0)) + parseFloat(fee.other_fee||0);
                             const o = parseFloat(fee.reg_fee||0);
                             t_tui += t; t_exm += x; t_oth += o;
                             const sub = t + x + o;
@@ -557,12 +525,33 @@
                 });
             };
 
+            // --- CRUD ---
+            const handleSave = async (e) => {
+                e.preventDefault();
+                const newData = { ...formData };
+                if(['payments','others'].includes(modalType) && !newData.name) {
+                    const s = data.students.find(st => norm(st.reg_no) === norm(newData.reg_no));
+                    if(s) newData.name = s.name;
+                }
+                let type = modalType.endsWith('s') ? modalType.slice(0, -1) : modalType;
+                if(modalType === 'others') type = 'other';
+                const ok = await postToApi(`save_${type}`, { data: newData, id: editingId });
+                if(ok) { setShowModal(false); setFormData({}); setEditingId(null); }
+            };
+
+            const handleDelete = async (type, id) => {
+                if(!confirm("Delete?")) return;
+                let at = type.endsWith('s') ? type.slice(0, -1) : type;
+                if(type === 'others') at = 'other';
+                await postToApi(`delete_${at}`, { id });
+            };
+
             // --- COMPONENTS ---
             const TableHeader = () => (
                 <thead className="bg-gray-100 text-gray-700 font-bold text-xs uppercase border-b">
                     <tr>
                         <th className="p-4 w-10"><input type="checkbox" onChange={handleSelectAll} checked={filteredData.length > 0 && selectedIds.size === filteredData.length} /></th>
-                        {getHeaders(activeTab).map(h => <th key={h} className="p-4 cursor-pointer hover:text-blue-600" onClick={() => handleSort(h)}>{h} {sortConfig.key === h ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th>)}
+                        {getHeaders(activeTab).map(h => <th key={h} className="p-4 cursor-pointer hover:text-blue-600" onClick={() => handleSort(h)}>{h.replace(/_/g, ' ')} {sortConfig.key === h ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th>)}
                         <th className="p-4 text-center">Actions</th>
                     </tr>
                 </thead>
@@ -594,8 +583,8 @@
                         <div className="flex justify-center mb-6"><img src="src/UOL-Green-V1.png" className="h-24 object-contain" /></div>
                         <h2 className="text-center text-xl font-bold mb-6">LSAF Fee Management</h2>
                         <form onSubmit={handleLogin} className="space-y-4">
-                            <input className="w-full border p-3 rounded-lg" placeholder="Username" value={loginData.username} onChange={e => setLoginData({...loginData, username: e.target.value})} />
-                            <input className="w-full border p-3 rounded-lg" type="password" placeholder="Password" value={loginData.password} onChange={e => setLoginData({...loginData, password: e.target.value})} />
+                            <input className="w-full border p-3 rounded-lg" placeholder="Username" value={loginData.username} onChange={e=>setLoginData({...loginData, username:e.target.value})} />
+                            <input className="w-full border p-3 rounded-lg" type="password" placeholder="Password" value={loginData.password} onChange={e=>setLoginData({...loginData, password:e.target.value})} />
                             <button className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition">Sign In</button>
                         </form>
                     </div>
