@@ -8,12 +8,12 @@
     <!-- TAILWIND CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- REACT & REACT DOM -->
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- REACT & REACT DOM (Stable CDN) -->
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     
-    <!-- BABEL -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- BABEL (Stable CDN) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
 
     <!-- FONT & ICONS -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -22,56 +22,27 @@
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         
-        /* Print Styles */
         @media print {
             body * { visibility: hidden; }
             #printableArea, #printableArea * { visibility: visible; }
             #printableArea {
                 position: absolute; left: 0; top: 0; width: 100%; height: 100%;
                 margin: 0; padding: 10px; background: white;
-                transform: scale(0.85); transform-origin: top left;
+                transform: scale(0.90); transform-origin: top left;
             }
-            #printableArea table { width: 100%; font-size: 11px; border-collapse: collapse; }
-            #printableArea th, #printableArea td { padding: 4px; border: 1px solid #000; }
+            #printableArea table { width: 100%; font-size: 10px; border-collapse: collapse; }
+            #printableArea th, #printableArea td { padding: 4px; border: 1px solid #ddd; }
             @page { size: A4; margin: 0; }
             .no-print { display: none !important; }
-        }
-
-        /* Error Overlay */
-        #js-error-display {
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: #fff0f0; color: #d8000c; z-index: 9999; padding: 2rem; font-family: monospace;
         }
     </style>
 </head>
 <body class="bg-gray-100 font-sans text-gray-800">
-    <!-- Error Container -->
-    <div id="js-error-display">
-        <h1 class="text-2xl font-bold mb-4">Application Error</h1>
-        <p>Something went wrong. Please share this error message:</p>
-        <pre id="error-message" class="bg-white p-4 border border-red-300 mt-4 rounded"></pre>
-        <button onclick="localStorage.clear(); sessionStorage.clear(); window.location.reload();" class="mt-6 px-6 py-3 bg-red-600 text-white rounded font-bold hover:bg-red-700">
-            Reset App Data & Reload
-        </button>
-    </div>
-
-    <!-- React Root -->
     <div id="root"></div>
 
-    <!-- Error Handler Script -->
-    <script>
-        window.onerror = function(message, source, lineno, colno, error) {
-            var display = document.getElementById('js-error-display');
-            var msg = document.getElementById('error-message');
-            display.style.display = 'block';
-            msg.innerText = "Error: " + message + "\nLine: " + lineno + "\nSource: " + source;
-            return false;
-        };
-    </script>
-
     <script type="text/babel">
-        const { useState, useEffect, useMemo } = React;
-        const API_URL = 'api.php';
+        const { useState, useEffect } = React;
+        const API_URL = './api.php'; // Relative path
 
         // --- ICONS ---
         const Icon = ({ d, ...props }) => (<svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>);
@@ -81,7 +52,7 @@
         const FileText = (p) => <Icon d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" {...p} />;
         const Users = (p) => <Icon d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" {...p} />;
         const DollarSign = (p) => <Icon d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" {...p} />;
-        const BookOpen = (p) => <Icon d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2zM22 3h-6a4 4 0 00-4 4v14a3 3 0 0 1 3-3h7z" {...p} />;
+        const BookOpen = (p) => <Icon d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2zM22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z" {...p} />;
         const CreditCard = (p) => <Icon d="M1 4h22v16H1zM1 10h22" {...p} />;
         const Percent = (p) => <Icon d="M19 5L5 19M6.5 6.5h0M17.5 17.5h0" {...p} />;
         const Printer = (p) => <Icon d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 01 2 2v5a2 2 0 0 1-2 2h-2" {...p} />;
@@ -141,6 +112,7 @@
                     const res = await fetch(API_URL);
                     if(!res.ok) throw new Error("API Network Error");
                     const json = await res.json();
+                    
                     const safeData = {
                         students: Array.isArray(json.students) ? json.students : [],
                         fees: Array.isArray(json.fees) ? json.fees : [],
@@ -228,6 +200,7 @@
                     setUser(found);
                     sessionStorage.setItem('feeUser', JSON.stringify(found));
                     setLoginData({ username: '', password: '' });
+                    
                     const userIsAdmin = (found.role && found.role.toLowerCase() === 'admin') || found.username === 'admin';
                     if (userIsAdmin) setActiveTab('clearance');
                     else if (found.permissions && found.permissions.length > 0) setActiveTab(found.permissions[0]);
@@ -244,13 +217,28 @@
                 setActiveTab('clearance');
             };
 
-            // --- RESTORED FUNCTIONS ---
-            
+            const handleChangePassword = async (e) => {
+                e.preventDefault();
+                if (passwordData.current !== user.password) return alert("Incorrect current password!");
+                if (passwordData.new !== passwordData.confirm) return alert("New passwords do not match!");
+                const success = await postToApi('save_user', { data: { ...user, password: passwordData.new }, id: user.id });
+                if(success) {
+                    alert("Password changed successfully!");
+                    setShowPasswordModal(false);
+                    setPasswordData({ current: '', new: '', confirm: '' });
+                    const updatedUser = { ...user, password: passwordData.new };
+                    setUser(updatedUser);
+                    sessionStorage.setItem('feeUser', JSON.stringify(updatedUser));
+                    refreshData();
+                }
+            };
+
             const generateReport = () => {
                 if (!searchReg) return;
                 const cleanReg = norm(searchReg);
                 const student = data.students?.find(s => norm(s.reg_no) === cleanReg);
                 if (!student) { alert("Student not found!"); setClearanceResult(null); return; }
+                
                 const masterFee = data.fees?.find(f => norm(f.degree) === norm(student.degree) && norm(f.batch) === norm(student.batch));
                 
                 const studentEnrollments = data.enrollments?.filter(e => norm(e.reg_no) === cleanReg).map(en => {
@@ -265,11 +253,15 @@
                         feeDetails.reg = 0; 
                         feeDetails.other = 0;
                     }
-                    const otherCharges = data.others?.filter(o => norm(o.reg_no) === cleanReg && (norm(o.semester) === enSem || enSem.includes(norm(o.semester)))) || [];
-                    const extraCharges = otherCharges.reduce((sum, o) => sum + parseFloat(o.amount || 0), 0);
                     
+                    const otherChargesList = data.others.filter(o => 
+                        norm(o.reg_no) === cleanReg && 
+                        (norm(o.semester) === enSem || enSem.includes(norm(o.semester)))
+                    );
+                    const extraCharges = otherChargesList.reduce((sum, o) => sum + parseFloat(o.amount || 0), 0);
                     feeDetails.other += extraCharges;
-                    feeDetails.total = feeDetails.tuition + feeDetails.exam + feeDetails.other;
+
+                    feeDetails.total = feeDetails.tuition + feeDetails.exam + feeDetails.reg + feeDetails.other;
 
                     const discRecord = data.discounts?.find(d => norm(d.reg_no) === cleanReg && norm(d.term) === enSem);
                     const discPct = discRecord ? parseFloat(discRecord.discount || 0) : 0;
@@ -306,9 +298,6 @@
             const handleSave = async (e) => {
                 e.preventDefault();
                 const newData = { ...formData };
-                if (modalType === 'fees') {
-                    // Logic preserved but simplified for DB storage
-                }
                 if ((modalType === 'payments' || modalType === 'others') && !newData.name) {
                     const s = data.students.find(st => norm(st.reg_no) === norm(newData.reg_no));
                     if(s) newData.name = s.name;
@@ -322,7 +311,7 @@
             const openModal = (type, item = null) => {
                 setModalType(type);
                 if (item) { setFormData(item); setEditingId(item.id || item.reg_no); } 
-                else { setFormData(type==='users' ? {role:'user',permissions:[]} : {}); setEditingId(null); }
+                else { setFormData(type==='users' ? {role:'user', permissions:[]} : {}); setEditingId(null); }
                 setShowModal(true);
             };
 
@@ -370,6 +359,20 @@
                 refreshData();
             };
 
+            const getHeaders = (type) => {
+                switch(type) {
+                    case 'students': return ['reg_no', 'name', 'degree', 'batch'];
+                    case 'fees': return ['degree', 'batch', 'per_cr_fee', 'per_course_fee', 'reg_fee', 'other_fee'];
+                    case 'enrollments': return ['reg_no', 'name', 'semester', 'cr', 'courses'];
+                    case 'payments': return ['reg_no', 'name', 'semester', 'amount', 'date', 'bank'];
+                    case 'discounts': return ['reg_no', 'name', 'term', 'discount'];
+                    case 'others': return ['reg_no', 'name', 'semester', 'fee_name', 'amount'];
+                    case 'users': return ['username', 'password', 'role', 'permissions'];
+                    case 'banks': return ['name', 'account_no'];
+                    default: return [];
+                }
+            };
+            
             const downloadSample = (type) => {
                 const headers = getHeaders(type);
                 const csvContent = "data:text/csv;charset=utf-8," + headers.join(",");
@@ -405,7 +408,7 @@
                 link.click();
                 document.body.removeChild(link);
             };
-
+            
             const handleImport = (e, type) => {
                 const file = e.target.files[0];
                 if (!file) return;
@@ -481,36 +484,6 @@
                 refreshData();
             };
 
-            const handleChangePassword = async (e) => {
-                e.preventDefault();
-                if (passwordData.current !== user.password) return alert("Incorrect current password!");
-                if (passwordData.new !== passwordData.confirm) return alert("New passwords do not match!");
-                const success = await postToApi('save_user', { data: { ...user, password: passwordData.new }, id: user.id });
-                if(success) {
-                    alert("Password changed successfully!");
-                    setShowPasswordModal(false);
-                    setPasswordData({ current: '', new: '', confirm: '' });
-                    const updatedUser = { ...user, password: passwordData.new };
-                    setUser(updatedUser);
-                    sessionStorage.setItem('feeUser', JSON.stringify(updatedUser));
-                    refreshData();
-                }
-            };
-            
-            const getHeaders = (type) => {
-                switch(type) {
-                    case 'students': return ['reg_no', 'name', 'degree', 'batch'];
-                    case 'fees': return ['degree', 'batch', 'per_cr_fee', 'per_course_fee', 'reg_fee', 'other_fee'];
-                    case 'enrollments': return ['reg_no', 'name', 'semester', 'cr', 'courses'];
-                    case 'payments': return ['reg_no', 'name', 'semester', 'amount', 'date', 'bank'];
-                    case 'discounts': return ['reg_no', 'name', 'term', 'discount'];
-                    case 'others': return ['reg_no', 'name', 'semester', 'fee_name', 'amount'];
-                    case 'users': return ['username', 'password', 'role', 'permissions'];
-                    case 'banks': return ['name', 'account_no'];
-                    default: return [];
-                }
-            };
-
             // --- VIEW ---
             if (!user) {
                 return (
@@ -555,6 +528,7 @@
                     </div>
 
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                        {/* VIEW CONTENT */}
                         {activeTab === 'clearance' && (
                             <div className="space-y-6">
                                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 no-print">
@@ -609,7 +583,7 @@
                             </div>
                         )}
 
-                        {/* DATA LISTS */}
+                        {/* LIST VIEWS */}
                         {activeTab !== 'clearance' && (
                             <div>
                                 <div className="flex flex-col gap-4 mb-6 no-print">
@@ -617,7 +591,7 @@
                                     <div className="bg-white p-3 rounded-xl border border-gray-200 flex flex-wrap gap-3 items-center justify-between shadow-sm">
                                         <div className="relative flex-grow max-w-md"><Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" /><input type="text" value={tabSearch} onChange={(e) => setTabSearch(e.target.value)} placeholder={`Filter ${activeTab}...`} className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" /></div>
                                         <div className="flex gap-2">
-                                            {selectedIds.size > 0 && <button onClick={deleteSelected} className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm font-bold hover:bg-red-100 flex items-center gap-2 animate-pulse"><Trash2 className="h-4 w-4" /> Delete ({selectedIds.size})</button>}
+                                            {selectedIds.size > 0 && <button onClick={deleteSelected} className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm font-bold hover:bg-red-100 flex items-center gap-2"><Trash2 className="h-4 w-4" /> Delete ({selectedIds.size})</button>}
                                             {(activeTab === 'enrollments' || activeTab === 'payments' || activeTab === 'others') && <button onClick={deleteBySemester} className="bg-orange-50 border border-orange-200 text-orange-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-orange-100 flex items-center gap-2"><CalendarX className="h-4 w-4" /> Del Sem</button>}
                                             {user.role === 'admin' && <button onClick={deleteAllInTab} className="bg-white border border-red-200 text-red-600 px-3 py-2 rounded-lg text-sm font-medium hover:bg-red-50 flex items-center gap-2"><XSquare className="h-4 w-4" /> Delete All</button>}
                                             <div className="h-8 w-px bg-gray-300 mx-1"></div>
@@ -631,7 +605,19 @@
                                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                                     <table className="w-full text-sm text-left">
                                         <thead className="bg-gray-50 text-gray-700 uppercase font-bold text-xs border-b border-gray-200">
-                                            <tr><th className="p-4 w-10"><input type="checkbox" onChange={handleSelectAll} checked={filteredData.length > 0 && selectedIds.size === filteredData.length} className="rounded" /></th>{getHeaders(activeTab).map(h => <th key={h} className="p-4 cursor-pointer hover:text-blue-600" onClick={() => handleSort(h)}>{h.replace(/_/g, ' ')} {sortConfig.key === h ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th>)}<th className="p-4 text-center">Actions</th></tr>
+                                            <tr>
+                                                <th className="p-4 w-10"><input type="checkbox" onChange={handleSelectAll} checked={filteredData.length > 0 && selectedIds.size === filteredData.length} className="rounded" /></th>
+                                                {/* Header rendering based on tab */}
+                                                {activeTab === 'students' && <><th className="p-4 cursor-pointer hover:text-blue-600" onClick={() => handleSort('reg_no')}>Reg No {sortConfig.key === 'reg_no' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th><th className="p-4 cursor-pointer hover:text-blue-600" onClick={() => handleSort('name')}>Name {sortConfig.key === 'name' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th><th className="p-4">Degree</th><th className="p-4">Batch</th><th className="p-4">Mobile</th><th className="p-4">Email</th></>}
+                                                {activeTab === 'fees' && <><th className="p-4">Degree</th><th className="p-4">Batch</th><th className="p-4 text-right">Fee/Cr</th><th className="p-4 text-right">Fee/Sub</th><th className="p-4 text-right">Reg Fee</th><th className="p-4 text-right">Other</th></>}
+                                                {activeTab === 'enrollments' && <><th className="p-4">Reg No</th><th className="p-4">Name</th><th className="p-4">Semester</th><th className="p-4">Cr Hrs</th><th className="p-4">Courses</th></>}
+                                                {activeTab === 'payments' && <><th className="p-4">Reg No</th><th className="p-4">Name</th><th className="p-4">Semester</th><th className="p-4 text-right">Amount</th><th className="p-4">Date</th><th className="p-4">Bank</th></>}
+                                                {activeTab === 'others' && <><th className="p-4">Reg No</th><th className="p-4">Name</th><th className="p-4">Semester</th><th className="p-4">Fee Name</th><th className="p-4 text-right">Amount</th></>}
+                                                {activeTab === 'discounts' && <><th className="p-4">Reg No</th><th className="p-4">Name</th><th className="p-4">Term</th><th className="p-4 text-right">Discount</th></>}
+                                                {activeTab === 'users' && <><th className="p-4">Username</th><th className="p-4">Role</th><th className="p-4">Permissions</th></>}
+                                                {activeTab === 'banks' && <><th className="p-4">Bank Name</th><th className="p-4">Account No</th></>}
+                                                <th className="p-4 text-center">Actions</th>
+                                            </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-100">
                                             {filteredData.map((item, idx) => (
@@ -655,7 +641,6 @@
                             </div>
                         )}
                     </div>
-                    {/* ... (Modals remain unchanged but included in logic) ... */}
                     {showModal && (
                         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
                             <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
