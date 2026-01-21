@@ -138,9 +138,11 @@
                 { id: 'banks', label: 'Banks', icon: Landmark } 
             ];
 
+            // ROBUST ADMIN CHECK: Check both role AND username case-insensitively
+            const isAdmin = user && ((user.role && user.role.toLowerCase() === 'admin') || (user.username && user.username.toLowerCase() === 'admin'));
+
             const availableTabs = user ? (
-                // Force show 'users' tab if role is 'admin' or username is 'admin'
-                (user.role && user.role.toLowerCase() === 'admin') || user.username.toLowerCase() === 'admin'
+                isAdmin
                 ? [...TABS, { id: 'users', label: 'Users & Access', icon: Shield }] 
                 : TABS.filter(t => user.permissions && user.permissions.includes(t.id))
             ) : [];
@@ -151,7 +153,6 @@
                     const res = await fetch(API_URL);
                     const json = await res.json();
                     
-                    // SAFEGUARD: Ensure all arrays exist, defaulting to [] if API returns partial data or error
                     const safeData = {
                         students: Array.isArray(json.students) ? json.students : [],
                         fees: Array.isArray(json.fees) ? json.fees : [],
@@ -167,7 +168,6 @@
 
                 } catch(e) { 
                     console.error("Connection Error:", e);
-                    // On error, prevent crash by initializing empty state
                     setData({
                         students: [], fees: [], enrollments: [], payments: [], discounts: [], others: [], users: [], banks: []
                     });
@@ -186,16 +186,13 @@
                 if (user && data.users.length > 0) {
                     const freshUser = data.users.find(u => u.username === user.username);
                     if (freshUser) {
-                        // Only update if something changed (avoid loop)
                         if (JSON.stringify(freshUser) !== JSON.stringify(user)) {
-                            // Keep password hash out of session storage for safety if API returns it, 
-                            // but here we just sync entire object for role/permissions
                             setUser(freshUser);
                             sessionStorage.setItem('feeUser', JSON.stringify(freshUser));
                         }
                     }
                 }
-            }, [data.users]); // Runs when users list updates
+            }, [data.users]);
 
             useEffect(() => {
                 setSelectedIds(new Set());
@@ -586,6 +583,14 @@
                                 <div className="flex items-center gap-4">
                                     <div className="text-right hidden sm:block"><div className="text-sm font-bold">{user.username}</div><div className="text-xs text-gray-500 uppercase">{user.role}</div></div>
                                     <button onClick={() => setShowPasswordModal(true)} className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg"><Key className="h-5 w-5" /></button>
+                                    
+                                    {/* SHOW USER ADMIN BUTTON FOR ADMINS */}
+                                    {isAdmin && (
+                                        <button onClick={() => setActiveTab('users')} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg" title="Manage Users">
+                                            <Shield className="h-5 w-5" />
+                                        </button>
+                                    )}
+
                                     <button onClick={() => window.print()} className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg"><Printer className="h-5 w-5" /></button>
                                     <button onClick={handleLogout} className="bg-red-50 text-red-600 px-3 py-2 rounded-lg text-sm font-bold hover:bg-red-100 flex items-center gap-2 transition"><LogOut className="h-4 w-4" /> Logout</button>
                                 </div>
@@ -809,7 +814,7 @@
                     {uploadStatus.active && (
                         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
                             <div className="bg-white p-6 rounded-xl shadow-xl w-80 text-center">
-                                <h3 className="font-bold text-lg mb-2">Importing Data...</h3>
+                                <h3 className="font-bold text-lg mb-2">{uploadStatus.title || 'Processing...'}</h3>
                                 <div className="w-full bg-gray-200 rounded-full h-4 mb-2">
                                     <div className="bg-blue-600 h-4 rounded-full transition-all duration-300" style={{ width: `${(uploadStatus.current / uploadStatus.total) * 100}%` }}></div>
                                 </div>
