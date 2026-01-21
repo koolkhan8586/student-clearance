@@ -35,31 +35,30 @@
                 left: 0;
                 top: 0;
                 width: 100%;
-                height: 100%;
                 margin: 0;
-                padding: 10px;
+                padding: 0; /* Remove padding to maximize space */
                 background: white;
-                /* Scale to fit A4 perfectly including Balance column */
-                transform: scale(0.85); 
-                transform-origin: top left;
             }
-             /* Ensure table fits */
+            
+            /* Specific print styling for the table */
             #printableArea table {
                 width: 100%;
-                font-size: 10px; /* Reduced font size for print */
+                font-size: 10px; /* reduced font size for print */
                 border-collapse: collapse;
             }
             #printableArea th, #printableArea td {
-                padding: 4px;
-                border: 1px solid #ddd;
+                padding: 4px; /* compact padding */
+                border: 1px solid #9ca3af;
+                word-wrap: break-word;
             }
-            
-            @page {
-                size: A4;
-                margin: 0;
-            }
-            /* Hide non-essential UI elements in print mode just in case */
+
+            /* Hide elements that shouldn't print but might be caught by general rules */
             .no-print { display: none !important; }
+
+            @page {
+                size: A4 portrait;
+                margin: 10mm; /* Standard margin */
+            }
         }
     </style>
 </head>
@@ -71,40 +70,39 @@
         const API_URL = 'api.php'; // Pointing to local PHP API
 
         // --- ICONS (Lucide style SVGs) ---
-        const Icon = ({ d, ...props }) => (
+        const Icon = ({ children, ...props }) => (
             <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d={d} />
+                {children}
             </svg>
         );
         
         // Simplified icon definitions mapping to paths or groups
-        const Search = (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>;
-        const Plus = (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
-        const Trash2 = (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>;
-        const FileText = (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>;
-        const Users = (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
-        const DollarSign = (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>;
-        const BookOpen = (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>;
-        const CreditCard = (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>;
-        const Percent = (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>;
-        const Printer = (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>;
-        const Download = (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>;
-        const Upload = (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>;
-        const FileSpreadsheet = (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h2"/><path d="M8 17h2"/><path d="M14 13h2"/><path d="M14 17h2"/></svg>;
-        const XSquare = (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg>;
-        const AlertCircle = (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>;
-        const CalendarX = (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="10" y1="14" x2="14" y2="18"/><line x1="14" y1="14" x2="10" y2="18"/></svg>;
-        const Lock = (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>;
-        const LogOut = (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>;
-        const Shield = (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>;
-        const Key = (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>;
-        const CloudUpload = (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19a4 4 0 0 0 4 4h11a4 4 0 0 0 4-4v-2.5"/><line x1="16" y1="16" x2="16" y2="8"/><line x1="12" y1="12" x2="16" y2="8"/><line x1="20" y1="12" x2="16" y2="8"/></svg>;
-        const ArrowUpDown = (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M7 15l5 5 5-5"/><path d="M7 9l5-5 5 5"/></svg>;
-        const RefreshCw = (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>;
-        const Landmark = (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="22" x2="21" y2="22" /><line x1="6" y1="18" x2="6" y2="11" /><line x1="10" y1="18" x2="10" y2="11" /><line x1="14" y1="18" x2="14" y2="11" /><line x1="18" y1="18" x2="18" y2="11" /><polygon points="12 2 20 7 4 7" /></svg>;
+        const Search = (p) => <Icon {...p}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></Icon>;
+        const Plus = (p) => <Icon {...p}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></Icon>;
+        const Trash2 = (p) => <Icon {...p}><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></Icon>;
+        const FileText = (p) => <Icon {...p}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></Icon>;
+        const Users = (p) => <Icon {...p}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></Icon>;
+        const DollarSign = (p) => <Icon {...p}><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></Icon>;
+        const BookOpen = (p) => <Icon {...p}><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></Icon>;
+        const CreditCard = (p) => <Icon {...p}><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></Icon>;
+        const Percent = (p) => <Icon {...p}><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></Icon>;
+        const Printer = (p) => <Icon {...p}><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></Icon>;
+        const Download = (p) => <Icon {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></Icon>;
+        const Upload = (p) => <Icon {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></Icon>;
+        const FileSpreadsheet = (p) => <Icon {...p}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h2"/><path d="M8 17h2"/><path d="M14 13h2"/><path d="M14 17h2"/></Icon>;
+        const XSquare = (p) => <Icon {...p}><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></Icon>;
+        const AlertCircle = (p) => <Icon {...p}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></Icon>;
+        const CalendarX = (p) => <Icon {...p}><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="10" y1="14" x2="14" y2="18"/><line x1="14" y1="14" x2="10" y2="18"/></Icon>;
+        const Lock = (p) => <Icon {...p}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></Icon>;
+        const LogOut = (p) => <Icon {...p}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></Icon>;
+        const Shield = (p) => <Icon {...p}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></Icon>;
+        const Key = (p) => <Icon {...p}><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></Icon>;
+        const CloudUpload = (p) => <Icon {...p}><path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19a4 4 0 0 0 4 4h11a4 4 0 0 0 4-4v-2.5"/><line x1="16" y1="16" x2="16" y2="8"/><line x1="12" y1="12" x2="16" y2="8"/><line x1="20" y1="12" x2="16" y2="8"/></Icon>;
+        const ArrowUpDown = (p) => <Icon {...p}><path d="M7 15l5 5 5-5"/><path d="M7 9l5-5 5 5"/></Icon>;
+        const RefreshCw = (p) => <Icon {...p}><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></Icon>;
+        const Landmark = (p) => <Icon {...p}><line x1="3" y1="22" x2="21" y2="22" /><line x1="6" y1="18" x2="6" y2="11" /><line x1="10" y1="18" x2="10" y2="11" /><line x1="14" y1="18" x2="14" y2="11" /><line x1="18" y1="18" x2="18" y2="11" /><polygon points="12 2 20 7 4 7" /></Icon>;
 
         function App() {
-            // --- STATE MANAGEMENT ---
             const [user, setUser] = useState(null);
             const [activeTab, setActiveTab] = useState('clearance');
             const [data, setData] = useState({
@@ -123,7 +121,6 @@
             const [passwordData, setPasswordData] = useState({ current: '', new: '', confirm: '' });
             
             const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
-            const [importPreview, setImportPreview] = useState({ show: false, total: 0, newItems: [], duplicates: [], type: '' });
             const [uploadStatus, setUploadStatus] = useState({ active: false, current: 0, total: 0 });
             const [importTerm, setImportTerm] = useState(''); 
 
@@ -144,74 +141,46 @@
                 : TABS.filter(t => user.permissions.includes(t.id))
             ) : [];
 
-            // FETCH DATA FROM SERVER
             const refreshData = async () => {
                 try {
                     const res = await fetch(API_URL);
                     const json = await res.json();
-                    
-                    // SAFEGUARD: Ensure all arrays exist, defaulting to [] if API returns partial data or error
-                    const safeData = {
-                        students: Array.isArray(json.students) ? json.students : [],
-                        fees: Array.isArray(json.fees) ? json.fees : [],
-                        enrollments: Array.isArray(json.enrollments) ? json.enrollments : [],
-                        payments: Array.isArray(json.payments) ? json.payments : [],
-                        discounts: Array.isArray(json.discounts) ? json.discounts : [],
-                        others: Array.isArray(json.others) ? json.others : [],
-                        users: Array.isArray(json.users) ? json.users : [],
-                        banks: Array.isArray(json.banks) ? json.banks : []
-                    };
-                    
-                    setData(safeData);
-
-                } catch(e) { 
-                    console.error("Connection Error:", e);
-                    // On error, prevent crash by initializing empty state
-                    setData({
-                        students: [], fees: [], enrollments: [], payments: [], discounts: [], others: [], users: [], banks: []
-                    });
-                }
+                    if(json.students) {
+                        // MERGE DB DATA WITH DEFAULT STRUCT TO PREVENT CRASH
+                        setData({
+                            students: json.students || [],
+                            fees: json.fees || [],
+                            enrollments: json.enrollments || [],
+                            payments: json.payments || [],
+                            discounts: json.discounts || [],
+                            others: json.others || [],
+                            users: json.users || [],
+                            banks: json.banks || []
+                        });
+                    }
+                } catch(e) { console.error("Connection Error:", e); }
             };
 
             useEffect(() => {
                 refreshData();
                 const storedUser = sessionStorage.getItem('feeUser');
                 if(storedUser) setUser(JSON.parse(storedUser));
+                const local = localStorage.getItem('feeSystemData_v2');
+                if(local) {
+                    const parsed = JSON.parse(local);
+                    if(parsed.students && parsed.students.length > 0 && data.students.length === 0) setData(parsed);
+                }
             }, []);
 
             useEffect(() => {
                 setSelectedIds(new Set());
                 setTabSearch('');
                 setSortConfig({ key: null, direction: 'asc' }); 
-                setImportTerm(''); 
+                setImportTerm(''); // Reset import term on tab change
             }, [activeTab]);
 
             const norm = (str) => str ? str.toString().toLowerCase().replace(/[^a-z0-9]/g, '') : '';
             const num = (n) => parseFloat(n || 0).toLocaleString('en-US');
-
-            // --- FILTERING & SORTING LOGIC ---
-            const getProcessedData = () => {
-                let result = (data[activeTab] || []); 
-                if (tabSearch) {
-                    result = result.filter(item => Object.values(item).some(val => String(val || '').toLowerCase().includes(tabSearch.toLowerCase())));
-                }
-                if (sortConfig.key) {
-                    result = [...result].sort((a, b) => {
-                        let valA = a[sortConfig.key]?.toString().toLowerCase() || '';
-                        let valB = b[sortConfig.key]?.toString().toLowerCase() || '';
-                        const numA = parseFloat(valA); const numB = parseFloat(valB);
-                        if (!isNaN(numA) && !isNaN(numB) && isFinite(valA) && isFinite(valB)) {
-                             return sortConfig.direction === 'asc' ? numA - numB : numB - numA;
-                        }
-                        if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
-                        if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
-                        return 0;
-                    });
-                }
-                return result;
-            };
-
-            const filteredData = getProcessedData();
 
             const postToApi = async (action, payload = {}) => {
                 try {
@@ -250,6 +219,7 @@
 
             const handleLogin = (e) => {
                 e.preventDefault();
+                // Safe check if data.users exists
                 const userList = data.users || [];
                 const found = userList.find(u => u.username === loginData.username && u.password === loginData.password);
                 if (found) {
@@ -280,7 +250,6 @@
                     const updatedUser = { ...user, password: passwordData.new };
                     setUser(updatedUser);
                     sessionStorage.setItem('feeUser', JSON.stringify(updatedUser));
-                    refreshData();
                 }
             };
 
@@ -291,16 +260,37 @@
                 setSortConfig({ key, direction });
             };
 
+            // --- PROCESSING ---
+            const getProcessedData = () => {
+                let result = data[activeTab] || []; // GUARD AGAINST UNDEFINED
+                if (tabSearch) {
+                    result = result.filter(item => Object.values(item).some(val => String(val).toLowerCase().includes(tabSearch.toLowerCase())));
+                }
+                if (sortConfig.key) {
+                    result = [...result].sort((a, b) => {
+                        let valA = a[sortConfig.key]?.toString().toLowerCase() || '';
+                        let valB = b[sortConfig.key]?.toString().toLowerCase() || '';
+                        const numA = parseFloat(valA); const numB = parseFloat(valB);
+                        if (!isNaN(numA) && !isNaN(numB) && isFinite(valA) && isFinite(valB)) {
+                             return sortConfig.direction === 'asc' ? numA - numB : numB - numA;
+                        }
+                        if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+                        if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+                        return 0;
+                    });
+                }
+                return result;
+            };
 
             // --- CORE LOGIC ---
             const generateReport = () => {
                 if (!searchReg) return;
                 const cleanReg = norm(searchReg);
-                const student = data.students?.find(s => norm(s.reg_no) === cleanReg);
+                const student = data.students.find(s => norm(s.reg_no) === cleanReg);
                 if (!student) { alert("Student not found!"); setClearanceResult(null); return; }
-                const masterFee = data.fees?.find(f => norm(f.degree) === norm(student.degree) && norm(f.batch) === norm(student.batch));
+                const masterFee = data.fees.find(f => norm(f.degree) === norm(student.degree) && norm(f.batch) === norm(student.batch));
                 
-                const studentEnrollments = data.enrollments?.filter(e => norm(e.reg_no) === cleanReg).map(en => {
+                const studentEnrollments = data.enrollments.filter(e => norm(e.reg_no) === cleanReg).map(en => {
                     const enSem = norm(en.semester);
                     const cr = parseFloat(en.cr || 0);
                     const courses = parseFloat(en.courses || 0);
@@ -308,31 +298,39 @@
                     
                     if (masterFee) {
                         feeDetails.tuition = cr * parseFloat(masterFee.per_cr_fee || 0);
+                        // Exam Fee now includes the 'other' amount from fee structure as per request
                         feeDetails.exam = (courses * parseFloat(masterFee.per_course_fee || 0)) + parseFloat(masterFee.other_fee || 0); 
+                        // REG FEE REMOVED FROM LOGIC AS REQUESTED
                         feeDetails.reg = 0; 
+                        // The 'other' slot is now reserved for ad-hoc charges only
                         feeDetails.other = 0;
                     }
-                    const otherCharges = data.others?.filter(o => norm(o.reg_no) === cleanReg && (norm(o.semester) === enSem || enSem.includes(norm(o.semester)))) || [];
+                    const otherCharges = data.others.filter(o => norm(o.reg_no) === cleanReg && (norm(o.semester) === enSem || enSem.includes(norm(o.semester))));
                     const extraCharges = otherCharges.reduce((sum, o) => sum + parseFloat(o.amount || 0), 0);
                     
+                    // Add extra charges to the 'other' column
                     feeDetails.other += extraCharges;
+                    
+                    // Removed reg from total calculation
                     feeDetails.total = feeDetails.tuition + feeDetails.exam + feeDetails.other;
 
-                    const discRecord = data.discounts?.find(d => norm(d.reg_no) === cleanReg && norm(d.term) === enSem);
+                    const discRecord = data.discounts.find(d => norm(d.reg_no) === cleanReg && norm(d.term) === enSem);
                     const discPct = discRecord ? parseFloat(discRecord.discount || 0) : 0;
+                    
+                    // MODIFIED: Calculate discount on Tuition Fee ONLY
                     const discAmt = (feeDetails.tuition * discPct) / 100;
                     
                     const netFee = feeDetails.total - discAmt;
                     
-                    const payments = data.payments?.filter(p => {
+                    const payments = data.payments.filter(p => {
                         if (norm(p.reg_no) !== cleanReg) return false;
                         const pSem = norm(p.semester);
                         return pSem === enSem || (enSem.includes(pSem) && pSem.length > 3) || (pSem.includes(enSem) && enSem.length > 3);
-                    }) || [];
+                    });
                     const totalPaid = payments.reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
                     const balance = netFee - totalPaid;
                     return { ...en, ...feeDetails, discPct, discAmt, netFee, totalPaid, balance };
-                }) || [];
+                });
 
                 const summary = studentEnrollments.reduce((acc, curr) => ({
                     total: acc.total + curr.total, fa: acc.fa + curr.discAmt,
@@ -347,7 +345,6 @@
             const handleDelete = async (type, id) => {
                 if(!confirm("Are you sure?")) return;
                 await postToApi(`delete_${type}`, { id });
-                refreshData();
             };
 
             const handleSave = async (e) => {
@@ -366,7 +363,7 @@
                 let actionType = modalType.slice(0, -1);
                 if(modalType === 'others') actionType = 'other';
                 const success = await postToApi(`save_${actionType}`, { data: newData, id: editingId });
-                if(success) { setShowModal(false); setFormData({}); setEditingId(null); refreshData(); }
+                if(success) { setShowModal(false); setFormData({}); setEditingId(null); }
             };
             
             const openModal = (type, item = null) => {
@@ -376,88 +373,8 @@
                 setShowModal(true);
             };
 
-            // --- IMPORT HANDLER ---
-            const handleImport = (e, type) => {
-                const file = e.target.files[0];
-                if (!file) return;
-                const reader = new FileReader();
-                reader.onload = async (evt) => {
-                    const text = evt.target.result;
-                    const rows = text.split('\n').map(r => r.trim()).filter(r => r);
-                    if (rows.length < 2) return; 
-                    const headers = rows[0].split(',').map(h => h.trim().replace(/ /g, '_').toLowerCase());
-                    
-                    const existingData = data[type] || [];
-                    const newItems = [];
-                    const duplicates = [];
-                    
-                    for (let i = 1; i < rows.length; i++) {
-                        const values = rows[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
-                        const obj = {};
-                        
-                        // Smart Header Mapping
-                        headers.forEach((h, index) => {
-                            let val = values[index] ? values[index].trim() : '';
-                            if (val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1);
-                            
-                            // Map CSV headers to internal keys
-                            if (h.includes('reg') && h.includes('no')) obj['reg_no'] = val;
-                            else if (h.includes('name')) obj['name'] = val;
-                            else if (h.includes('semester')) obj['semester'] = val;
-                            else if (h.includes('amount')) obj['amount'] = val;
-                            else if (h === 'cr') obj['cr'] = val;
-                            else if (h.includes('course')) obj['courses'] = val;
-                            else if (h.includes('degree')) obj['degree'] = val;
-                            else if (h.includes('batch')) obj['batch'] = val;
-                            else if (h.includes('term')) obj['term'] = val;
-                            else if (h.includes('fee') && h.includes('name')) obj['fee_name'] = val;
-                            else if (h.includes('bank')) obj['bank'] = val;
-                            else obj[h] = val; // Fallback
-                        });
-
-                        if(importTerm) {
-                            if(type === 'enrollments' || type === 'payments' || type === 'others') obj.semester = importTerm;
-                            else if(type === 'discounts') obj.term = importTerm;
-                        }
-                        if (obj.amount) obj.amount = obj.amount.replace(/[^0-9.-]/g, '');
-
-                        const isDuplicate = existingData.some(existing => 
-                            norm(existing.reg_no) === norm(obj.reg_no) &&
-                            (
-                                (existing.semester && norm(existing.semester) === norm(obj.semester)) ||
-                                (existing.term && norm(existing.term) === norm(obj.term))
-                            )
-                        );
-                        
-                        if (isDuplicate) duplicates.push(obj);
-                        else newItems.push(obj);
-                    }
-                    
-                    setImportPreview({ show: true, total: rows.length - 1, newItems, duplicates, type });
-                    e.target.value = null;
-                };
-                reader.readAsText(file);
-            };
-
-            const confirmImport = async () => {
-                setUploadStatus({ active: true, current: 0, total: importPreview.newItems.length });
-                let actionType = importPreview.type.slice(0, -1);
-                if(importPreview.type === 'others') actionType = 'other';
-                let uploadedCount = 0;
-                for (const item of importPreview.newItems) {
-                    await postToApi(`save_${actionType}`, { data: item });
-                    uploadedCount++;
-                    setUploadStatus(prev => ({ ...prev, current: uploadedCount }));
-                }
-                setImportPreview({ show: false, total: 0, newItems: [], duplicates: [], type: '' });
-                setUploadStatus({ active: false, current: 0, total: 0 });
-                alert(`Successfully imported ${uploadedCount} records!`);
-                refreshData();
-            };
-
-            // --- FILTER & BULK ---
             const handleSelectAll = (e) => {
-                if (e.target.checked) setSelectedIds(new Set(filteredData.map(i => i.id || i.reg_no)));
+                if (e.target.checked) setSelectedIds(new Set(processedData.map(i => i.id || i.reg_no)));
                 else setSelectedIds(new Set());
             };
             const handleSelectRow = (id) => {
@@ -501,7 +418,7 @@
                     case 'payments': return ['reg_no', 'name', 'semester', 'amount', 'date', 'bank'];
                     case 'discounts': return ['reg_no', 'name', 'term', 'discount'];
                     case 'others': return ['reg_no', 'name', 'semester', 'fee_name', 'amount'];
-                    case 'users': return ['username', 'password', 'role', 'permissions']; // REMOVED PASSWORD FROM HEADERS
+                    case 'users': return ['username', 'password', 'role', 'permissions'];
                     case 'banks': return ['name', 'account_no'];
                     default: return [];
                 }
@@ -541,6 +458,91 @@
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
+            };
+
+            const handleImport = (e, type) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = async (evt) => {
+                    const text = evt.target.result;
+                    const rows = text.split('\n').map(r => r.trim()).filter(r => r);
+                    if (rows.length < 2) return; 
+                    const headers = rows[0].split(',').map(h => h.trim());
+                    
+                    let actionType = type.slice(0, -1);
+                    if(type === 'others') actionType = 'other';
+                    
+                    setUploadStatus({ active: true, current: 0, total: rows.length - 1 });
+
+                    // IMPROVED: Duplicate Check Logic
+                    const existingData = data[type] || [];
+                    const newItems = [];
+                    
+                    for (let i = 1; i < rows.length; i++) {
+                        // Regex to split by comma ONLY if not inside quotes
+                        const values = rows[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+                        const obj = {};
+                        headers.forEach((h, index) => {
+                            let val = values[index] ? values[index].trim() : '';
+                            if (val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1);
+                            obj[h] = val;
+                        });
+                        
+                        // NEW: Auto-assign semester from input if available
+                        if(importTerm) {
+                            if(type === 'enrollments' || type === 'payments' || type === 'others') {
+                                obj.semester = importTerm;
+                            } else if(type === 'discounts') {
+                                obj.term = importTerm;
+                            }
+                        }
+                        
+                        // Ensure amount field is sanitized
+                        if (obj.amount) {
+                             obj.amount = obj.amount.replace(/[^0-9.-]/g, '');
+                        }
+
+                        // DUPLICATE CHECK: Skip if Reg No & Semester/Term match existing
+                        const isDuplicate = existingData.some(existing => 
+                            norm(existing.reg_no) === norm(obj.reg_no) &&
+                            (
+                                (existing.semester && norm(existing.semester) === norm(obj.semester)) ||
+                                (existing.term && norm(existing.term) === norm(obj.term))
+                            )
+                        );
+
+                        if (!isDuplicate) {
+                            newItems.push(obj);
+                        }
+                    }
+                    
+                    // Upload only NEW items
+                    if (newItems.length === 0) {
+                        setUploadStatus({ active: false, current: 0, total: 0 });
+                        alert("No new records found. All items in the file were duplicates.");
+                        e.target.value = null;
+                        return;
+                    }
+
+                    if (confirm(`Found ${rows.length - 1} records. ${rows.length - 1 - newItems.length} are duplicates. Import ${newItems.length} new records?`)) {
+                         // Reset progress for actual upload
+                         setUploadStatus({ active: true, current: 0, total: newItems.length });
+                         let uploadedCount = 0;
+                         for (const item of newItems) {
+                            await postToApi(`save_${actionType}`, { data: item });
+                            uploadedCount++;
+                            setUploadStatus(prev => ({ ...prev, current: uploadedCount }));
+                         }
+                         alert(`Successfully imported ${uploadedCount} new records!`);
+                    } else {
+                        alert("Import cancelled.");
+                    }
+
+                    setUploadStatus({ active: false, current: 0, total: 0 });
+                    e.target.value = null;
+                };
+                reader.readAsText(file);
             };
             
             const processedData = getProcessedData();
@@ -595,6 +597,7 @@
                     </div>
 
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                        {/* CLEARANCE REPORT UI */}
                         {activeTab === 'clearance' && (
                             <div className="space-y-6">
                                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 no-print">
@@ -622,18 +625,21 @@
                                                 <div className="flex justify-between border-b border-gray-200 py-1"><span className="font-bold text-gray-600">Batch / Session:</span><span className="text-gray-900">{clearanceResult.student.batch}</span></div>
                                                 <div className="flex justify-between border-b border-gray-200 py-1"><span className="font-bold text-gray-600">Rate (Per Cr. Hr):</span><span className="text-gray-900">{clearanceResult.masterFee ? num(clearanceResult.masterFee.per_cr_fee) : '-'}</span></div>
                                             </div>
+                                            {!clearanceResult.masterFeeFound && (
+                                                <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4"><p className="text-sm text-yellow-700"><strong>Warning:</strong> No matching Fee Structure found for {clearanceResult.student.degree} {clearanceResult.student.batch}.</p></div>
+                                            )}
                                             <div className="overflow-x-auto">
                                                 <table className="w-full text-xs">
                                                     <thead className="bg-gray-100 text-gray-900 font-bold uppercase">
-                                                        <tr><th className="p-2 border">Sem</th><th className="p-2 border text-center">Cr</th><th className="p-2 border text-center">Sub</th><th className="p-2 border text-right">Tuition</th><th className="p-2 border text-right">Exam</th><th className="p-2 border text-right">Reg</th><th className="p-2 border text-right">Other</th><th className="p-2 border text-right bg-gray-50">Total</th><th className="p-2 border text-center">Disc %</th><th className="p-2 border text-right">Disc Amt</th><th className="p-2 border text-right">Net Fee</th><th className="p-2 border text-right text-green-700">Paid</th><th className="p-2 border text-right">Balance</th></tr>
+                                                        <tr><th className="p-2 border">Sem</th><th className="p-2 border text-center">Sub</th><th className="p-2 border text-center">Cr</th><th className="p-2 border text-right">Tuition</th><th className="p-2 border text-right">Exam</th><th className="p-2 border text-right">Reg</th><th className="p-2 border text-right">Other</th><th className="p-2 border text-right bg-gray-50">Total</th><th className="p-2 border text-center">Disc %</th><th className="p-2 border text-right">Disc Amt</th><th className="p-2 border text-right">Net Fee</th><th className="p-2 border text-right text-green-700">Paid</th><th className="p-2 border text-right">Balance</th></tr>
                                                     </thead>
                                                     <tbody className="divide-y divide-gray-200">
                                                         {clearanceResult.rows.map((row, idx) => (
                                                             <tr key={idx} className="hover:bg-gray-50">
-                                                                <td className="p-2 border font-medium">{row.semester}</td><td className="p-2 border text-center">{row.cr}</td><td className="p-2 border text-center">{row.courses}</td><td className="p-2 border text-right text-gray-600">{num(row.tuition)}</td><td className="p-2 border text-right text-gray-600">{num(row.exam)}</td><td className="p-2 border text-right text-gray-600">{num(row.reg)}</td><td className="p-2 border text-right text-gray-600">{num(row.other)}</td><td className="p-2 border text-right font-bold bg-gray-50">{num(row.total)}</td><td className="p-2 border text-center text-gray-500">{row.discPct > 0 ? `${row.discPct}%` : '-'}</td><td className="p-2 border text-right text-gray-500">{row.discAmt > 0 ? num(row.discAmt) : '-'}</td><td className="p-2 border text-right font-bold">{num(row.netFee)}</td><td className="p-2 border text-right font-bold text-green-600">{num(row.totalPaid)}</td><td className={`p-2 border text-right font-bold ${row.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>{num(row.balance)}</td>
+                                                                <td className="p-2 border font-medium">{row.semester}</td><td className="p-2 border text-center">{row.courses}</td><td className="p-2 border text-center">{row.cr}</td><td className="p-2 border text-right text-gray-600">{num(row.tuition)}</td><td className="p-2 border text-right text-gray-600">{num(row.exam)}</td><td className="p-2 border text-right text-gray-600">{num(row.reg)}</td><td className="p-2 border text-right text-gray-600">{num(row.other)}</td><td className="p-2 border text-right font-bold bg-gray-50">{num(row.total)}</td><td className="p-2 border text-center text-gray-500">{row.discPct > 0 ? `${row.discPct}%` : '-'}</td><td className="p-2 border text-right text-gray-500">{row.discAmt > 0 ? num(row.discAmt) : '-'}</td><td className="p-2 border text-right font-bold">{num(row.netFee)}</td><td className="p-2 border text-right font-bold text-green-600">{num(row.totalPaid)}</td><td className={`p-2 border text-right font-bold ${row.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>{num(row.balance)}</td>
                                                             </tr>
                                                         ))}
-                                                        <tr className="bg-gray-800 text-white font-bold"><td colSpan="7" className="p-3 text-right uppercase tracking-wider">Grand Totals</td><td className="p-3 text-right">{num(clearanceResult.summary.total)}</td><td className="p-3 text-center">-</td><td className="p-3 text-right">{num(clearanceResult.summary.fa)}</td><td className="p-3 text-right">{num(clearanceResult.summary.total - clearanceResult.summary.fa)}</td><td className="p-3 text-right text-green-400">{num(clearanceResult.summary.paid)}</td><td className={`p-3 text-right ${clearanceResult.summary.balance > 0 ? 'text-red-400' : 'text-green-400'}`}>{num(clearanceResult.summary.balance)}</td></tr>
+                                                        <tr className="bg-gray-800 text-white font-bold"><td className="p-3"></td><td className="p-3 text-center">{clearanceResult.summary.courses}</td><td className="p-3 text-center">{clearanceResult.summary.cr}</td><td colSpan="4"></td><td className="p-3 text-right">{num(clearanceResult.summary.total)}</td><td className="p-3 text-center">-</td><td className="p-3 text-right">{num(clearanceResult.summary.fa)}</td><td className="p-3 text-right">{num(clearanceResult.summary.total - clearanceResult.summary.fa)}</td><td className="p-3 text-right text-green-400">{num(clearanceResult.summary.paid)}</td><td className={`p-3 text-right ${clearanceResult.summary.balance > 0 ? 'text-red-400' : 'text-green-400'}`}>{num(clearanceResult.summary.balance)}</td></tr>
                                                     </tbody>
                                                 </table>
                                             </div>
@@ -646,22 +652,38 @@
                                 )}
                             </div>
                         )}
-                        
-                        {/* GENERIC DATA TABLE UI */}
+
+                        {/* OTHER TABS UI */}
                         {activeTab !== 'clearance' && (
                             <div>
                                 <div className="flex flex-col gap-4 mb-6 no-print">
-                                    <div className="flex justify-between items-center"><h2 className="text-2xl font-bold text-gray-800 capitalize">{activeTab} Directory</h2><div className="flex gap-2">{(user.role === 'admin' || user.permissions.includes(activeTab)) && <button onClick={() => openModal(activeTab)} className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700 transition flex items-center gap-2"><Plus className="h-5 w-5" /> Add New</button>}</div></div>
+                                    <div className="flex justify-between items-center"><h2 className="text-2xl font-bold text-gray-800 capitalize">{activeTab} Directory <span className="ml-2 text-sm bg-gray-200 text-gray-700 py-1 px-3 rounded-full">{data[activeTab]?.length || 0}</span></h2><div className="flex gap-2">{(user.role === 'admin' || user.permissions.includes(activeTab)) && <button onClick={() => openModal(activeTab)} className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700 transition flex items-center gap-2 shadow-sm"><Plus className="h-5 w-5" /> Add New</button>}</div></div>
+                                    
+                                    {/* Action Buttons: Refresh, Delete, Import etc */}
                                     <div className="bg-white p-3 rounded-xl border border-gray-200 flex flex-wrap gap-3 items-center justify-between shadow-sm">
                                         <div className="relative flex-grow max-w-md"><Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" /><input type="text" value={tabSearch} onChange={(e) => setTabSearch(e.target.value)} placeholder={`Filter ${activeTab}...`} className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" /></div>
                                         <div className="flex gap-2">
-                                            {selectedIds.size > 0 && <button onClick={deleteSelected} className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm font-bold hover:bg-red-100 flex items-center gap-2"><Trash2 className="h-4 w-4" /> Delete ({selectedIds.size})</button>}
+                                            
+                                            {/* NEW: Default Import Term Input */}
+                                            {(activeTab === 'enrollments' || activeTab === 'payments' || activeTab === 'discounts' || activeTab === 'others') && (
+                                                <input 
+                                                    type="text" 
+                                                    value={importTerm} 
+                                                    onChange={(e) => setImportTerm(e.target.value)} 
+                                                    placeholder="Default Semester (Import)" 
+                                                    className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-48 focus:ring-2 focus:ring-blue-500 outline-none"
+                                                    title="Records without a semester in the CSV will use this value"
+                                                />
+                                            )}
+
+                                            <button onClick={refreshData} className="bg-gray-100 border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-200" title="Refresh Data"><Icon><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></Icon></button>
+                                            {selectedIds.size > 0 && <button onClick={deleteSelected} className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm font-bold hover:bg-red-100 flex items-center gap-2 animate-pulse"><Trash2 className="h-4 w-4" /> Delete ({selectedIds.size})</button>}
                                             {(activeTab === 'enrollments' || activeTab === 'payments' || activeTab === 'others') && <button onClick={deleteBySemester} className="bg-orange-50 border border-orange-200 text-orange-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-orange-100 flex items-center gap-2"><CalendarX className="h-4 w-4" /> Del Sem</button>}
                                             {user.role === 'admin' && <button onClick={deleteAllInTab} className="bg-white border border-red-200 text-red-600 px-3 py-2 rounded-lg text-sm font-medium hover:bg-red-50 flex items-center gap-2"><XSquare className="h-4 w-4" /> Delete All</button>}
                                             <div className="h-8 w-px bg-gray-300 mx-1"></div>
-                                            <button onClick={() => downloadSample(activeTab)} className="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2"><FileSpreadsheet className="h-4 w-4" /></button>
+                                            <button onClick={() => downloadSample(activeTab)} className="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2"><FileSpreadsheet className="h-4 w-4" /> Sample</button>
                                             <label className="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 cursor-pointer flex items-center gap-2"><Download className="h-4 w-4" /><input type="file" onChange={(e) => handleImport(e, activeTab)} className="hidden" accept=".csv" /></label>
-                                            <button onClick={() => handleExport(activeTab)} className="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2"><Upload className="h-4 w-4" /></button>
+                                            <button onClick={() => handleExport(activeTab)} className="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2"><Upload className="h-4 w-4" /> Export</button>
                                         </div>
                                     </div>
                                 </div>
@@ -669,30 +691,27 @@
                                     <div className="overflow-x-auto">
                                         <table className="w-full text-sm text-left">
                                             <thead className="bg-gray-50 text-gray-700 uppercase font-bold text-xs border-b border-gray-200">
-                                                <tr><th className="p-4 w-10"><input type="checkbox" onChange={handleSelectAll} checked={filteredData.length > 0 && selectedIds.size === filteredData.length} className="rounded" /></th>{getHeaders(activeTab).map(h => <th key={h} className="p-4">{h.replace(/_/g, ' ')}</th>)}<th className="p-4 text-center">Actions</th></tr>
+                                                <tr><th className="p-4 w-10"><input type="checkbox" onChange={handleSelectAll} checked={processedData.length > 0 && selectedIds.size === processedData.length} className="rounded" /></th>{getHeaders(activeTab).map(h => <th key={h} className="p-4 cursor-pointer hover:bg-gray-200 transition" onClick={() => handleSort(h)}>{h.replace(/_/g, ' ')} <Icon className="inline h-3 w-3 ml-1"><path d="M7 15l5 5 5-5"/><path d="M7 9l5-5 5 5"/></Icon></th>)}<th className="p-4 text-center">Actions</th></tr>
                                             </thead>
                                             <tbody className="divide-y divide-gray-100">
-                                                {filteredData.map((item, idx) => (
+                                                {processedData.map((item, idx) => (
                                                     <tr key={item.id || idx} className={`hover:bg-gray-50 transition ${selectedIds.has(item.id || item.reg_no) ? 'bg-blue-50' : ''}`}>
                                                         <td className="p-4"><input type="checkbox" checked={selectedIds.has(item.id || item.reg_no)} onChange={() => handleSelectRow(item.id || item.reg_no)} className="rounded" /></td>
-                                                        
-                                                        {/* SPECIFIC ROW RENDERING BASED ON ACTIVE TAB */}
                                                         {activeTab === 'students' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4 font-bold">{item.name}</td><td className="p-4"><span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-bold">{item.degree}</span></td><td className="p-4 text-gray-500">{item.batch}</td></>}
                                                         {activeTab === 'fees' && <><td className="p-4 font-bold">{item.degree}</td><td className="p-4 text-gray-600">{item.batch}</td><td className="p-4 text-right text-gray-500">{num(item.per_cr_fee)}</td><td className="p-4 text-right font-bold text-green-700">{num(item.per_course_fee)}</td><td className="p-4 text-right text-gray-500">{num(item.reg_fee)}</td><td className="p-4 text-right text-gray-500">{num(item.other_fee)}</td></>}
                                                         {activeTab === 'enrollments' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4"><span className="bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-xs font-bold">{item.semester}</span></td><td className="p-4">{item.cr}</td><td className="p-4">{item.courses}</td></>}
-                                                        {activeTab === 'payments' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4"><span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-bold">{item.semester}</span></td><td className="p-4 text-right font-bold">{num(item.amount)}</td><td className="p-4 text-gray-500">{item.date}</td><td className="p-4 text-gray-500">{item.bank}</td></>}
+                                                        {activeTab === 'payments' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4"><span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-bold">{item.semester}</span></td><td className="p-4 text-right font-bold">{num(item.amount)}</td><td className="p-4">{item.date}</td><td className="p-4">{item.bank}</td></>}
                                                         {activeTab === 'others' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4 text-gray-600">{item.semester}</td><td className="p-4"><span className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs font-bold">{item.fee_name}</span></td><td className="p-4 text-right font-bold">{num(item.amount)}</td></>}
                                                         {activeTab === 'discounts' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4 text-gray-500">{item.term}</td><td className="p-4 text-right font-bold text-purple-600">{item.discount}%</td></>}
-                                                        {activeTab === 'users' && <><td className="p-4 font-bold">{item.username}</td><td className="p-4 capitalize">{item.role}</td><td className="p-4 text-xs max-w-xs truncate">{item.role === 'admin' ? 'Full Access' : (Array.isArray(item.permissions) ? item.permissions.join(', ') : item.permissions)}</td></>}
-                                                        {activeTab === 'banks' && <><td className="p-4 font-bold">{item.name}</td><td className="p-4 font-mono text-gray-600">{item.account_no}</td></>}
-                                                        
+                                                        {activeTab === 'users' && <><td className="p-4 font-bold">{item.username}</td><td className="p-4">****</td><td className="p-4 capitalize">{item.role}</td><td className="p-4 text-xs max-w-xs truncate">{item.role === 'admin' ? 'Full Access' : (Array.isArray(item.permissions) ? item.permissions.join(', ') : item.permissions)}</td></>}
+                                                        {activeTab === 'banks' && <><td className="p-4 font-bold">{item.name}</td><td className="p-4 text-gray-600 font-mono">{item.account_no}</td></>}
                                                         <td className="p-4 text-center flex justify-center gap-2">
                                                             <button onClick={() => openModal(activeTab, item)} className="p-2 text-blue-600 hover:bg-blue-50 rounded"><i className="fas fa-edit"></i> Edit</button>
                                                             <button onClick={() => handleDelete(activeTab, item.id)} className="p-2 text-red-600 hover:bg-red-50 rounded"><Trash2 className="h-4 w-4" /></button>
                                                         </td>
                                                     </tr>
                                                 ))}
-                                                {filteredData.length === 0 && <tr><td colSpan="10" className="p-8 text-center text-gray-400">No records found.</td></tr>}
+                                                {processedData.length === 0 && <tr><td colSpan="10" className="p-8 text-center text-gray-400">No records found.</td></tr>}
                                             </tbody>
                                         </table>
                                     </div>
@@ -773,38 +792,6 @@
                                     <div className="bg-blue-600 h-4 rounded-full transition-all duration-300" style={{ width: `${(uploadStatus.current / uploadStatus.total) * 100}%` }}></div>
                                 </div>
                                 <p className="text-sm text-gray-600">{uploadStatus.current} / {uploadStatus.total}</p>
-                            </div>
-                        </div>
-                    )}
-                    {/* IMPORT PREVIEW MODAL */}
-                    {importPreview.show && (
-                        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-                            <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl p-6 max-h-[90vh] flex flex-col">
-                                <h3 className="text-xl font-bold mb-4">Import Summary ({importPreview.type})</h3>
-                                <div className="grid grid-cols-3 gap-4 mb-4 text-center">
-                                     <div className="bg-blue-50 p-2 rounded"><div className="text-xl font-bold text-blue-600">{importPreview.total}</div><div className="text-xs text-gray-500">Total Found</div></div>
-                                     <div className="bg-green-50 p-2 rounded"><div className="text-xl font-bold text-green-600">{importPreview.newItems.length}</div><div className="text-xs text-gray-500">New Records</div></div>
-                                     <div className="bg-red-50 p-2 rounded"><div className="text-xl font-bold text-red-600">{importPreview.duplicates.length}</div><div className="text-xs text-gray-500">Duplicates (Skipped)</div></div>
-                                </div>
-                                
-                                {importPreview.duplicates.length > 0 && (
-                                    <div className="flex-1 overflow-hidden flex flex-col">
-                                        <h4 className="font-bold text-sm text-gray-700 mb-2">Duplicate Entries:</h4>
-                                        <div className="overflow-y-auto border rounded bg-gray-50 p-2 text-sm text-gray-600 space-y-1">
-                                            {importPreview.duplicates.map((d, i) => (
-                                                <div key={i} className="flex justify-between border-b border-gray-200 last:border-0 pb-1">
-                                                    <span>{d.reg_no || d.name || 'Unknown'}</span>
-                                                    <span className="text-xs bg-gray-200 px-2 rounded text-gray-500">{d.semester || d.term || 'N/A'}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-
-                                <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
-                                    <button onClick={() => { setImportPreview({show:false, newItems:[], duplicates:[], total:0, type:''}); }} className="px-4 py-2 bg-gray-100 rounded font-bold hover:bg-gray-200">Cancel</button>
-                                    {importPreview.newItems.length > 0 && <button onClick={confirmImport} className="px-6 py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700">Import {importPreview.newItems.length} Records</button>}
-                                </div>
                             </div>
                         </div>
                     )}
