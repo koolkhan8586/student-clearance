@@ -139,9 +139,10 @@
             ];
 
             const availableTabs = user ? (
-                user.role === 'admin' 
+                // Force show 'users' tab if role is 'admin', case-insensitive check for robustness
+                (user.role && user.role.toLowerCase() === 'admin')
                 ? [...TABS, { id: 'users', label: 'Users & Access', icon: Shield }] 
-                : TABS.filter(t => user.permissions.includes(t.id))
+                : TABS.filter(t => user.permissions && user.permissions.includes(t.id))
             ) : [];
 
             // FETCH DATA FROM SERVER
@@ -150,7 +151,6 @@
                     const res = await fetch(API_URL);
                     const json = await res.json();
                     
-                    // SAFEGUARD: Ensure all arrays exist, defaulting to [] if API returns partial data or error
                     const safeData = {
                         students: Array.isArray(json.students) ? json.students : [],
                         fees: Array.isArray(json.fees) ? json.fees : [],
@@ -183,8 +183,7 @@
                 setSelectedIds(new Set());
                 setTabSearch('');
                 setSortConfig({ key: null, direction: 'asc' }); 
-                // Don't reset importTerm on tab change to keep user input if they switch quickly, or reset if preferred.
-                // setImportTerm(''); 
+                setImportTerm(''); 
             }, [activeTab]);
 
             const norm = (str) => str ? str.toString().toLowerCase().replace(/[^a-z0-9]/g, '') : '';
@@ -514,7 +513,7 @@
                     case 'payments': return ['reg_no', 'name', 'semester', 'amount', 'date', 'bank'];
                     case 'discounts': return ['reg_no', 'name', 'term', 'discount'];
                     case 'others': return ['reg_no', 'name', 'semester', 'fee_name', 'amount'];
-                    case 'users': return ['username', 'role', 'permissions']; // REMOVED PASSWORD FROM HEADERS
+                    case 'users': return ['username', 'password', 'role', 'permissions']; // REMOVED PASSWORD FROM HEADERS
                     case 'banks': return ['name', 'account_no'];
                     default: return [];
                 }
@@ -642,9 +641,6 @@
                                                 <div className="flex justify-between border-b border-gray-200 py-1"><span className="font-bold text-gray-600">Batch / Session:</span><span className="text-gray-900">{clearanceResult.student.batch}</span></div>
                                                 <div className="flex justify-between border-b border-gray-200 py-1"><span className="font-bold text-gray-600">Rate (Per Cr. Hr):</span><span className="text-gray-900">{clearanceResult.masterFee ? num(clearanceResult.masterFee.per_cr_fee) : '-'}</span></div>
                                             </div>
-                                            {!clearanceResult.masterFeeFound && (
-                                                <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4"><p className="text-sm text-yellow-700"><strong>Warning:</strong> No matching Fee Structure found for {clearanceResult.student.degree} {clearanceResult.student.batch}.</p></div>
-                                            )}
                                             <div className="overflow-x-auto">
                                                 <table className="w-full text-xs">
                                                     <thead className="bg-gray-100 text-gray-900 font-bold uppercase">
@@ -657,7 +653,6 @@
                                                                 <td className="p-2 border font-medium">{row.semester}</td><td className="p-2 border text-center">{row.courses}</td><td className="p-2 border text-center">{row.cr}</td><td className="p-2 border text-right text-gray-600">{num(row.tuition)}</td><td className="p-2 border text-right text-gray-600">{num(row.exam)}</td><td className="p-2 border text-right text-gray-600">{num(row.reg)}</td><td className="p-2 border text-right text-gray-600">{num(row.other)}</td><td className="p-2 border text-right font-bold bg-gray-50">{num(row.total)}</td><td className="p-2 border text-center text-gray-500">{row.discPct > 0 ? `${row.discPct}%` : '-'}</td><td className="p-2 border text-right text-gray-500">{row.discAmt > 0 ? num(row.discAmt) : '-'}</td><td className="p-2 border text-right font-bold">{num(row.netFee)}</td><td className="p-2 border text-right font-bold text-green-600">{num(row.totalPaid)}</td><td className={`p-2 border text-right font-bold ${row.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>{num(row.balance)}</td>
                                                             </tr>
                                                         ))}
-                                                        {clearanceResult.rows.length === 0 && <tr><td colSpan="13" className="p-4 text-center text-gray-400 italic">No enrollment records found.</td></tr>}
                                                         <tr className="bg-gray-800 text-white font-bold">
                                                             <td className="p-3 text-right uppercase tracking-wider">Total</td>
                                                             <td className="p-3 text-center">{num(clearanceResult.summary.courses)}</td>
