@@ -98,7 +98,6 @@
         const LogOut = (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>;
         const Shield = (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>;
         const Key = (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>;
-        const CloudUpload = (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19a4 4 0 0 0 4 4h11a4 4 0 0 0 4-4v-2.5"/><line x1="16" y1="16" x2="16" y2="8"/><line x1="12" y1="12" x2="16" y2="8"/><line x1="20" y1="12" x2="16" y2="8"/></svg>;
         const ArrowUpDown = (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M7 15l5 5 5-5"/><path d="M7 9l5-5 5 5"/></svg>;
         const RefreshCw = (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>;
         const Landmark = (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="22" x2="21" y2="22" /><line x1="6" y1="18" x2="6" y2="11" /><line x1="10" y1="18" x2="10" y2="11" /><line x1="14" y1="18" x2="14" y2="11" /><line x1="18" y1="18" x2="18" y2="11" /><polygon points="12 2 20 7 4 7" /></svg>;
@@ -139,8 +138,8 @@
             ];
 
             const availableTabs = user ? (
-                // Force show 'users' tab if role is 'admin', case-insensitive check for robustness
-                (user.role && user.role.toLowerCase() === 'admin')
+                // Force show 'users' tab if role is 'admin' or username is 'admin'
+                (user.role && user.role.toLowerCase() === 'admin') || user.username === 'admin'
                 ? [...TABS, { id: 'users', label: 'Users & Access', icon: Shield }] 
                 : TABS.filter(t => user.permissions && user.permissions.includes(t.id))
             ) : [];
@@ -151,6 +150,7 @@
                     const res = await fetch(API_URL);
                     const json = await res.json();
                     
+                    // SAFEGUARD: Ensure all arrays exist
                     const safeData = {
                         students: Array.isArray(json.students) ? json.students : [],
                         fees: Array.isArray(json.fees) ? json.fees : [],
@@ -183,7 +183,7 @@
                 setSelectedIds(new Set());
                 setTabSearch('');
                 setSortConfig({ key: null, direction: 'asc' }); 
-                setImportTerm(''); 
+                // Don't reset importTerm on tab change
             }, [activeTab]);
 
             const norm = (str) => str ? str.toString().toLowerCase().replace(/[^a-z0-9]/g, '') : '';
@@ -224,28 +224,6 @@
                     if(json.status === 'success') { refreshData(); return true; } 
                     else { alert("Error: " + json.message); return false; }
                 } catch(e) { alert("Network Error"); return false; }
-            };
-
-            const syncBrowserDataToDb = async () => {
-                if(!confirm("Sync browser data to database?")) return;
-                const local = localStorage.getItem('feeSystemData_v2') || localStorage.getItem('fee_system_local');
-                if(!local) return alert("No local data found.");
-                const localData = JSON.parse(local);
-                const categories = ['students', 'fees', 'enrollments', 'payments', 'discounts', 'others', 'banks'];
-                let count = 0;
-                setUploadStatus({ active: true, current: 0, total: 100 }); 
-                for (const cat of categories) {
-                     const items = localData[cat] || [];
-                     for (const item of items) {
-                         let actionType = cat.endsWith('s') ? cat.slice(0, -1) : cat;
-                         if(cat === 'others') actionType = 'other';
-                         await postToApi(`save_${actionType}`, { data: item });
-                         count++;
-                     }
-                }
-                setUploadStatus({ active: false, current: 0, total: 0 });
-                alert(`Sync Complete! Uploaded/Checked ${count} records.`);
-                refreshData();
             };
 
             const handleLogin = (e) => {
@@ -591,7 +569,6 @@
                                 <div className="flex items-center gap-4">
                                     <div className="text-right hidden sm:block"><div className="text-sm font-bold">{user.username}</div><div className="text-xs text-gray-500 uppercase">{user.role}</div></div>
                                     <button onClick={() => setShowPasswordModal(true)} className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg"><Key className="h-5 w-5" /></button>
-                                    <button onClick={syncBrowserDataToDb} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg" title="Sync Browser Data to DB"><CloudUpload className="h-5 w-5" /></button>
                                     <button onClick={() => window.print()} className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg"><Printer className="h-5 w-5" /></button>
                                     <button onClick={handleLogout} className="bg-red-50 text-red-600 px-3 py-2 rounded-lg text-sm font-bold hover:bg-red-100 flex items-center gap-2 transition"><LogOut className="h-4 w-4" /> Logout</button>
                                 </div>
@@ -641,6 +618,9 @@
                                                 <div className="flex justify-between border-b border-gray-200 py-1"><span className="font-bold text-gray-600">Batch / Session:</span><span className="text-gray-900">{clearanceResult.student.batch}</span></div>
                                                 <div className="flex justify-between border-b border-gray-200 py-1"><span className="font-bold text-gray-600">Rate (Per Cr. Hr):</span><span className="text-gray-900">{clearanceResult.masterFee ? num(clearanceResult.masterFee.per_cr_fee) : '-'}</span></div>
                                             </div>
+                                            {!clearanceResult.masterFeeFound && (
+                                                <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4"><p className="text-sm text-yellow-700"><strong>Warning:</strong> No matching Fee Structure found for {clearanceResult.student.degree} {clearanceResult.student.batch}.</p></div>
+                                            )}
                                             <div className="overflow-x-auto">
                                                 <table className="w-full text-xs">
                                                     <thead className="bg-gray-100 text-gray-900 font-bold uppercase">
