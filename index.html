@@ -138,11 +138,9 @@
                 { id: 'banks', label: 'Banks', icon: Landmark } 
             ];
 
-            // ROBUST ADMIN CHECK: Check both role AND username case-insensitively
-            const isAdmin = user && ((user.role && user.role.toLowerCase() === 'admin') || (user.username && user.username.toLowerCase() === 'admin'));
-
             const availableTabs = user ? (
-                isAdmin
+                // Force show 'users' tab if role is 'admin' or username is 'admin'
+                (user.role && user.role.toLowerCase() === 'admin') || user.username.toLowerCase() === 'admin'
                 ? [...TABS, { id: 'users', label: 'Users & Access', icon: Shield }] 
                 : TABS.filter(t => user.permissions && user.permissions.includes(t.id))
             ) : [];
@@ -404,6 +402,8 @@
                             else if (h.includes('term')) obj['term'] = val;
                             else if (h.includes('fee') && h.includes('name')) obj['fee_name'] = val;
                             else if (h.includes('bank')) obj['bank'] = val;
+                            else if (h.includes('mobile')) obj['mobile'] = val; // NEW
+                            else if (h.includes('email')) obj['email'] = val; // NEW
                             else obj[h] = val; // Fallback
                         });
 
@@ -499,13 +499,13 @@
             
             const getHeaders = (type) => {
                 switch(type) {
-                    case 'students': return ['reg_no', 'name', 'degree', 'batch'];
+                    case 'students': return ['reg_no', 'name', 'degree', 'batch', 'mobile', 'email']; // NEW FIELDS ADDED
                     case 'fees': return ['degree', 'batch', 'per_cr_fee', 'per_course_fee', 'reg_fee', 'other_fee'];
                     case 'enrollments': return ['reg_no', 'name', 'semester', 'cr', 'courses'];
                     case 'payments': return ['reg_no', 'name', 'semester', 'amount', 'date', 'bank'];
                     case 'discounts': return ['reg_no', 'name', 'term', 'discount'];
                     case 'others': return ['reg_no', 'name', 'semester', 'fee_name', 'amount'];
-                    case 'users': return ['username', 'password', 'role', 'permissions']; // REMOVED PASSWORD FROM HEADERS
+                    case 'users': return ['username', 'password', 'role', 'permissions']; 
                     case 'banks': return ['name', 'account_no'];
                     default: return [];
                 }
@@ -600,12 +600,6 @@
                                     <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === tab.id ? 'border-blue-600 text-blue-600 bg-blue-50' : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}>
                                         <tab.icon className="h-4 w-4" />
                                         {tab.label}
-                                        {/* Show count for data tabs */}
-                                        {data[tab.id] && Array.isArray(data[tab.id]) && (
-                                            <span className={`ml-2 text-xs font-bold px-2 py-0.5 rounded-full ${activeTab === tab.id ? 'bg-blue-200 text-blue-800' : 'bg-gray-200 text-gray-600'}`}>
-                                                {data[tab.id].length}
-                                            </span>
-                                        )}
                                     </button>
                                 ))}
                             </div>
@@ -684,11 +678,16 @@
                         {activeTab !== 'clearance' && (
                             <div>
                                 <div className="flex flex-col gap-4 mb-6 no-print">
-                                    <div className="flex justify-between items-center"><h2 className="text-2xl font-bold text-gray-800 capitalize">{activeTab} Directory</h2><div className="flex gap-2">{(user.role === 'admin' || user.permissions.includes(activeTab)) && <button onClick={() => openModal(activeTab)} className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700 transition flex items-center gap-2 shadow-sm"><Plus className="h-5 w-5" /> Add New</button>}</div></div>
+                                    <div className="flex justify-between items-center">
+                                        <h2 className="text-2xl font-bold text-gray-800 capitalize">{activeTab} Directory 
+                                            {/* Show Count in Header */}
+                                            {data[activeTab] && <span className="ml-3 bg-gray-200 text-gray-700 text-sm py-1 px-3 rounded-full">{data[activeTab].length}</span>}
+                                        </h2>
+                                        <div className="flex gap-2">{(user.role === 'admin' || user.permissions.includes(activeTab)) && <button onClick={() => openModal(activeTab)} className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700 transition flex items-center gap-2 shadow-sm"><Plus className="h-5 w-5" /> Add New</button>}</div></div>
                                     <div className="bg-white p-3 rounded-xl border border-gray-200 flex flex-wrap gap-3 items-center justify-between shadow-sm">
                                         <div className="relative flex-grow max-w-md"><Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" /><input type="text" value={tabSearch} onChange={(e) => setTabSearch(e.target.value)} placeholder={`Filter ${activeTab}...`} className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" /></div>
                                         <div className="flex gap-2">
-                                            {selectedIds.size > 0 && <button onClick={deleteSelected} className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm font-bold hover:bg-red-100 flex items-center gap-2"><Trash2 className="h-4 w-4" /> Delete ({selectedIds.size})</button>}
+                                            {selectedIds.size > 0 && <button onClick={deleteSelected} className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm font-bold hover:bg-red-100 flex items-center gap-2 animate-pulse"><Trash2 className="h-4 w-4" /> Delete ({selectedIds.size})</button>}
                                             {(activeTab === 'enrollments' || activeTab === 'payments' || activeTab === 'others') && <button onClick={deleteBySemester} className="bg-orange-50 border border-orange-200 text-orange-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-orange-100 flex items-center gap-2"><CalendarX className="h-4 w-4" /> Del Sem</button>}
                                             {user.role === 'admin' && <button onClick={deleteAllInTab} className="bg-white border border-red-200 text-red-600 px-3 py-2 rounded-lg text-sm font-medium hover:bg-red-50 flex items-center gap-2"><XSquare className="h-4 w-4" /> Delete All</button>}
                                             <div className="h-8 w-px bg-gray-300 mx-1"></div>
@@ -715,7 +714,10 @@
                                     <div className="overflow-x-auto">
                                         <table className="w-full text-sm text-left">
                                             <thead className="bg-gray-50 text-gray-700 uppercase font-bold text-xs border-b border-gray-200">
-                                                <tr><th className="p-4 w-10"><input type="checkbox" onChange={handleSelectAll} checked={filteredData.length > 0 && selectedIds.size === filteredData.length} className="rounded" /></th>{getHeaders(activeTab).map(h => <th key={h} className="p-4">{h.replace(/_/g, ' ')}</th>)}<th className="p-4 text-center">Actions</th></tr>
+                                                <tr><th className="p-4 w-10"><input type="checkbox" onChange={handleSelectAll} checked={filteredData.length > 0 && selectedIds.size === filteredData.length} className="rounded" /></th>
+                                                {/* ADDED SORT CLICK HANDLER TO HEADERS */}
+                                                {getHeaders(activeTab).map(h => <th key={h} className="p-4 cursor-pointer hover:text-blue-600" onClick={() => handleSort(h)}>{h.replace(/_/g, ' ')} {sortConfig.key === h ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th>)}
+                                                <th className="p-4 text-center">Actions</th></tr>
                                             </thead>
                                             <tbody className="divide-y divide-gray-100">
                                                 {filteredData.map((item, idx) => (
@@ -723,7 +725,7 @@
                                                         <td className="p-4"><input type="checkbox" checked={selectedIds.has(item.id || item.reg_no)} onChange={() => handleSelectRow(item.id || item.reg_no)} className="rounded" /></td>
                                                         
                                                         {/* SPECIFIC ROW RENDERING BASED ON ACTIVE TAB */}
-                                                        {activeTab === 'students' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4 font-bold">{item.name}</td><td className="p-4"><span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-bold">{item.degree}</span></td><td className="p-4 text-gray-500">{item.batch}</td></>}
+                                                        {activeTab === 'students' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4 font-bold">{item.name}</td><td className="p-4"><span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-bold">{item.degree}</span></td><td className="p-4 text-gray-500">{item.batch}</td><td className="p-4 text-gray-500">{item.mobile || '-'}</td><td className="p-4 text-gray-500">{item.email || '-'}</td></>}
                                                         {activeTab === 'fees' && <><td className="p-4 font-bold">{item.degree}</td><td className="p-4 text-gray-600">{item.batch}</td><td className="p-4 text-right text-gray-500">{num(item.per_cr_fee)}</td><td className="p-4 text-right font-bold text-green-700">{num(item.per_course_fee)}</td><td className="p-4 text-right text-gray-500">{num(item.reg_fee)}</td><td className="p-4 text-right text-gray-500">{num(item.other_fee)}</td></>}
                                                         {activeTab === 'enrollments' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4"><span className="bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-xs font-bold">{item.semester}</span></td><td className="p-4">{item.cr}</td><td className="p-4">{item.courses}</td></>}
                                                         {activeTab === 'payments' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4"><span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-bold">{item.semester}</span></td><td className="p-4 text-right font-bold">{num(item.amount)}</td><td className="p-4 text-gray-500">{item.date}</td><td className="p-4 text-gray-500">{item.bank}</td></>}
@@ -751,7 +753,18 @@
                             <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
                                 <h3 className="text-xl font-bold mb-4 capitalize">Add/Edit {modalType.slice(0, -1)}</h3>
                                 <form onSubmit={handleSave} className="space-y-4">
-                                    {modalType === 'students' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={e => setFormData({...formData, reg_no: e.target.value})} /><input required placeholder="Full Name" className="w-full border p-2 rounded" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} /><div className="grid grid-cols-2 gap-4"><input placeholder="Degree (e.g. BSCAF)" className="w-full border p-2 rounded" value={formData.degree || ''} onChange={e => setFormData({...formData, degree: e.target.value})} /><input placeholder="Batch (e.g. Fall 2023)" className="w-full border p-2 rounded" value={formData.batch || ''} onChange={e => setFormData({...formData, batch: e.target.value})} /></div></>}
+                                    {modalType === 'students' && <>
+                                        <input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={e => setFormData({...formData, reg_no: e.target.value})} />
+                                        <input required placeholder="Full Name" className="w-full border p-2 rounded" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} />
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <input placeholder="Degree (e.g. BSCAF)" className="w-full border p-2 rounded" value={formData.degree || ''} onChange={e => setFormData({...formData, degree: e.target.value})} />
+                                            <input placeholder="Batch (e.g. Fall 2023)" className="w-full border p-2 rounded" value={formData.batch || ''} onChange={e => setFormData({...formData, batch: e.target.value})} />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <input placeholder="Mobile Number (Optional)" className="w-full border p-2 rounded" value={formData.mobile || ''} onChange={e => setFormData({...formData, mobile: e.target.value})} />
+                                            <input placeholder="Email Address (Optional)" className="w-full border p-2 rounded" value={formData.email || ''} onChange={e => setFormData({...formData, email: e.target.value})} />
+                                        </div>
+                                    </>}
                                     {modalType === 'fees' && <><div className="bg-blue-50 p-3 rounded text-xs text-blue-800 mb-2"><strong>Note:</strong> Fee Structure applies to ALL semesters for this Degree & Batch.</div><div className="grid grid-cols-2 gap-4"><input required placeholder="Degree" className="w-full border p-2 rounded" value={formData.degree || ''} onChange={e => setFormData({...formData, degree: e.target.value})} /><input required placeholder="Batch" className="w-full border p-2 rounded" value={formData.batch || ''} onChange={e => setFormData({...formData, batch: e.target.value})} /></div><div className="grid grid-cols-2 gap-4"><input type="number" placeholder="Fee Per Credit Hour" className="w-full border p-2 rounded" value={formData.per_cr_fee || ''} onChange={e => setFormData({...formData, per_cr_fee: e.target.value})} /><input type="number" placeholder="Fee Per Subject/Course" className="w-full border p-2 rounded" value={formData.per_course_fee || ''} onChange={e => setFormData({...formData, per_course_fee: e.target.value})} /></div><div className="grid grid-cols-2 gap-4"><input type="number" placeholder="Registration Fee (Semester)" className="w-full border p-2 rounded" value={formData.reg_fee || ''} onChange={e => setFormData({...formData, reg_fee: e.target.value})} /><input type="number" placeholder="Other Charges (Semester)" className="w-full border p-2 rounded" value={formData.other_fee || ''} onChange={e => setFormData({...formData, other_fee: e.target.value})} /></div></>}
                                     {modalType === 'enrollments' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={e => setFormData({...formData, reg_no: e.target.value})} /><input placeholder="Student Name" className="w-full border p-2 rounded" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} /><input required placeholder="Semester (e.g. Spring 2024)" className="w-full border p-2 rounded" value={formData.semester || ''} onChange={e => setFormData({...formData, semester: e.target.value})} /><div className="grid grid-cols-2 gap-4"><input type="number" placeholder="Credit Hours" className="w-full border p-2 rounded" value={formData.cr || ''} onChange={e => setFormData({...formData, cr: e.target.value})} /><input type="number" placeholder="No. of Courses" className="w-full border p-2 rounded" value={formData.courses || ''} onChange={e => setFormData({...formData, courses: e.target.value})} /></div></>}
                                     {modalType === 'payments' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={e => setFormData({...formData, reg_no: e.target.value})} /><input required placeholder="Semester (e.g. Spring 2024)" className="w-full border p-2 rounded" value={formData.semester || ''} onChange={e => setFormData({...formData, semester: e.target.value})} /><input required type="number" placeholder="Amount Paid" className="w-full border p-2 rounded font-bold text-lg" value={formData.amount || ''} onChange={e => setFormData({...formData, amount: e.target.value})} /><input type="date" className="w-full border p-2 rounded" value={formData.date || ''} onChange={e => setFormData({...formData, date: e.target.value})} />
@@ -824,7 +837,7 @@
                     )}
                     {/* IMPORT PREVIEW MODAL */}
                     {importPreview.show && (
-                        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 z-[60]">
                             <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl p-6 max-h-[90vh] flex flex-col">
                                 <h3 className="text-xl font-bold mb-4">Import Summary ({importPreview.type})</h3>
                                 <div className="grid grid-cols-3 gap-4 mb-4 text-center">
