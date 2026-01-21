@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Student Fee Management</title>
+    <title>LSAF Fee Management</title>
     
     <!-- TAILWIND CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -15,8 +15,8 @@
     <!-- BABEL -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
 
-    <!-- FONT & ICONS -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- FONT AWESOME -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     
     <style>
         .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -45,28 +45,23 @@
     </style>
 </head>
 <body class="bg-gray-100 font-sans text-gray-800">
-    <!-- Error Container -->
+
     <div id="js-error-display">
-        <h1 class="text-2xl font-bold mb-4">Application Error</h1>
-        <p>Something went wrong. Please share this error message:</p>
+        <h1 class="text-2xl font-bold mb-4">System Error</h1>
+        <p>Please reload the page. If the issue persists, contact support.</p>
         <pre id="error-message" class="bg-white p-4 border border-red-300 mt-4 rounded"></pre>
-        <button onclick="localStorage.clear(); sessionStorage.clear(); window.location.reload();" class="mt-6 px-6 py-3 bg-red-600 text-white rounded font-bold hover:bg-red-700">
-            Reset App Data & Reload
-        </button>
+        <button onclick="location.reload()" class="mt-4 px-4 py-2 bg-red-600 text-white rounded">Reload</button>
     </div>
 
-    <!-- React Root -->
     <div id="root"></div>
 
-    <!-- Error Handler Script -->
     <script>
-        window.onerror = function(message, source, lineno, colno, error) {
-            if (message.includes('Script error')) return false;
-            var display = document.getElementById('js-error-display');
-            var msg = document.getElementById('error-message');
-            display.style.display = 'block';
-            msg.innerText = "Error: " + message + "\nLine: " + lineno + "\nSource: " + source;
-            return false;
+        window.onerror = function(msg, source, lineno, colno, error) {
+            // Filter out benign script errors from CDNs
+            if (msg.toLowerCase().includes('script error')) return false;
+            document.getElementById('js-error-display').style.display = 'block';
+            document.getElementById('error-message').innerText = msg + '\nLine: ' + lineno;
+            return false; 
         };
     </script>
 
@@ -74,32 +69,33 @@
         const { useState, useEffect, useMemo } = React;
         const API_URL = 'api.php';
 
-        // --- ICONS ---
-        const Icon = ({ d, ...props }) => (<svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>);
-        const Search = (p) => <Icon d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" {...p} />;
-        const Plus = (p) => <Icon d="M12 5v14m-7-7h14" {...p} />;
-        const Trash2 = (p) => <Icon d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" {...p} />;
-        const FileText = (p) => <Icon d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" {...p} />;
-        const Users = (p) => <Icon d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" {...p} />;
-        const DollarSign = (p) => <Icon d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" {...p} />;
-        const BookOpen = (p) => <Icon d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2zM22 3h-6a4 4 0 00-4 4v14a3 3 0 0 1 3-3h7z" {...p} />;
-        const CreditCard = (p) => <Icon d="M1 4h22v16H1zM1 10h22" {...p} />;
-        const Percent = (p) => <Icon d="M19 5L5 19M6.5 6.5h0M17.5 17.5h0" {...p} />;
-        const Printer = (p) => <Icon d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 01 2 2v5a2 2 0 0 1-2 2h-2" {...p} />;
-        const Download = (p) => <Icon d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" {...p} />;
-        const Upload = (p) => <Icon d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" {...p} />;
-        const FileSpreadsheet = (p) => <Icon d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" {...p} />;
-        const XSquare = (p) => <Icon d="M3 3h18v18H3zM9 9l6 6M15 9l-6 6" {...p} />;
-        const AlertCircle = (p) => <Icon d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zM12 8v4M12 16h.01" {...p} />;
-        const CalendarX = (p) => <Icon d="M19 4H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V6a2 2 0 00-2-2zM16 2v4M8 2v4M3 10h18M10 14l4 4M14 14l-4 4" {...p} />;
-        const Lock = (p) => <Icon d="M19 11H5a2 2 0 00-2 2v7a2 2 0 002 2h14a2 2 0 002-2v-7a2 2 0 00-2-2zm-2 0V7a5 5 0 00-10 0v4" {...p} />;
-        const LogOut = (p) => <Icon d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" {...p} />;
-        const Shield = (p) => <Icon d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" {...p} />;
-        const Key = (p) => <Icon d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" {...p} />;
-        const Landmark = (p) => <Icon d="M3 22h18M6 18v-7M10 18v-7M14 18v-7M18 18v-7M12 2l8 5H4z" {...p} />;
-        const PieChart = (p) => <Icon d="M21.21 15.89A10 10 0 1 1 8 2.83M22 12A10 10 0 0 0 12 2v10z" {...p} />;
+        // --- ICONS (SVG Components) ---
+        const Icon = ({ d }) => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>;
+        
+        // Simple Icon Mapping
+        const Icons = {
+            Search: () => <Icon d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />,
+            Plus: () => <Icon d="M12 5v14m-7-7h14" />,
+            Trash: () => <Icon d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />,
+            FileText: () => <Icon d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />,
+            Users: () => <Icon d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />,
+            Dollar: () => <Icon d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />,
+            Book: () => <Icon d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2zM22 3h-6a4 4 0 00-4 4v14a3 3 0 0 1 3-3h7z" />,
+            Card: () => <Icon d="M1 4h22v16H1zM1 10h22" />,
+            Percent: () => <Icon d="M19 5L5 19M6.5 6.5h0M17.5 17.5h0" />,
+            Print: () => <Icon d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 01 2 2v5a2 2 0 0 1-2 2h-2" />,
+            Download: () => <Icon d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />,
+            Upload: () => <Icon d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" />,
+            Alert: () => <Icon d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zM12 8v4M12 16h.01" />,
+            Calendar: () => <Icon d="M19 4H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V6a2 2 0 00-2-2zM16 2v4M8 2v4M3 10h18M10 14l4 4M14 14l-4 4" />,
+            Shield: () => <Icon d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />,
+            Key: () => <Icon d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />,
+            Bank: () => <Icon d="M3 22h18M6 18v-7M10 18v-7M14 18v-7M18 18v-7M12 2l8 5H4z" />,
+            Chart: () => <Icon d="M21.21 15.89A10 10 0 1 1 8 2.83M22 12A10 10 0 0 0 12 2v10z" />
+        };
 
         function App() {
+            // --- STATE ---
             const [user, setUser] = useState(null);
             const [activeTab, setActiveTab] = useState('clearance');
             const [data, setData] = useState({
@@ -109,52 +105,33 @@
             const [tabSearch, setTabSearch] = useState('');
             const [selectedIds, setSelectedIds] = useState(new Set());
             const [clearanceResult, setClearanceResult] = useState(null);
+            
+            // Modals & Forms
             const [showModal, setShowModal] = useState(false);
             const [modalType, setModalType] = useState('');
             const [editingId, setEditingId] = useState(null);
             const [formData, setFormData] = useState({});
-            const [loginData, setLoginData] = useState({ username: '', password: '' });
+            
             const [showPasswordModal, setShowPasswordModal] = useState(false);
             const [passwordData, setPasswordData] = useState({ current: '', new: '', confirm: '' });
             
-            const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
-            const [importPreview, setImportPreview] = useState({ show: false, total: 0, newItems: [], duplicates: [], type: '' });
-            const [uploadStatus, setUploadStatus] = useState({ active: false, current: 0, total: 0, title: '' });
-            const [importTerm, setImportTerm] = useState(''); 
+            const [loginData, setLoginData] = useState({ username: '', password: '' });
             
-            // SUMMARY TAB STATE
+            // Import/Summary Features
+            const [importPreview, setImportPreview] = useState({ show: false, total: 0, newItems: [], duplicates: [], type: '' });
+            const [uploadStatus, setUploadStatus] = useState({ active: false, current: 0, total: 0 });
+            const [importTerm, setImportTerm] = useState('');
             const [summaryTerm, setSummaryTerm] = useState('');
             const [summaryData, setSummaryData] = useState(null);
+            const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
 
-            const TABS = [
-                { id: 'clearance', label: 'Clearance', icon: FileText },
-                { id: 'summary', label: 'Summary', icon: PieChart }, 
-                { id: 'students', label: 'Students', icon: Users },
-                { id: 'fees', label: 'Fee Structure', icon: DollarSign },
-                { id: 'others', label: 'Other Charges', icon: AlertCircle },
-                { id: 'enrollments', label: 'Enrollments', icon: BookOpen },
-                { id: 'payments', label: 'Payments', icon: CreditCard },
-                { id: 'discounts', label: 'Discounts', icon: Percent },
-                { id: 'banks', label: 'Banks', icon: Landmark } 
-            ];
-
-            const isAdmin = user && (
-                (user.role && user.role.toLowerCase() === 'admin') || 
-                (user.username && user.username.toLowerCase() === 'admin')
-            );
-
-            const availableTabs = user ? (
-                isAdmin 
-                ? [...TABS, { id: 'users', label: 'Users & Access', icon: Shield }] 
-                : TABS.filter(t => user.permissions && user.permissions.includes(t.id))
-            ) : [];
-
-            // FETCH DATA
+            // --- DATA LOADING ---
             const refreshData = async () => {
                 try {
                     const res = await fetch(API_URL);
                     const json = await res.json();
                     
+                    // Fallback to empty arrays if API returns partial data
                     const safeData = {
                         students: Array.isArray(json.students) ? json.students : [],
                         fees: Array.isArray(json.fees) ? json.fees : [],
@@ -166,62 +143,23 @@
                         banks: Array.isArray(json.banks) ? json.banks : []
                     };
                     setData(safeData);
-                } catch(e) { 
-                    console.error("Data Load Error:", e);
+                } catch(e) {
+                    console.error("API Error", e);
                 }
             };
 
             useEffect(() => {
                 refreshData();
                 try {
-                    const storedUser = sessionStorage.getItem('feeUser');
-                    if(storedUser) setUser(JSON.parse(storedUser));
-                } catch(e) {}
+                    const sess = sessionStorage.getItem('feeUser');
+                    if(sess) setUser(JSON.parse(sess));
+                } catch(e){}
             }, []);
 
-            useEffect(() => {
-                if (user && data.users.length > 0) {
-                    const freshUser = data.users.find(u => u.username === user.username);
-                    if (freshUser && JSON.stringify(freshUser) !== JSON.stringify(user)) {
-                        setUser(freshUser);
-                        sessionStorage.setItem('feeUser', JSON.stringify(freshUser));
-                    }
-                }
-            }, [data.users]);
-
-            useEffect(() => {
-                setSelectedIds(new Set());
-                setTabSearch('');
-                setSortConfig({ key: null, direction: 'asc' }); 
-            }, [activeTab]);
-
-            // UTILS
-            const norm = (str) => str ? str.toString().toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+            // --- HELPERS ---
+            const norm = (str) => str ? String(str).toLowerCase().replace(/[^a-z0-9]/g, '') : '';
             const num = (n) => parseFloat(n || 0).toLocaleString('en-US');
-
-            const getProcessedData = () => {
-                let result = (data[activeTab] || []); 
-                if (tabSearch) {
-                    result = result.filter(item => Object.values(item).some(val => String(val || '').toLowerCase().includes(tabSearch.toLowerCase())));
-                }
-                if (sortConfig.key) {
-                    result = [...result].sort((a, b) => {
-                        let valA = a[sortConfig.key]?.toString().toLowerCase() || '';
-                        let valB = b[sortConfig.key]?.toString().toLowerCase() || '';
-                        const numA = parseFloat(valA); const numB = parseFloat(valB);
-                        if (!isNaN(numA) && !isNaN(numB) && isFinite(valA) && isFinite(valB)) {
-                             return sortConfig.direction === 'asc' ? numA - numB : numB - numA;
-                        }
-                        if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
-                        if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
-                        return 0;
-                    });
-                }
-                return result;
-            };
-
-            const filteredData = getProcessedData();
-
+            
             const postToApi = async (action, payload = {}) => {
                 try {
                     const res = await fetch(API_URL, {
@@ -230,238 +168,209 @@
                         body: JSON.stringify({ action, ...payload })
                     });
                     const json = await res.json();
-                    if(json.status === 'success') { refreshData(); return true; } 
-                    else { alert("API Error: " + json.message); return false; }
-                } catch(e) { alert("Network Error"); return false; }
+                    if(json.status === 'success') { refreshData(); return true; }
+                    else { alert("Error: " + json.message); return false; }
+                } catch(e) { alert("Connection Error"); return false; }
             };
 
+            // --- AUTH ---
             const handleLogin = (e) => {
                 e.preventDefault();
                 const found = data.users.find(u => u.username === loginData.username && u.password === loginData.password);
-                if (found) {
+                if(found) {
                     setUser(found);
                     sessionStorage.setItem('feeUser', JSON.stringify(found));
-                    setLoginData({ username: '', password: '' });
-                    
-                    const userIsAdmin = (found.role && found.role.toLowerCase() === 'admin') || found.username === 'admin';
-                    if (userIsAdmin) setActiveTab('clearance');
-                    else if (found.permissions && found.permissions.length > 0) setActiveTab(found.permissions[0]);
+                    // Redirect based on role
+                    if(found.role === 'admin' || found.username === 'admin') setActiveTab('clearance');
+                    else if(found.permissions && found.permissions.length > 0) setActiveTab(found.permissions[0]);
                     else setActiveTab('clearance');
-                } else {
-                    alert("Invalid Credentials");
-                }
+                } else alert("Invalid Credentials");
             };
 
-            const handleLogout = () => {
-                setUser(null);
-                sessionStorage.removeItem('feeUser');
-                setClearanceResult(null);
-                setActiveTab('clearance');
+            // --- REPORT LOGIC ---
+            const generateReport = () => {
+                if (!searchReg) return;
+                const cleanReg = norm(searchReg);
+                const student = data.students.find(s => norm(s.reg_no) === cleanReg);
+                if (!student) { alert("Student not found!"); setClearanceResult(null); return; }
+                
+                const masterFee = data.fees.find(f => norm(f.degree) === norm(student.degree) && norm(f.batch) === norm(student.batch));
+                
+                const rows = data.enrollments.filter(e => norm(e.reg_no) === cleanReg).map(en => {
+                    const cleanSem = norm(en.semester);
+                    const cr = parseFloat(en.cr||0);
+                    const courses = parseFloat(en.courses||0);
+                    
+                    let t = 0, x = 0, r = 0, o = 0;
+                    if(masterFee) {
+                        t = cr * parseFloat(masterFee.per_cr_fee||0);
+                        x = courses * parseFloat(masterFee.per_course_fee||0);
+                        r = parseFloat(masterFee.reg_fee||0);
+                        o = parseFloat(masterFee.other_fee||0); // Base semester fee
+                    }
+                    
+                    // Add manual other charges
+                    const extra = data.others.filter(oth => norm(oth.reg_no) === cleanReg && norm(oth.semester).includes(cleanSem))
+                        .reduce((acc, curr) => acc + parseFloat(curr.amount||0), 0);
+                    o += extra;
+
+                    const total = t + x + r + o;
+
+                    // Discount
+                    const disc = data.discounts.find(d => norm(d.reg_no) === cleanReg && norm(d.term).includes(cleanSem));
+                    const discPct = disc ? parseFloat(disc.discount||0) : 0;
+                    const discAmt = (t * discPct) / 100; // Discount on Tuition usually
+                    
+                    const net = total - discAmt;
+
+                    // Payment
+                    const paid = data.payments.filter(p => norm(p.reg_no) === cleanReg && norm(p.semester).includes(cleanSem))
+                        .reduce((acc, p) => acc + parseFloat(p.amount||0), 0);
+                    
+                    return {
+                        ...en, tuition: t, exam: x, reg: r, other: o, total, discPct, discAmt, netFee: net, totalPaid: paid, balance: net - paid
+                    };
+                });
+
+                const summary = rows.reduce((acc, r) => ({
+                    total: acc.total + r.total,
+                    fa: acc.fa + r.discAmt,
+                    paid: acc.paid + r.totalPaid,
+                    balance: acc.balance + r.balance,
+                    cr: acc.cr + parseFloat(r.cr||0),
+                    courses: acc.courses + parseFloat(r.courses||0)
+                }), { total:0, fa:0, paid:0, balance:0, cr:0, courses:0 });
+
+                setClearanceResult({ student, rows, summary, masterFeeFound: !!masterFee, masterFee });
             };
 
-            // CORE ACTIONS
-            const handleDelete = async (type, id) => {
-                if(!confirm("Are you sure?")) return;
-                let actionType = type;
-                if(type === 'others') actionType = 'other';
-                if (['students','fees','enrollments','payments','discounts','users','banks'].includes(type)) {
-                     actionType = type.slice(0, -1);
-                }
-                await postToApi(`delete_${actionType}`, { id });
+            const generateSummary = () => {
+                if(!summaryTerm) return;
+                const term = norm(summaryTerm);
+                const enrs = data.enrollments.filter(e => norm(e.semester).includes(term));
+                
+                let proj = 0, disc = 0, rec = 0, manualOth = 0;
+                let t_tui = 0, t_exm = 0, t_oth = 0;
+
+                enrs.forEach(en => {
+                    const st = data.students.find(s => norm(s.reg_no) === norm(en.reg_no));
+                    if(st) {
+                        const fee = data.fees.find(f => norm(f.degree) === norm(st.degree) && norm(f.batch) === norm(st.batch));
+                        if(fee) {
+                            const cr = parseFloat(en.cr||0);
+                            const c = parseFloat(en.courses||0);
+                            const t = cr * parseFloat(fee.per_cr_fee||0);
+                            const x = c * parseFloat(fee.per_course_fee||0);
+                            const o = parseFloat(fee.reg_fee||0) + parseFloat(fee.other_fee||0);
+                            
+                            t_tui += t; t_exm += x; t_oth += o;
+                            const sub = t + x + o;
+                            proj += sub;
+
+                            const d = data.discounts.find(dx => norm(dx.reg_no) === norm(en.reg_no) && norm(dx.term).includes(term));
+                            if(d) disc += (t * parseFloat(d.discount||0))/100;
+                        }
+                    }
+                });
+
+                manualOth = data.others.filter(o => norm(o.semester).includes(term)).reduce((a,c) => a + parseFloat(c.amount||0), 0);
+                rec = data.payments.filter(p => norm(p.semester).includes(term)).reduce((a,c) => a + parseFloat(c.amount||0), 0);
+                
+                t_oth += manualOth;
+                proj += manualOth;
+
+                setSummaryData({
+                    enrollmentCount: enrs.length,
+                    totalProjected: proj,
+                    totalTuition: t_tui,
+                    totalExamFee: t_exm,
+                    totalOthers: t_oth,
+                    totalDiscounts: disc,
+                    netReceivable: proj - disc,
+                    totalReceived: rec,
+                    balance: (proj - disc) - rec
+                });
             };
 
+            // --- CRUD ---
             const handleSave = async (e) => {
                 e.preventDefault();
                 const newData = { ...formData };
-                // Fee Calcs
-                if (modalType === 'fees') {
-                     // Just pass the rates
-                }
-                // Auto Name Fetch
-                if ((modalType === 'payments' || modalType === 'others') && !newData.name) {
-                     const s = data.students.find(st => norm(st.reg_no) === norm(newData.reg_no));
-                     if(s) newData.name = s.name;
+                // Auto name
+                if(['payments','others'].includes(modalType) && !newData.name) {
+                    const s = data.students.find(st => norm(st.reg_no) === norm(newData.reg_no));
+                    if(s) newData.name = s.name;
                 }
                 
-                let actionType = modalType.slice(0, -1); // remove 's'
-                if(modalType === 'others') actionType = 'other';
+                let type = modalType.endsWith('s') ? modalType.slice(0, -1) : modalType;
+                if(modalType === 'others') type = 'other';
                 
-                const success = await postToApi(`save_${actionType}`, { data: newData, id: editingId });
-                if(success) { setShowModal(false); setFormData({}); setEditingId(null); }
+                const ok = await postToApi(`save_${type}`, { data: newData, id: editingId });
+                if(ok) { setShowModal(false); setFormData({}); setEditingId(null); }
             };
 
-            const openModal = (type, item = null) => {
-                setModalType(type);
-                if (item) { setFormData(item); setEditingId(item.id || item.reg_no); } 
-                else { setFormData(type==='users' ? {role:'user', permissions:[]} : {}); setEditingId(null); }
-                setShowModal(true);
+            const handleDelete = async (type, id) => {
+                if(!confirm("Delete?")) return;
+                let at = type.endsWith('s') ? type.slice(0, -1) : type;
+                if(type === 'others') at = 'other';
+                await postToApi(`delete_${at}`, { id });
             };
 
-            const handleChangePassword = async (e) => {
-                e.preventDefault();
-                if (passwordData.current !== user.password) return alert("Incorrect current password!");
-                if (passwordData.new !== passwordData.confirm) return alert("New passwords do not match!");
-                const success = await postToApi('save_user', { data: { ...user, password: passwordData.new }, id: user.id });
-                if(success) {
-                    alert("Password changed successfully!");
-                    setShowPasswordModal(false);
-                    setPasswordData({ current: '', new: '', confirm: '' });
-                    const updatedUser = { ...user, password: passwordData.new };
-                    setUser(updatedUser);
-                    sessionStorage.setItem('feeUser', JSON.stringify(updatedUser));
-                    refreshData();
-                }
-            };
-            
-             // --- SORTING ---
-            const handleSort = (key) => {
-                let direction = 'asc';
-                if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
-                setSortConfig({ key, direction });
-            };
-
-            const togglePermission = (tabId) => {
-                const perms = formData.permissions || [];
-                if (perms.includes(tabId)) setFormData({ ...formData, permissions: perms.filter(p => p !== tabId) });
-                else setFormData({ ...formData, permissions: [...perms, tabId] });
-            };
-            
-            const handleSelectAll = (e) => {
-                if (e.target.checked) setSelectedIds(new Set(filteredData.map(i => i.id || i.reg_no)));
-                else setSelectedIds(new Set());
-            };
-            const handleSelectRow = (id) => {
-                const newSet = new Set(selectedIds);
-                if (newSet.has(id)) newSet.delete(id); else newSet.add(id);
-                setSelectedIds(newSet);
-            };
-            const deleteSelected = async () => {
-                if (!confirm(`Delete ${selectedIds.size} records?`)) return;
-                for (let id of selectedIds) {
-                    let type = activeTab;
-                    let actionType = type.endsWith('s') ? type.slice(0, -1) : type;
-                    if(type === 'others') actionType = 'other';
-                    await postToApi(`delete_${actionType}`, { id });
-                }
-                setSelectedIds(new Set());
-                refreshData();
-            };
-            const deleteAllInTab = async () => {
-                if (!confirm(`Permanently delete ALL ${activeTab} records?`)) return;
-                await postToApi('delete_all', { table: activeTab });
-                refreshData();
-            };
-            const deleteBySemester = async () => {
-                const term = prompt("Enter Semester Name to delete:");
-                if (!term) return;
-                await postToApi('delete_semester', { table: activeTab, term });
-                refreshData();
-            };
-
-            const getHeaders = (type) => {
-                switch(type) {
-                    case 'students': return ['reg_no', 'name', 'degree', 'batch'];
-                    case 'fees': return ['degree', 'batch', 'per_cr_fee', 'per_course_fee', 'reg_fee', 'other_fee'];
-                    case 'enrollments': return ['reg_no', 'name', 'semester', 'cr', 'courses'];
-                    case 'payments': return ['reg_no', 'name', 'semester', 'amount', 'date', 'bank'];
-                    case 'discounts': return ['reg_no', 'name', 'term', 'discount'];
-                    case 'others': return ['reg_no', 'name', 'semester', 'fee_name', 'amount'];
-                    case 'users': return ['username', 'password', 'role', 'permissions'];
-                    case 'banks': return ['name', 'account_no'];
-                    default: return [];
-                }
-            };
-            
-            const downloadSample = (type) => {
-                const headers = getHeaders(type);
-                const csvContent = "data:text/csv;charset=utf-8," + headers.join(",");
-                const encodedUri = encodeURI(csvContent);
-                const link = document.createElement("a");
-                link.setAttribute("href", encodedUri);
-                link.setAttribute("download", `${type}_sample.csv`);
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            };
-
-            const handleExport = (type) => {
-                const records = data[type];
-                if (!records || records.length === 0) return alert("No data to export");
-                const headers = getHeaders(type);
-                const csvRows = [
-                    headers.join(','),
-                    ...records.map(row => headers.map(fieldName => {
-                        let val = row[fieldName];
-                        if (Array.isArray(val)) val = val.join('|'); 
-                        val = String(val || '');
-                        if (val.includes(',')) val = `"${val}"`; 
-                        return val;
-                    }).join(','))
-                ];
-                const csvContent = "data:text/csv;charset=utf-8," + csvRows.join("\n");
-                const encodedUri = encodeURI(csvContent);
-                const link = document.createElement("a");
-                link.setAttribute("href", encodedUri);
-                link.setAttribute("download", `${type}_export.csv`);
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            };
-            
             const handleImport = (e, type) => {
                 const file = e.target.files[0];
-                if (!file) return;
+                if(!file) return;
                 const reader = new FileReader();
-                reader.onload = async (evt) => {
-                    const text = evt.target.result;
-                    const rows = text.split('\n').map(r => r.trim()).filter(r => r);
-                    if (rows.length < 2) return; 
-                    const headers = rows[0].split(',').map(h => h.trim().replace(/ /g, '_').toLowerCase());
-                    const existingData = data[type] || [];
+                reader.onload = (ev) => {
+                    const text = ev.target.result;
+                    const rows = text.split('\n').map(r=>r.trim()).filter(r=>r);
+                    if(rows.length < 2) return;
+                    const headers = rows[0].split(',').map(h=>h.trim().toLowerCase().replace(/ /g,'_'));
                     const newItems = [];
-                    const duplicates = [];
-                    for (let i = 1; i < rows.length; i++) {
-                        const values = rows[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+                    const dups = [];
+                    const existing = data[type] || [];
+
+                    for(let i=1; i<rows.length; i++) {
+                        const vals = rows[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
                         const obj = {};
-                        headers.forEach((h, index) => {
-                            let val = values[index] ? values[index].trim() : '';
-                            if (val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1);
-                            if (h.includes('reg') && h.includes('no')) obj['reg_no'] = val;
-                            else if (h.includes('name')) obj['name'] = val;
-                            else if (h.includes('semester')) obj['semester'] = val;
-                            else if (h.includes('amount')) obj['amount'] = val;
-                            else if (h === 'cr') obj['cr'] = val;
-                            else if (h.includes('course')) obj['courses'] = val;
-                            else if (h.includes('degree')) obj['degree'] = val;
-                            else if (h.includes('batch')) obj['batch'] = val;
-                            else if (h.includes('term')) obj['term'] = val;
-                            else if (h.includes('fee') && h.includes('name')) obj['fee_name'] = val;
-                            else if (h.includes('bank')) obj['bank'] = val;
-                            else if (h.includes('mobile')) obj['mobile'] = val;
-                            else if (h.includes('email')) obj['email'] = val;
+                        headers.forEach((h, idx) => {
+                            let val = vals[idx] ? vals[idx].trim() : '';
+                            if(val.startsWith('"')) val = val.slice(1,-1);
+                            
+                            if(h.includes('reg')) obj.reg_no = val;
+                            else if(h.includes('name') && !h.includes('fee') && !h.includes('user')) obj.name = val;
+                            else if(h.includes('semester')) obj.semester = val;
+                            else if(h.includes('amount')) obj.amount = val;
+                            else if(h === 'cr') obj.cr = val;
+                            else if(h.includes('course')) obj.courses = val;
+                            else if(h.includes('degree')) obj.degree = val;
+                            else if(h.includes('batch')) obj.batch = val;
+                            else if(h.includes('term')) obj.term = val;
+                            else if(h.includes('fee') && h.includes('name')) obj.fee_name = val;
+                            else if(h.includes('account')) obj.account_no = val;
+                            else if(h.includes('user')) obj.username = val;
+                            else if(h.includes('pass')) obj.password = val;
+                            else if(h.includes('role')) obj.role = val;
                             else obj[h] = val;
                         });
+                        
                         if(importTerm) {
-                            if(type === 'enrollments' || type === 'payments' || type === 'others') obj.semester = importTerm;
-                            else if(type === 'discounts') obj.term = importTerm;
+                            if(['enrollments','payments','others'].includes(type)) obj.semester = importTerm;
+                            if(type==='discounts') obj.term = importTerm;
                         }
-                        if (obj.amount) obj.amount = obj.amount.replace(/[^0-9.-]/g, '');
+                        if(obj.amount) obj.amount = obj.amount.replace(/[^0-9.-]/g, '');
 
-                        let isDuplicate = false;
-                        if (type === 'payments') {
-                            isDuplicate = existingData.some(existing => 
-                                norm(existing.reg_no) === norm(obj.reg_no) && norm(existing.name) === norm(obj.name) &&
-                                parseFloat(existing.amount || 0) === parseFloat(obj.amount || 0) && existing.date === obj.date
-                            );
+                        // Check Dup
+                        let isDup = false;
+                        if(type === 'payments') {
+                             isDup = existing.some(ex => norm(ex.reg_no) === norm(obj.reg_no) && parseFloat(ex.amount) === parseFloat(obj.amount) && ex.date === obj.date);
                         } else {
-                            isDuplicate = existingData.some(existing => 
-                                norm(existing.reg_no) === norm(obj.reg_no) &&
-                                ((existing.semester && norm(existing.semester) === norm(obj.semester)) || (existing.term && norm(existing.term) === norm(obj.term)))
-                            );
+                             isDup = existing.some(ex => norm(ex.reg_no) === norm(obj.reg_no) && (norm(ex.semester||ex.term) === norm(obj.semester||obj.term)));
                         }
-                        if (isDuplicate) duplicates.push(obj); else newItems.push(obj);
+                        
+                        if(isDup) dups.push(obj);
+                        else newItems.push(obj);
                     }
-                    setImportPreview({ show: true, total: rows.length - 1, newItems, duplicates, type });
+                    setImportPreview({ show: true, type, newItems, duplicates: dups, total: rows.length-1 });
                     e.target.value = null;
                 };
                 reader.readAsText(file);
@@ -469,189 +378,168 @@
 
             const confirmImport = async () => {
                 setUploadStatus({ active: true, current: 0, total: importPreview.newItems.length });
-                let actionType = importPreview.type.slice(0, -1);
-                if(importPreview.type === 'others') actionType = 'other';
-                let uploadedCount = 0;
-                for (const item of importPreview.newItems) {
-                    await postToApi(`save_${actionType}`, { data: item });
-                    uploadedCount++;
-                    setUploadStatus(prev => ({ ...prev, current: uploadedCount }));
+                let type = importPreview.type.endsWith('s') ? importPreview.type.slice(0,-1) : importPreview.type;
+                if(importPreview.type === 'others') type = 'other';
+                
+                let count = 0;
+                for(const item of importPreview.newItems) {
+                    await postToApi(`save_${type}`, { data: item });
+                    count++;
+                    setUploadStatus(prev => ({...prev, current: count}));
                 }
-                setImportPreview({ show: false, total: 0, newItems: [], duplicates: [], type: '' });
-                setUploadStatus({ active: false, current: 0, total: 0 });
-                alert(`Successfully imported ${uploadedCount} records!`);
+                setImportPreview({ show: false, newItems:[], duplicates:[], total:0, type:'' });
+                setUploadStatus({ active: false, current:0, total:0 });
+                alert(`Imported ${count} records.`);
                 refreshData();
             };
 
-            // --- SUMMARY CALCULATOR ---
-            const generateSummary = () => {
-                if (!summaryTerm) return;
-                const cleanTerm = norm(summaryTerm);
-                
-                // Filter relevant records
-                const enrollments = data.enrollments.filter(e => norm(e.semester).includes(cleanTerm) || cleanTerm.includes(norm(e.semester)));
-                const payments = data.payments.filter(p => norm(p.semester).includes(cleanTerm) || cleanTerm.includes(norm(p.semester)));
-                const others = data.others.filter(o => norm(o.semester).includes(cleanTerm) || cleanTerm.includes(norm(o.semester)));
-                
-                // Calculate
-                let totalProjected = 0;
-                let totalDiscounts = 0;
-                let totalOthers = others.reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
-                let totalReceived = payments.reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
-
-                enrollments.forEach(en => {
-                    const student = data.students.find(s => norm(s.reg_no) === norm(en.reg_no));
-                    if (!student) return;
-                    
-                    const masterFee = data.fees.find(f => norm(f.degree) === norm(student.degree) && norm(f.batch) === norm(student.batch));
-                    
-                    if (masterFee) {
-                        const cr = parseFloat(en.cr || 0);
-                        const courses = parseFloat(en.courses || 0);
-                        const tuition = cr * parseFloat(masterFee.per_cr_fee || 0);
-                        const exam = courses * parseFloat(masterFee.per_course_fee || 0);
-                        const reg = parseFloat(masterFee.reg_fee || 0);
-                        const semOther = parseFloat(masterFee.other_fee || 0);
-                        
-                        const subTotal = tuition + exam + reg + semOther;
-                        totalProjected += subTotal;
-
-                        // Check discount
-                        const disc = data.discounts.find(d => norm(d.reg_no) === norm(en.reg_no) && (norm(d.term).includes(cleanTerm) || cleanTerm.includes(norm(d.term))));
-                        if (disc) {
-                            const discAmt = (subTotal * parseFloat(disc.discount || 0)) / 100;
-                            totalDiscounts += discAmt;
-                        }
-                    }
-                });
-                
-                // Add explicit 'Other' charges to projected total
-                totalProjected += totalOthers;
-
-                const netReceivable = totalProjected - totalDiscounts;
-                const balance = netReceivable - totalReceived;
-
-                setSummaryData({
-                    enrollmentCount: enrollments.length,
-                    totalProjected,
-                    totalOthers,
-                    totalDiscounts,
-                    netReceivable,
-                    totalReceived,
-                    balance
-                });
+            const deleteAll = async () => {
+                if(!confirm(`Delete ALL records in ${activeTab}?`)) return;
+                await postToApi('delete_all', { table: activeTab });
+                refreshData();
             };
 
-            // --- VIEW ---
-            if (!user) {
+            const deleteSem = async () => {
+                const term = prompt("Enter Semester:");
+                if(!term) return;
+                await postToApi('delete_semester', { table: activeTab, term });
+                refreshData();
+            };
+
+            // RENDER HELPERS
+            const TableHeader = () => {
+                const map = {
+                    students: ['Reg No', 'Name', 'Degree', 'Batch', 'Mobile', 'Email'],
+                    fees: ['Degree', 'Batch', 'Fee/Cr', 'Fee/Sub', 'Reg Fee', 'Other'],
+                    enrollments: ['Reg No', 'Name', 'Semester', 'Cr Hrs', 'Courses'],
+                    payments: ['Reg No', 'Name', 'Semester', 'Amount', 'Date', 'Bank'],
+                    discounts: ['Reg No', 'Name', 'Term', 'Discount %'],
+                    others: ['Reg No', 'Name', 'Semester', 'Fee Name', 'Amount'],
+                    users: ['Username', 'Role', 'Permissions'],
+                    banks: ['Bank Name', 'Account No']
+                };
+                const headers = map[activeTab] || [];
                 return (
-                    <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
-                        <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-8">
-                            <div className="flex justify-center mb-6"><div className="w-24 h-24 rounded-lg flex items-center justify-center bg-white p-2"><img src="src/UOL-Green-V1.png" alt="UOL Logo" className="w-full h-full object-contain" /></div></div>
-                            <h2 className="text-2xl font-bold text-center text-gray-800 mb-2">LSAF Student Fee Management Software</h2>
-                            <p className="text-center text-gray-500 mb-6">Secure Login</p>
-                            <form onSubmit={handleLogin} className="space-y-4">
-                                <div><label className="block text-sm font-bold text-gray-700 mb-1">Username</label><input type="text" value={loginData.username} onChange={e => setLoginData({...loginData, username: e.target.value})} className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required /></div>
-                                <div><label className="block text-sm font-bold text-gray-700 mb-1">Password</label><input type="password" value={loginData.password} onChange={e => setLoginData({...loginData, password: e.target.value})} className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" required /></div>
-                                <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-bold transition">Sign In</button>
-                            </form>
-                        </div>
-                    </div>
+                    <thead>
+                        <tr className="bg-gray-100 border-b">
+                            <th className="p-3 w-10">#</th>
+                            {headers.map(h => <th key={h} className="p-3 text-left font-bold text-xs uppercase text-gray-600">{h}</th>)}
+                            <th className="p-3 text-center">Actions</th>
+                        </tr>
+                    </thead>
                 );
-            }
+            };
+
+            const TableRow = ({ item, idx }) => {
+                return (
+                    <tr className="border-b hover:bg-gray-50 transition text-sm">
+                        <td className="p-3 text-gray-400">{idx+1}</td>
+                        {activeTab === 'students' && <><td className="p-3 font-mono">{item.reg_no}</td><td className="p-3 font-bold">{item.name}</td><td className="p-3"><span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">{item.degree}</span></td><td className="p-3">{item.batch}</td><td className="p-3">{item.mobile}</td><td className="p-3">{item.email}</td></>}
+                        {activeTab === 'fees' && <><td className="p-3 font-bold">{item.degree}</td><td className="p-3">{item.batch}</td><td className="p-3 text-right">{num(item.per_cr_fee)}</td><td className="p-3 text-right">{num(item.per_course_fee)}</td><td className="p-3 text-right">{num(item.reg_fee)}</td><td className="p-3 text-right">{num(item.other_fee)}</td></>}
+                        {activeTab === 'enrollments' && <><td className="p-3 font-mono">{item.reg_no}</td><td className="p-3">{item.name}</td><td className="p-3"><span className="bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-xs">{item.semester}</span></td><td className="p-3">{item.cr}</td><td className="p-3">{item.courses}</td></>}
+                        {activeTab === 'payments' && <><td className="p-3 font-mono">{item.reg_no}</td><td className="p-3">{item.name}</td><td className="p-3"><span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">{item.semester}</span></td><td className="p-3 text-right font-bold">{num(item.amount)}</td><td className="p-3">{item.date}</td><td className="p-3">{item.bank}</td></>}
+                        {activeTab === 'others' && <><td className="p-3 font-mono">{item.reg_no}</td><td className="p-3">{item.name}</td><td className="p-3">{item.semester}</td><td className="p-3"><span className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs">{item.fee_name}</span></td><td className="p-3 text-right font-bold">{num(item.amount)}</td></>}
+                        {activeTab === 'discounts' && <><td className="p-3 font-mono">{item.reg_no}</td><td className="p-3">{item.name}</td><td className="p-3">{item.term}</td><td className="p-3 font-bold text-purple-600">{item.discount}%</td></>}
+                        {activeTab === 'users' && <><td className="p-3 font-bold">{item.username}</td><td className="p-3 capitalize">{item.role}</td><td className="p-3 text-xs">{Array.isArray(item.permissions) ? item.permissions.join(', ') : 'All'}</td></>}
+                        {activeTab === 'banks' && <><td className="p-3 font-bold">{item.name}</td><td className="p-3 font-mono">{item.account_no}</td></>}
+                        <td className="p-3 text-center flex justify-center gap-2">
+                            <button onClick={() => { setModalType(activeTab); setFormData(item); setEditingId(item.id || item.reg_no); setShowModal(true); }} className="text-blue-600 hover:text-blue-800"><i className="fas fa-edit"></i></button>
+                            <button onClick={() => handleDelete(activeTab, item.id || item.reg_no)} className="text-red-500 hover:text-red-700"><Trash2 /></button>
+                        </td>
+                    </tr>
+                );
+            };
+
+            // VIEW RENDER
+            if(!user) return (
+                <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl shadow-2xl p-8 w-full max-w-md">
+                        <div className="flex justify-center mb-6"><img src="src/UOL-Green-V1.png" className="h-24 object-contain" /></div>
+                        <h2 className="text-center text-xl font-bold mb-6">LSAF Fee Management</h2>
+                        <form onSubmit={handleLogin} className="space-y-4">
+                            <input className="w-full border p-3 rounded" placeholder="Username" value={loginData.username} onChange={e=>setLoginData({...loginData, username:e.target.value})} />
+                            <input className="w-full border p-3 rounded" type="password" placeholder="Password" value={loginData.password} onChange={e=>setLoginData({...loginData, password:e.target.value})} />
+                            <button className="w-full bg-blue-600 text-white py-3 rounded font-bold hover:bg-blue-700">Login</button>
+                        </form>
+                    </div>
+                </div>
+            );
+
+            // Filter
+            const list = (data[activeTab] || []).filter(i => !tabSearch || Object.values(i).some(v => String(v).toLowerCase().includes(tabSearch.toLowerCase())));
 
             return (
                 <div className="min-h-screen bg-gray-100 font-sans text-gray-800 pb-20">
                     {/* Header */}
-                    <div className="bg-white shadow-md border-b border-gray-200 sticky top-0 z-20 no-print">
-                        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                            <div className="flex justify-between h-16">
-                                <div className="flex items-center gap-3"><div className="bg-blue-600 text-white p-2 rounded-lg"><BookOpen /></div><div><h1 className="text-xl font-bold text-gray-900 leading-none">Fee Manager</h1><p className="text-xs text-gray-500">School of Accountancy & Finance</p></div></div>
-                                <div className="flex items-center gap-4">
-                                    <div className="text-right hidden sm:block"><div className="text-sm font-bold">{user.username}</div><div className="text-xs text-gray-500 uppercase">{user.role}</div></div>
-                                    <button onClick={() => setShowPasswordModal(true)} className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg"><Key className="h-5 w-5" /></button>
-                                    
-                                    {isAdmin && (
-                                        <button onClick={() => setActiveTab('users')} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg" title="Manage Users">
-                                            <Shield className="h-5 w-5" />
-                                        </button>
-                                    )}
-
-                                    <button onClick={() => window.print()} className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg"><Printer className="h-5 w-5" /></button>
-                                    <button onClick={handleLogout} className="bg-red-50 text-red-600 px-3 py-2 rounded-lg text-sm font-bold hover:bg-red-100 flex items-center gap-2 transition"><LogOut className="h-4 w-4" /> Logout</button>
-                                </div>
+                    <div className="bg-white shadow-md border-b sticky top-0 z-30 px-6 py-3 flex justify-between items-center no-print">
+                        <div className="flex items-center gap-4">
+                            <img src="src/UOL-Green-V1.png" className="h-10" />
+                            <h1 className="font-bold text-lg hidden md:block">LSAF Fee Manager</h1>
+                        </div>
+                        <div className="flex gap-2 overflow-x-auto no-scrollbar">
+                            {user.role === 'admin' || user.username === 'admin' ? TABS.concat({id:'users', label:'Users', icon:Users}).map(t => (
+                                <button key={t.id} onClick={() => setActiveTab(t.id)} className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition ${activeTab === t.id ? 'bg-blue-600 text-white shadow-lg' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                                    <t.icon /> {t.label}
+                                </button>
+                            )) : TABS.filter(t => user.permissions?.includes(t.id)).map(t => (
+                                <button key={t.id} onClick={() => setActiveTab(t.id)} className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition ${activeTab === t.id ? 'bg-blue-600 text-white' : 'bg-gray-100'}`}><t.icon /> {t.label}</button>
+                            ))}
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <div className="text-right hidden sm:block leading-tight">
+                                <div className="font-bold text-sm">{user.username}</div>
+                                <div className="text-xs text-gray-500 uppercase">{user.role}</div>
                             </div>
-                            <div className="flex space-x-1 overflow-x-auto no-scrollbar">
-                                {availableTabs.map(tab => (
-                                    <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === tab.id ? 'border-blue-600 text-blue-600 bg-blue-50' : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}>
-                                        <tab.icon className="h-4 w-4" />
-                                        {tab.label}
-                                        {/* Show count for data tabs */}
-                                        {data[tab.id] && Array.isArray(data[tab.id]) && tab.id !== 'summary' && <span className={`ml-2 text-xs font-bold px-2 py-0.5 rounded-full ${activeTab === tab.id ? 'bg-blue-200 text-blue-800' : 'bg-gray-200 text-gray-600'}`}>{data[tab.id].length}</span>}
-                                    </button>
-                                ))}
-                            </div>
+                            <button onClick={() => window.print()} className="p-2 bg-gray-100 rounded hover:bg-gray-200"><Printer /></button>
+                            <button onClick={() => {setUser(null); sessionStorage.clear();}} className="p-2 bg-red-100 text-red-600 rounded hover:bg-red-200"><i className="fas fa-sign-out-alt"></i></button>
                         </div>
                     </div>
 
-                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                        {/* VIEW CONTENT */}
-                        {activeTab === 'clearance' && (
+                    <div className="max-w-7xl mx-auto p-6">
+                        {activeTab === 'clearance' ? (
                             <div className="space-y-6">
-                                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 no-print">
-                                    <label className="block text-sm font-bold text-gray-700 mb-2">Generate Student Clearance</label>
-                                    <div className="flex gap-3">
-                                        <input type="text" value={searchReg} onChange={(e) => setSearchReg(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && generateReport()} placeholder="Enter Registration No (e.g. BSCAF052530040)" className="flex-1 block w-full rounded-lg border-gray-300 border p-3 focus:ring-2 focus:ring-blue-500 outline-none" />
-                                        <button onClick={generateReport} className="bg-blue-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-blue-700 transition flex items-center gap-2"><Search className="h-5 w-5" /> Generate</button>
-                                    </div>
+                                <div className="bg-white p-6 rounded-xl shadow-sm flex gap-4 no-print">
+                                    <input className="flex-1 border p-3 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter Registration No (e.g. BSCAF052530040)" value={searchReg} onChange={e=>setSearchReg(e.target.value)} onKeyDown={e=>e.key==='Enter' && generateReport()} />
+                                    <button onClick={generateReport} className="bg-blue-600 text-white px-8 rounded-lg font-bold hover:bg-blue-700">Generate</button>
                                 </div>
                                 {clearanceResult && (
-                                    <div className="bg-white rounded-xl shadow-lg overflow-hidden" id="printableArea">
-                                        <div className="p-8">
-                                            <div className="border-b-2 border-gray-800 pb-6 mb-6 flex justify-between items-start">
-                                                <div className="w-32 h-32 rounded-lg flex items-center justify-center font-bold text-gray-400 overflow-hidden"><img src="src/UOL-Green-V1.png" alt="UOL Logo" className="w-full h-full object-contain" /></div>
-                                                <div className="text-center flex-1 px-4">
-                                                    <h2 className="text-2xl font-bold text-gray-900 uppercase">The University of Lahore</h2>
-                                                    <p className="text-gray-600 font-medium">School of Accountancy & Finance</p>
-                                                    <div className="inline-block bg-gray-100 px-3 py-1 rounded mt-2 text-xs font-bold uppercase tracking-wider">Fee Clearance Report</div>
-                                                </div>
+                                    <div id="printableArea" className="bg-white p-10 shadow-lg rounded-xl">
+                                        <div className="flex justify-between items-start border-b-2 border-gray-800 pb-6 mb-6">
+                                            <img src="src/UOL-Green-V1.png" className="w-24" />
+                                            <div className="text-center">
+                                                <h1 className="text-2xl font-bold uppercase text-gray-900">The University of Lahore</h1>
+                                                <p className="text-gray-600 font-medium">School of Accountancy & Finance</p>
+                                                <span className="inline-block bg-gray-100 px-3 py-1 rounded mt-2 text-xs font-bold uppercase">Fee Clearance Report</span>
                                             </div>
-                                            <div className="grid grid-cols-2 gap-x-12 gap-y-4 mb-8 text-sm">
-                                                <div className="flex justify-between border-b border-gray-200 py-1"><span className="font-bold text-gray-600">Registration No:</span><span className="font-mono font-bold text-gray-900">{clearanceResult.student.reg_no}</span></div>
-                                                <div className="flex justify-between border-b border-gray-200 py-1"><span className="font-bold text-gray-600">Student Name:</span><span className="text-gray-900">{clearanceResult.student.name}</span></div>
-                                                <div className="flex justify-between border-b border-gray-200 py-1"><span className="font-bold text-gray-600">Degree Program:</span><span className="text-gray-900">{clearanceResult.student.degree}</span></div>
-                                                <div className="flex justify-between border-b border-gray-200 py-1"><span className="font-bold text-gray-600">Batch / Session:</span><span className="text-gray-900">{clearanceResult.student.batch}</span></div>
-                                                <div className="flex justify-between border-b border-gray-200 py-1"><span className="font-bold text-gray-600">Rate (Per Cr. Hr):</span><span className="text-gray-900">{clearanceResult.masterFee ? num(clearanceResult.masterFee.per_cr_fee) : '-'}</span></div>
-                                            </div>
-                                            {!clearanceResult.masterFeeFound && <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4"><p className="text-sm text-yellow-700"><strong>Warning:</strong> No matching Fee Structure found.</p></div>}
-                                            <div className="overflow-x-auto">
-                                                <table className="w-full text-xs">
-                                                    <thead className="bg-gray-100 text-gray-900 font-bold uppercase">
-                                                        <tr><th className="p-2 border">Sem</th><th className="p-2 border text-center">Sub</th><th className="p-2 border text-center">Cr</th><th className="p-2 border text-right">Tuition</th><th className="p-2 border text-right">Exam</th><th className="p-2 border text-right">Reg</th><th className="p-2 border text-right">Other</th><th className="p-2 border text-right bg-gray-50">Total</th><th className="p-2 border text-center">Disc %</th><th className="p-2 border text-right">Disc Amt</th><th className="p-2 border text-right">Net Fee</th><th className="p-2 border text-right text-green-700">Paid</th><th className="p-2 border text-right">Balance</th></tr>
-                                                    </thead>
-                                                    <tbody className="divide-y divide-gray-200">
-                                                        {clearanceResult.rows.map((row, idx) => (
-                                                            <tr key={idx} className="hover:bg-gray-50">
-                                                                <td className="p-2 border font-medium">{row.semester}</td><td className="p-2 border text-center">{row.courses}</td><td className="p-2 border text-center">{row.cr}</td><td className="p-2 border text-right text-gray-600">{num(row.tuition)}</td><td className="p-2 border text-right text-gray-600">{num(row.exam)}</td><td className="p-2 border text-right text-gray-600">{num(row.reg)}</td><td className="p-2 border text-right text-gray-600">{num(row.other)}</td><td className="p-2 border text-right font-bold bg-gray-50">{num(row.total)}</td><td className="p-2 border text-center text-gray-500">{row.discPct > 0 ? `${row.discPct}%` : '-'}</td><td className="p-2 border text-right text-gray-500">{row.discAmt > 0 ? num(row.discAmt) : '-'}</td><td className="p-2 border text-right font-bold">{num(row.netFee)}</td><td className="p-2 border text-right font-bold text-green-600">{num(row.totalPaid)}</td><td className={`p-2 border text-right font-bold ${row.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>{num(row.balance)}</td>
-                                                            </tr>
-                                                        ))}
-                                                        <tr className="bg-gray-800 text-white font-bold"><td colSpan="7" className="p-3 text-right uppercase tracking-wider">Grand Totals</td><td className="p-3 text-right">{num(clearanceResult.summary.total)}</td><td className="p-3 text-center">-</td><td className="p-3 text-right">{num(clearanceResult.summary.fa)}</td><td className="p-3 text-right">{num(clearanceResult.summary.total - clearanceResult.summary.fa)}</td><td className="p-3 text-right text-green-400">{num(clearanceResult.summary.paid)}</td><td className={`p-3 text-right ${clearanceResult.summary.balance > 0 ? 'text-red-400' : 'text-green-400'}`}>{num(clearanceResult.summary.balance)}</td></tr>
-                                                    </tbody>
-                                                </table>
-                                                <div className="flex justify-between mt-1 text-xs font-bold text-gray-600"><div>Total Subjects: {clearanceResult.summary.courses}</div><div>Total Credits: {clearanceResult.summary.cr}</div></div>
-                                            </div>
-                                            <div className="mt-4 flex justify-between items-end">
-                                                <div className="text-xs text-gray-500"><p>Printed by: <span className="font-bold text-gray-800">{user.username}</span></p><p>Time: {new Date().toLocaleString('en-US', { timeZone: 'Asia/Karachi' })}</p></div>
-                                                <div className="w-64 bg-gray-50 p-4 rounded border border-gray-200"><div className="flex justify-between text-sm mb-2"><span className="text-gray-600">Total Scholarship:</span><span className="font-bold text-green-600">{num(clearanceResult.summary.fa)}</span></div><div className="border-t border-gray-300 my-2"></div><div className="flex justify-between text-lg font-bold"><span>Net Payable:</span><span className="text-red-600">{num(clearanceResult.summary.balance)}</span></div></div>
-                                            </div>
+                                            <div className="text-right text-xs text-gray-500"><p>Printed: {new Date().toLocaleString()}</p></div>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-6 mb-6 text-sm">
+                                            <div className="flex border-b py-1"><span className="font-bold w-32">Registration No:</span> {clearanceResult.student.reg_no}</div>
+                                            <div className="flex border-b py-1"><span className="font-bold w-32">Student Name:</span> {clearanceResult.student.name}</div>
+                                            <div className="flex border-b py-1"><span className="font-bold w-32">Degree:</span> {clearanceResult.student.degree}</div>
+                                            <div className="flex border-b py-1"><span className="font-bold w-32">Batch:</span> {clearanceResult.student.batch}</div>
+                                        </div>
+                                        <table className="w-full text-xs mb-6">
+                                            <thead className="bg-gray-100 uppercase font-bold">
+                                                <tr><th className="p-2 border">Sem</th><th className="p-2 border text-center">Sub</th><th className="p-2 border text-center">Cr</th><th className="p-2 border text-right">Tuition</th><th className="p-2 border text-right">Exam</th><th className="p-2 border text-right">Reg</th><th className="p-2 border text-right">Other</th><th className="p-2 border text-right bg-gray-50">Total</th><th className="p-2 border text-center">Disc</th><th className="p-2 border text-right">Amt</th><th className="p-2 border text-right">Net</th><th className="p-2 border text-right">Paid</th><th className="p-2 border text-right">Bal</th></tr>
+                                            </thead>
+                                            <tbody>
+                                                {clearanceResult.rows.map((r, i) => (
+                                                    <tr key={i}>
+                                                        <td className="p-2 border font-bold">{r.semester}</td><td className="p-2 border text-center">{r.courses}</td><td className="p-2 border text-center">{r.cr}</td><td className="p-2 border text-right">{num(r.tuition)}</td><td className="p-2 border text-right">{num(r.exam)}</td><td className="p-2 border text-right">{num(r.reg)}</td><td className="p-2 border text-right">{num(r.other)}</td><td className="p-2 border text-right font-bold bg-gray-50">{num(r.total)}</td><td className="p-2 border text-center">{r.discPct}%</td><td className="p-2 border text-right">{num(r.discAmt)}</td><td className="p-2 border text-right font-bold">{num(r.netFee)}</td><td className="p-2 border text-right text-green-700 font-bold">{num(r.totalPaid)}</td><td className="p-2 border text-right font-bold">{num(r.balance)}</td>
+                                                    </tr>
+                                                ))}
+                                                <tr className="bg-gray-800 text-white font-bold"><td colSpan="7" className="p-2 text-right">Totals</td><td className="p-2 text-right">{num(clearanceResult.summary.total)}</td><td></td><td className="p-2 text-right">{num(clearanceResult.summary.fa)}</td><td className="p-2 text-right">{num(clearanceResult.summary.total - clearanceResult.summary.fa)}</td><td className="p-2 text-right">{num(clearanceResult.summary.paid)}</td><td className="p-2 text-right">{num(clearanceResult.summary.balance)}</td></tr>
+                                            </tbody>
+                                        </table>
+                                        <div className="flex justify-between items-end mt-12">
+                                            <div className="text-xs text-gray-500">Printed by: {user.username}</div>
+                                            <div className="w-64 border-t border-black text-center pt-2 font-bold text-sm">Accounts Officer</div>
                                         </div>
                                     </div>
                                 )}
                             </div>
-                        )}
-
-                        {/* NEW: SUMMARY TAB */}
-                        {activeTab === 'summary' && (
+                        ) : activeTab === 'summary' ? (
                              <div className="space-y-6">
                                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
                                     <label className="block text-sm font-bold text-gray-700 mb-2">Term Financial Summary</label>
@@ -667,9 +555,25 @@
                                             <h3 className="text-2xl font-bold text-gray-900 mt-1">{num(summaryData.totalProjected)}</h3>
                                             <p className="text-xs text-gray-400 mt-1">Based on {summaryData.enrollmentCount} Enrollments</p>
                                         </div>
+                                        <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-purple-500">
+                                            <p className="text-xs font-bold text-gray-500 uppercase">Tuition Fee</p>
+                                            <h3 className="text-2xl font-bold text-purple-600 mt-1">{num(summaryData.totalTuition)}</h3>
+                                        </div>
+                                        <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-indigo-500">
+                                            <p className="text-xs font-bold text-gray-500 uppercase">Exam Fee</p>
+                                            <h3 className="text-2xl font-bold text-indigo-600 mt-1">{num(summaryData.totalExamFee)}</h3>
+                                        </div>
+                                        <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-yellow-500">
+                                            <p className="text-xs font-bold text-gray-500 uppercase">Other Charges</p>
+                                            <h3 className="text-2xl font-bold text-yellow-600 mt-1">{num(summaryData.totalOthers)}</h3>
+                                        </div>
                                         <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-orange-500">
                                             <p className="text-xs font-bold text-gray-500 uppercase">Discounts Given</p>
                                             <h3 className="text-2xl font-bold text-orange-600 mt-1">{num(summaryData.totalDiscounts)}</h3>
+                                        </div>
+                                        <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-teal-500">
+                                            <p className="text-xs font-bold text-gray-500 uppercase">Net Receivable</p>
+                                            <h3 className="text-2xl font-bold text-teal-600 mt-1">{num(summaryData.netReceivable)}</h3>
                                         </div>
                                         <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-green-500">
                                             <p className="text-xs font-bold text-gray-500 uppercase">Total Received</p>
@@ -683,171 +587,74 @@
                                     </div>
                                 )}
                              </div>
-                        )}
-
-                        {/* LIST VIEWS */}
-                        {activeTab !== 'clearance' && activeTab !== 'summary' && (
-                            <div>
-                                <div className="flex flex-col gap-4 mb-6 no-print">
-                                    <div className="flex justify-between items-center"><h2 className="text-2xl font-bold text-gray-800 capitalize">{activeTab} Directory {data[activeTab] && <span className="ml-3 bg-gray-200 text-gray-700 text-sm py-1 px-3 rounded-full">{data[activeTab].length}</span>}</h2><div className="flex gap-2">{(user.role === 'admin' || user.permissions.includes(activeTab)) && <button onClick={() => openModal(activeTab)} className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700 transition flex items-center gap-2 shadow-sm"><Plus className="h-5 w-5" /> Add New</button>}</div></div>
-                                    <div className="bg-white p-3 rounded-xl border border-gray-200 flex flex-wrap gap-3 items-center justify-between shadow-sm">
-                                        <div className="relative flex-grow max-w-md"><Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" /><input type="text" value={tabSearch} onChange={(e) => setTabSearch(e.target.value)} placeholder={`Filter ${activeTab}...`} className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" /></div>
-                                        <div className="flex gap-2">
-                                            {selectedIds.size > 0 && <button onClick={deleteSelected} className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm font-bold hover:bg-red-100 flex items-center gap-2"><Trash2 className="h-4 w-4" /> Delete ({selectedIds.size})</button>}
-                                            {(activeTab === 'enrollments' || activeTab === 'payments' || activeTab === 'others') && <button onClick={deleteBySemester} className="bg-orange-50 border border-orange-200 text-orange-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-orange-100 flex items-center gap-2"><CalendarX className="h-4 w-4" /> Del Sem</button>}
-                                            {user.role === 'admin' && <button onClick={deleteAllInTab} className="bg-white border border-red-200 text-red-600 px-3 py-2 rounded-lg text-sm font-medium hover:bg-red-50 flex items-center gap-2"><XSquare className="h-4 w-4" /> Delete All</button>}
-                                            <div className="h-8 w-px bg-gray-300 mx-1"></div>
-                                            <button onClick={() => downloadSample(activeTab)} className="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2"><FileSpreadsheet className="h-4 w-4" /> Sample</button>
-                                            <label className="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 cursor-pointer flex items-center gap-2"><Download className="h-4 w-4" /> Import<input type="file" onChange={(e) => handleImport(e, activeTab)} className="hidden" accept=".csv" /></label>
-                                            {['enrollments', 'payments', 'others', 'discounts'].includes(activeTab) && <input type="text" value={importTerm} onChange={(e) => setImportTerm(e.target.value)} placeholder="Term (e.g. Fall 2024)" className="border border-gray-300 px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-48" />}
-                                            <button onClick={() => handleExport(activeTab)} className="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2"><Upload className="h-4 w-4" /> Export</button>
-                                        </div>
+                        ) : (
+                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                                <div className="p-4 border-b bg-gray-50 flex justify-between items-center no-print">
+                                    <div className="flex gap-2 w-full max-w-xl">
+                                        <input className="border p-2 rounded flex-1 outline-none focus:ring-1" placeholder="Search..." value={tabSearch} onChange={e=>setTabSearch(e.target.value)} />
+                                    </div>
+                                    <div className="flex gap-2">
+                                        {/* Import Term Input */}
+                                        {['enrollments','payments','others','discounts'].includes(activeTab) && 
+                                            <input className="border p-2 rounded w-32 text-sm" placeholder="Import Term" value={importTerm} onChange={e=>setImportTerm(e.target.value)} />
+                                        }
+                                        <button onClick={()=>openModal(activeTab)} className="bg-blue-600 text-white px-4 py-2 rounded font-bold text-sm"><Plus /> Add</button>
+                                        <label className="bg-white border px-3 py-2 rounded cursor-pointer text-sm font-bold text-gray-600"><Download /> Import <input type="file" className="hidden" onChange={e=>handleImport(e, activeTab)} /></label>
+                                        <button onClick={()=>handleExport(activeTab)} className="bg-white border px-3 py-2 rounded text-sm font-bold text-gray-600"><Upload /> Export</button>
+                                        <button onClick={()=>downloadSample(activeTab)} className="bg-white border px-3 py-2 rounded text-sm font-bold text-gray-600"><FileSpreadsheet /> Sample</button>
+                                        {user.role === 'admin' && <button onClick={()=>deleteAll(activeTab)} className="bg-red-50 text-red-600 border border-red-200 px-3 py-2 rounded text-sm font-bold"><XSquare /> Del All</button>}
+                                        {(activeTab === 'enrollments' || activeTab === 'payments' || activeTab === 'others') && <button onClick={deleteSem} className="bg-orange-50 text-orange-600 border border-orange-200 px-3 py-2 rounded text-sm font-bold"><CalendarX /> Del Sem</button>}
+                                        {selectedIds.size > 0 && <button onClick={deleteSelected} className="bg-red-600 text-white px-3 py-2 rounded text-sm font-bold animate-pulse">Delete ({selectedIds.size})</button>}
                                     </div>
                                 </div>
-                                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                                <div className="overflow-x-auto">
                                     <table className="w-full text-sm text-left">
-                                        <thead className="bg-gray-50 text-gray-700 uppercase font-bold text-xs border-b border-gray-200">
-                                            <tr>
-                                                <th className="p-4 w-10"><input type="checkbox" onChange={handleSelectAll} checked={filteredData.length > 0 && selectedIds.size === filteredData.length} className="rounded" /></th>
-                                                {/* Header rendering based on tab */}
-                                                {activeTab === 'students' && <><th className="p-4 cursor-pointer hover:text-blue-600" onClick={() => handleSort('reg_no')}>Reg No {sortConfig.key === 'reg_no' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th><th className="p-4 cursor-pointer hover:text-blue-600" onClick={() => handleSort('name')}>Name {sortConfig.key === 'name' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th><th className="p-4">Degree</th><th className="p-4">Batch</th><th className="p-4">Mobile</th><th className="p-4">Email</th></>}
-                                                {activeTab === 'fees' && <><th className="p-4">Degree</th><th className="p-4">Batch</th><th className="p-4 text-right">Fee/Cr</th><th className="p-4 text-right">Fee/Sub</th><th className="p-4 text-right">Reg Fee</th><th className="p-4 text-right">Other</th></>}
-                                                {activeTab === 'enrollments' && <><th className="p-4">Reg No</th><th className="p-4">Name</th><th className="p-4">Semester</th><th className="p-4">Cr Hrs</th><th className="p-4">Courses</th></>}
-                                                {activeTab === 'payments' && <><th className="p-4">Reg No</th><th className="p-4">Name</th><th className="p-4">Semester</th><th className="p-4 text-right">Amount</th><th className="p-4">Date</th><th className="p-4">Bank</th></>}
-                                                {activeTab === 'others' && <><th className="p-4">Reg No</th><th className="p-4">Name</th><th className="p-4">Semester</th><th className="p-4">Fee Name</th><th className="p-4 text-right">Amount</th></>}
-                                                {activeTab === 'discounts' && <><th className="p-4">Reg No</th><th className="p-4">Name</th><th className="p-4">Term</th><th className="p-4 text-right">Discount</th></>}
-                                                {activeTab === 'users' && <><th className="p-4">Username</th><th className="p-4">Role</th><th className="p-4">Permissions</th></>}
-                                                {activeTab === 'banks' && <><th className="p-4">Bank Name</th><th className="p-4">Account No</th></>}
-                                                <th className="p-4 text-center">Actions</th>
-                                            </tr>
-                                        </thead>
+                                        <TableHeader />
                                         <tbody className="divide-y divide-gray-100">
-                                            {filteredData.map((item, idx) => (
-                                                <tr key={item.id || idx} className={`hover:bg-gray-50 transition ${selectedIds.has(item.id || item.reg_no) ? 'bg-blue-50' : ''}`}>
-                                                    <td className="p-4"><input type="checkbox" checked={selectedIds.has(item.id || item.reg_no)} onChange={() => handleSelectRow(item.id || item.reg_no)} className="rounded" /></td>
-                                                    {activeTab === 'students' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4 font-bold">{item.name}</td><td className="p-4"><span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-bold">{item.degree}</span></td><td className="p-4 text-gray-500">{item.batch}</td><td className="p-4 text-gray-500">{item.mobile || '-'}</td><td className="p-4 text-gray-500">{item.email || '-'}</td></>}
-                                                    {activeTab === 'fees' && <><td className="p-4 font-bold">{item.degree}</td><td className="p-4 text-gray-600">{item.batch}</td><td className="p-4 text-right text-gray-500">{num(item.per_cr_fee)}</td><td className="p-4 text-right font-bold text-green-700">{num(item.per_course_fee)}</td><td className="p-4 text-right text-gray-500">{num(item.reg_fee)}</td><td className="p-4 text-right text-gray-500">{num(item.other_fee)}</td></>}
-                                                    {activeTab === 'enrollments' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4"><span className="bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-xs font-bold">{item.semester}</span></td><td className="p-4">{item.cr}</td><td className="p-4">{item.courses}</td></>}
-                                                    {activeTab === 'payments' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4"><span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-bold">{item.semester}</span></td><td className="p-4 text-right font-bold">{num(item.amount)}</td><td className="p-4 text-gray-500">{item.date}</td><td className="p-4 text-gray-500">{item.bank}</td></>}
-                                                    {activeTab === 'others' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4 text-gray-600">{item.semester}</td><td className="p-4"><span className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs font-bold">{item.fee_name}</span></td><td className="p-4 text-right font-bold">{num(item.amount)}</td></>}
-                                                    {activeTab === 'discounts' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4 text-gray-500">{item.term}</td><td className="p-4 text-right font-bold text-purple-600">{item.discount}%</td></>}
-                                                    {activeTab === 'users' && <><td className="p-4 font-bold">{item.username}</td><td className="p-4 capitalize">{item.role}</td><td className="p-4 text-xs max-w-xs truncate">{item.role === 'admin' ? 'Full Access' : (Array.isArray(item.permissions) ? item.permissions.join(', ') : item.permissions)}</td></>}
-                                                    {activeTab === 'banks' && <><td className="p-4 font-bold">{item.name}</td><td className="p-4 font-mono text-gray-600">{item.account_no}</td></>}
-                                                    <td className="p-4 text-center flex justify-center gap-2"><button onClick={() => openModal(activeTab, item)} className="p-2 text-blue-600 hover:bg-blue-50 rounded"><i className="fas fa-edit"></i> Edit</button><button onClick={() => handleDelete(activeTab, item.id || item.reg_no)} className="p-2 text-red-600 hover:bg-red-50 rounded"><Trash2 className="h-4 w-4" /></button></td>
-                                                </tr>
-                                            ))}
-                                            {filteredData.length === 0 && <tr><td colSpan="10" className="p-8 text-center text-gray-400">No records found.</td></tr>}
+                                            {list.map((item, idx) => <TableRow key={item.id||idx} item={item} idx={idx} />)}
+                                            {list.length === 0 && <tr><td colSpan="10" className="p-8 text-center text-gray-400">No records found.</td></tr>}
                                         </tbody>
                                     </table>
                                 </div>
                             </div>
                         )}
                     </div>
+
+                    {/* MODAL */}
                     {showModal && (
                         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
                             <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
-                                <h3 className="text-xl font-bold mb-4 capitalize">Add/Edit {modalType.slice(0, -1)}</h3>
+                                <h3 className="text-xl font-bold mb-4 capitalize">Add/Edit {modalType.replace(/s$/,'')}</h3>
                                 <form onSubmit={handleSave} className="space-y-4">
-                                    {modalType === 'students' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={e => setFormData({...formData, reg_no: e.target.value})} /><input required placeholder="Full Name" className="w-full border p-2 rounded" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} /><div className="grid grid-cols-2 gap-4"><input placeholder="Degree (e.g. BSCAF)" className="w-full border p-2 rounded" value={formData.degree || ''} onChange={e => setFormData({...formData, degree: e.target.value})} /><input placeholder="Batch (e.g. Fall 2023)" className="w-full border p-2 rounded" value={formData.batch || ''} onChange={e => setFormData({...formData, batch: e.target.value})} /></div><div className="grid grid-cols-2 gap-4"><input placeholder="Mobile Number (Optional)" className="w-full border p-2 rounded" value={formData.mobile || ''} onChange={e => setFormData({...formData, mobile: e.target.value})} /><input placeholder="Email Address (Optional)" className="w-full border p-2 rounded" value={formData.email || ''} onChange={e => setFormData({...formData, email: e.target.value})} /></div></>}
-                                    {modalType === 'fees' && <><div className="bg-blue-50 p-3 rounded text-xs text-blue-800 mb-2"><strong>Note:</strong> Fee Structure applies to ALL semesters for this Degree & Batch.</div><div className="grid grid-cols-2 gap-4"><input required placeholder="Degree" className="w-full border p-2 rounded" value={formData.degree || ''} onChange={e => setFormData({...formData, degree: e.target.value})} /><input required placeholder="Batch" className="w-full border p-2 rounded" value={formData.batch || ''} onChange={e => setFormData({...formData, batch: e.target.value})} /></div><div className="grid grid-cols-2 gap-4"><input type="number" placeholder="Fee Per Credit Hour" className="w-full border p-2 rounded" value={formData.per_cr_fee || ''} onChange={e => setFormData({...formData, per_cr_fee: e.target.value})} /><input type="number" placeholder="Fee Per Subject/Course" className="w-full border p-2 rounded" value={formData.per_course_fee || ''} onChange={e => setFormData({...formData, per_course_fee: e.target.value})} /></div><div className="grid grid-cols-2 gap-4"><input type="number" placeholder="Registration Fee (Semester)" className="w-full border p-2 rounded" value={formData.reg_fee || ''} onChange={e => setFormData({...formData, reg_fee: e.target.value})} /><input type="number" placeholder="Other Charges (Semester)" className="w-full border p-2 rounded" value={formData.other_fee || ''} onChange={e => setFormData({...formData, other_fee: e.target.value})} /></div></>}
-                                    {modalType === 'enrollments' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={e => setFormData({...formData, reg_no: e.target.value})} /><input placeholder="Student Name" className="w-full border p-2 rounded" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} /><input required placeholder="Semester (e.g. Spring 2024)" className="w-full border p-2 rounded" value={formData.semester || ''} onChange={e => setFormData({...formData, semester: e.target.value})} /><div className="grid grid-cols-2 gap-4"><input type="number" placeholder="Credit Hours" className="w-full border p-2 rounded" value={formData.cr || ''} onChange={e => setFormData({...formData, cr: e.target.value})} /><input type="number" placeholder="No. of Courses" className="w-full border p-2 rounded" value={formData.courses || ''} onChange={e => setFormData({...formData, courses: e.target.value})} /></div></>}
-                                    {modalType === 'payments' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={e => setFormData({...formData, reg_no: e.target.value})} /><input required placeholder="Semester (e.g. Spring 2024)" className="w-full border p-2 rounded" value={formData.semester || ''} onChange={e => setFormData({...formData, semester: e.target.value})} /><input required type="number" placeholder="Amount Paid" className="w-full border p-2 rounded font-bold text-lg" value={formData.amount || ''} onChange={e => setFormData({...formData, amount: e.target.value})} /><input type="date" className="w-full border p-2 rounded" value={formData.date || ''} onChange={e => setFormData({...formData, date: e.target.value})} />
-                                    <label className="block text-sm font-bold text-gray-700 mt-2 mb-1">Payment Through (Bank)</label>
-                                    <select className="w-full border p-2 rounded bg-white" value={formData.bank || ''} onChange={e => setFormData({...formData, bank: e.target.value})}>
-                                        <option value="">Select Bank</option>
-                                        <option value="Cash">Cash</option>
-                                        {data.banks.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
-                                    </select>
-                                    </>}
-                                    {modalType === 'others' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={e => setFormData({...formData, reg_no: e.target.value})} /><div className="grid grid-cols-2 gap-4"><input required placeholder="Semester" className="w-full border p-2 rounded" value={formData.semester || ''} onChange={e => setFormData({...formData, semester: e.target.value})} /><input required placeholder="Fee Name (e.g. Late Fine)" className="w-full border p-2 rounded" value={formData.fee_name || ''} onChange={e => setFormData({...formData, fee_name: e.target.value})} /></div><input required type="number" placeholder="Amount" className="w-full border p-2 rounded font-bold text-lg" value={formData.amount || ''} onChange={e => setFormData({...formData, amount: e.target.value})} /></>}
-                                    {modalType === 'discounts' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={e => setFormData({...formData, reg_no: e.target.value})} /><input required placeholder="Term" className="w-full border p-2 rounded" value={formData.term || ''} onChange={e => setFormData({...formData, term: e.target.value})} /><input required type="number" placeholder="Discount %" className="w-full border p-2 rounded" value={formData.discount || ''} onChange={e => setFormData({...formData, discount: e.target.value})} /></>}
-                                    {modalType === 'banks' && <><input required placeholder="Bank Name" className="w-full border p-2 rounded" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} /><input placeholder="Account Number (Optional)" className="w-full border p-2 rounded" value={formData.account_no || ''} onChange={e => setFormData({...formData, account_no: e.target.value})} /></>}
-                                    {modalType === 'users' && (
-                                        <div className="space-y-4">
-                                            <input required placeholder="Username" className="w-full border p-2 rounded" value={formData.username || ''} onChange={e => setFormData({...formData, username: e.target.value})} />
-                                            <input required type="password" placeholder="Password" className="w-full border p-2 rounded" value={formData.password || ''} onChange={e => setFormData({...formData, password: e.target.value})} />
-                                            <select className="w-full border p-2 rounded bg-white" value={formData.role || 'user'} onChange={e => setFormData({...formData, role: e.target.value})}>
-                                                <option value="user">Regular User</option>
-                                                <option value="admin">Administrator</option>
-                                            </select>
-                                            {formData.role !== 'admin' && (
-                                                <div className="bg-gray-50 p-3 rounded border">
-                                                    <label className="block text-xs font-bold text-gray-500 mb-2 uppercase">Tab Access Permissions</label>
-                                                    <div className="grid grid-cols-2 gap-2">
-                                                        {TABS.map(t => (
-                                                            <label key={t.id} className="flex items-center gap-2 text-sm cursor-pointer">
-                                                                <input type="checkbox" checked={(formData.permissions || []).includes(t.id)} onChange={() => togglePermission(t.id)} />
-                                                                {t.label}
-                                                            </label>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
+                                    {/* DYNAMIC FORM FIELDS */}
+                                    {modalType === 'students' && <><input required placeholder="Reg No" className="w-full border p-2 rounded" value={formData.reg_no||''} onChange={e=>setFormData({...formData, reg_no:e.target.value})} /><input placeholder="Name" className="w-full border p-2 rounded" value={formData.name||''} onChange={e=>setFormData({...formData, name:e.target.value})} /><div className="grid grid-cols-2 gap-4"><input placeholder="Degree" className="w-full border p-2 rounded" value={formData.degree||''} onChange={e=>setFormData({...formData, degree:e.target.value})} /><input placeholder="Batch" className="w-full border p-2 rounded" value={formData.batch||''} onChange={e=>setFormData({...formData, batch:e.target.value})} /></div><div className="grid grid-cols-2 gap-4"><input placeholder="Mobile" className="w-full border p-2 rounded" value={formData.mobile||''} onChange={e=>setFormData({...formData, mobile:e.target.value})} /><input placeholder="Email" className="w-full border p-2 rounded" value={formData.email||''} onChange={e=>setFormData({...formData, email:e.target.value})} /></div></>}
+                                    {modalType === 'fees' && <><div className="grid grid-cols-2 gap-4"><input placeholder="Degree" className="w-full border p-2 rounded" value={formData.degree||''} onChange={e=>setFormData({...formData, degree:e.target.value})} /><input placeholder="Batch" className="w-full border p-2 rounded" value={formData.batch||''} onChange={e=>setFormData({...formData, batch:e.target.value})} /></div><div className="grid grid-cols-2 gap-4"><input type="number" placeholder="Fee/Cr" className="w-full border p-2 rounded" value={formData.per_cr_fee||''} onChange={e=>setFormData({...formData, per_cr_fee:e.target.value})} /><input type="number" placeholder="Fee/Sub" className="w-full border p-2 rounded" value={formData.per_course_fee||''} onChange={e=>setFormData({...formData, per_course_fee:e.target.value})} /></div><div className="grid grid-cols-2 gap-4"><input type="number" placeholder="Reg Fee" className="w-full border p-2 rounded" value={formData.reg_fee||''} onChange={e=>setFormData({...formData, reg_fee:e.target.value})} /><input type="number" placeholder="Other" className="w-full border p-2 rounded" value={formData.other_fee||''} onChange={e=>setFormData({...formData, other_fee:e.target.value})} /></div></>}
+                                    {modalType === 'enrollments' && <><input required placeholder="Reg No" className="w-full border p-2 rounded" value={formData.reg_no||''} onChange={e=>setFormData({...formData, reg_no:e.target.value})} /><input placeholder="Name" className="w-full border p-2 rounded" value={formData.name||''} onChange={e=>setFormData({...formData, name:e.target.value})} /><input required placeholder="Semester" className="w-full border p-2 rounded" value={formData.semester||''} onChange={e=>setFormData({...formData, semester:e.target.value})} /><div className="grid grid-cols-2 gap-4"><input type="number" placeholder="Cr Hrs" className="w-full border p-2 rounded" value={formData.cr||''} onChange={e=>setFormData({...formData, cr:e.target.value})} /><input type="number" placeholder="Courses" className="w-full border p-2 rounded" value={formData.courses||''} onChange={e=>setFormData({...formData, courses:e.target.value})} /></div></>}
+                                    {modalType === 'payments' && <><input required placeholder="Reg No" className="w-full border p-2 rounded" value={formData.reg_no||''} onChange={e=>setFormData({...formData, reg_no:e.target.value})} /><input required placeholder="Semester" className="w-full border p-2 rounded" value={formData.semester||''} onChange={e=>setFormData({...formData, semester:e.target.value})} /><input required type="number" placeholder="Amount" className="w-full border p-2 rounded font-bold" value={formData.amount||''} onChange={e=>setFormData({...formData, amount:e.target.value})} /><input type="date" className="w-full border p-2 rounded" value={formData.date||''} onChange={e=>setFormData({...formData, date:e.target.value})} /><select className="w-full border p-2 rounded bg-white" value={formData.bank||''} onChange={e=>setFormData({...formData, bank:e.target.value})}><option value="">Select Bank</option><option value="Cash">Cash</option>{data.banks.map(b=><option key={b.id} value={b.name}>{b.name}</option>)}</select></>}
+                                    {modalType === 'discounts' && <><input required placeholder="Reg No" className="w-full border p-2 rounded" value={formData.reg_no||''} onChange={e=>setFormData({...formData, reg_no:e.target.value})} /><input placeholder="Term" className="w-full border p-2 rounded" value={formData.term||''} onChange={e=>setFormData({...formData, term:e.target.value})} /><input type="number" placeholder="Discount %" className="w-full border p-2 rounded" value={formData.discount||''} onChange={e=>setFormData({...formData, discount:e.target.value})} /></>}
+                                    {modalType === 'others' && <><input required placeholder="Reg No" className="w-full border p-2 rounded" value={formData.reg_no||''} onChange={e=>setFormData({...formData, reg_no:e.target.value})} /><div className="grid grid-cols-2 gap-4"><input placeholder="Semester" className="w-full border p-2 rounded" value={formData.semester||''} onChange={e=>setFormData({...formData, semester:e.target.value})} /><input placeholder="Fee Name" className="w-full border p-2 rounded" value={formData.fee_name||''} onChange={e=>setFormData({...formData, fee_name:e.target.value})} /></div><input type="number" placeholder="Amount" className="w-full border p-2 rounded" value={formData.amount||''} onChange={e=>setFormData({...formData, amount:e.target.value})} /></>}
+                                    {modalType === 'banks' && <><input placeholder="Bank Name" className="w-full border p-2 rounded" value={formData.name||''} onChange={e=>setFormData({...formData, name:e.target.value})} /><input placeholder="Account No" className="w-full border p-2 rounded" value={formData.account_no||''} onChange={e=>setFormData({...formData, account_no:e.target.value})} /></>}
+                                    {modalType === 'users' && <div className="space-y-4"><input placeholder="Username" className="w-full border p-2 rounded" value={formData.username||''} onChange={e=>setFormData({...formData, username:e.target.value})} /><input type="password" placeholder="Password" className="w-full border p-2 rounded" value={formData.password||''} onChange={e=>setFormData({...formData, password:e.target.value})} /><select className="w-full border p-2 rounded bg-white" value={formData.role||'user'} onChange={e=>setFormData({...formData, role:e.target.value})}><option value="user">User</option><option value="admin">Admin</option></select></div>}
+                                    
+                                    <div className="flex justify-end gap-3 pt-4"><button type="button" onClick={()=>setShowModal(false)} className="px-4 py-2 bg-gray-100 rounded hover:bg-gray-200">Cancel</button><button type="submit" className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Save</button></div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
 
-                                    <div className="flex justify-end gap-3 mt-6">
-                                        <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 bg-gray-100 rounded hover:bg-gray-200 font-bold">Cancel</button>
-                                        <button type="submit" className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-bold">Save Record</button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    )}
-                    {showPasswordModal && (
-                        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-                            <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6">
-                                <h3 className="text-xl font-bold mb-4">Change Password</h3>
-                                <form onSubmit={handleChangePassword} className="space-y-4">
-                                    <div><label className="block text-sm font-medium text-gray-700 mb-1">Current Password</label><input required type="password" value={passwordData.current} onChange={e => setPasswordData({...passwordData, current: e.target.value})} className="w-full border p-2 rounded" /></div>
-                                    <div><label className="block text-sm font-medium text-gray-700 mb-1">New Password</label><input required type="password" value={passwordData.new} onChange={e => setPasswordData({...passwordData, new: e.target.value})} className="w-full border p-2 rounded" /></div>
-                                    <div><label className="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label><input required type="password" value={passwordData.confirm} onChange={e => setPasswordData({...passwordData, confirm: e.target.value})} className="w-full border p-2 rounded" /></div>
-                                    <div className="flex justify-end gap-3 mt-4"><button type="button" onClick={() => {setShowPasswordModal(false); setPasswordData({current:'',new:'',confirm:''})}} className="px-4 py-2 bg-gray-100 rounded hover:bg-gray-200 font-bold">Cancel</button><button type="submit" className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-bold">Update</button></div>
-                                </form>
-                            </div>
-                        </div>
-                    )}
-                    {/* IMPORT PROGRESS BAR */}
-                    {uploadStatus.active && (
-                        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center z-[100]">
-                            <div className="bg-white p-6 rounded-xl shadow-xl w-80 text-center">
-                                <h3 className="font-bold text-lg mb-2">{uploadStatus.title || 'Processing...'}</h3>
-                                <div className="w-full bg-gray-200 rounded-full h-4 mb-2">
-                                    <div className="bg-blue-600 h-4 rounded-full transition-all duration-300" style={{ width: `${(uploadStatus.current / uploadStatus.total) * 100}%` }}></div>
-                                </div>
-                                <p className="text-sm text-gray-600">{uploadStatus.current} / {uploadStatus.total}</p>
-                            </div>
-                        </div>
-                    )}
-                    {/* IMPORT PREVIEW MODAL */}
+                    {/* IMPORT PREVIEW */}
                     {importPreview.show && (
-                        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 z-[60]">
-                            <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl p-6 max-h-[90vh] flex flex-col">
-                                <h3 className="text-xl font-bold mb-4">Import Summary ({importPreview.type})</h3>
-                                <div className="grid grid-cols-3 gap-4 mb-4 text-center">
-                                     <div className="bg-blue-50 p-2 rounded"><div className="text-xl font-bold text-blue-600">{importPreview.total}</div><div className="text-xs text-gray-500">Total Found</div></div>
-                                     <div className="bg-green-50 p-2 rounded"><div className="text-xl font-bold text-green-600">{importPreview.newItems.length}</div><div className="text-xs text-gray-500">New Records</div></div>
-                                     <div className="bg-red-50 p-2 rounded"><div className="text-xl font-bold text-red-600">{importPreview.duplicates.length}</div><div className="text-xs text-gray-500">Duplicates (Skipped)</div></div>
+                        <div className="fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-4">
+                            <div className="bg-white rounded-xl shadow-2xl w-full max-w-xl p-6">
+                                <h3 className="text-xl font-bold mb-4">Import Preview</h3>
+                                <div className="space-y-2 mb-4">
+                                    <p>Total Records: <strong>{importPreview.total}</strong></p>
+                                    <p className="text-green-600">New Records: <strong>{importPreview.newItems.length}</strong></p>
+                                    <p className="text-red-600">Duplicates: <strong>{importPreview.duplicates.length}</strong></p>
                                 </div>
-                                
-                                {importPreview.duplicates.length > 0 && (
-                                    <div className="flex-1 overflow-hidden flex flex-col">
-                                        <h4 className="font-bold text-sm text-gray-700 mb-2">Duplicate Entries:</h4>
-                                        <div className="overflow-y-auto border rounded bg-gray-50 p-2 text-sm text-gray-600 space-y-1">
-                                            {importPreview.duplicates.map((d, i) => (
-                                                <div key={i} className="flex justify-between border-b border-gray-200 last:border-0 pb-1">
-                                                    <span>{d.reg_no || d.name || 'Unknown'}</span>
-                                                    <span className="text-xs bg-gray-200 px-2 rounded text-gray-500">{d.semester || d.term || 'N/A'}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-
-                                <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
-                                    <button onClick={() => { setImportPreview({show:false, newItems:[], duplicates:[], total:0, type:''}); }} className="px-4 py-2 bg-gray-100 rounded font-bold hover:bg-gray-200">Cancel</button>
-                                    {importPreview.newItems.length > 0 && <button onClick={confirmImport} className="px-6 py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700">Import {importPreview.newItems.length} Records</button>}
-                                </div>
+                                {importPreview.duplicates.length > 0 && <div className="bg-red-50 p-3 rounded text-sm text-red-700 mb-4 max-h-40 overflow-y-auto"><strong>Duplicates:</strong> {importPreview.duplicates.map(d=>d.reg_no).join(', ')}</div>}
+                                {uploadStatus.active && <div className="w-full bg-gray-200 rounded-full h-4 mb-4"><div className="bg-blue-600 h-4 rounded-full transition-all duration-300" style={{width: `${(uploadStatus.current/uploadStatus.total)*100}%`}}></div></div>}
+                                <div className="flex justify-end gap-3"><button onClick={()=>setImportPreview({show:false, newItems:[], duplicates:[], total:0})} className="px-4 py-2 bg-gray-100 rounded">Cancel</button><button onClick={confirmImport} className="px-6 py-2 bg-blue-600 text-white rounded">Import {importPreview.newItems.length} Records</button></div>
                             </div>
                         </div>
                     )}
