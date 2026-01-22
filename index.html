@@ -233,6 +233,7 @@
                 } catch(e) { alert("Connection Error"); return false; }
             };
 
+            // --- AUTH ---
             const handleLogin = (e) => {
                 e.preventDefault();
                 const found = data.users.find(u => u.username === loginData.username && u.password === loginData.password);
@@ -325,8 +326,6 @@
                 if (newSet.has(id)) newSet.delete(id); else newSet.add(id);
                 setSelectedIds(newSet);
             };
-            
-            // --- FIX: RENAMED FUNCTIONS TO MATCH JSX ---
             const deleteSelected = async () => {
                 if (!confirm(`Delete ${selectedIds.size} records?`)) return;
                 for (let id of selectedIds) {
@@ -349,7 +348,6 @@
                 await postToApi('delete_semester', { table: activeTab, term });
                 refreshData();
             };
-            // -------------------------------------------
 
             const getHeaders = (type) => {
                 const map = {
