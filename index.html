@@ -26,7 +26,7 @@
         @media print {
             @page {
                 size: A4 portrait;
-                margin: 5mm;
+                margin: 5mm; /* Reduced margin */
             }
             body * {
                 visibility: hidden;
@@ -41,22 +41,63 @@
                 width: 100%;
                 height: 100%;
                 margin: 0;
-                padding: 10px;
+                padding: 5px;
                 background: white;
-                font-size: 11px; /* Optimal reading size for A4 */
+                font-family: 'Arial', sans-serif;
+                font-size: 9px; /* Reduced font for better fit */
+                color: black;
             }
             .no-print { display: none !important; }
             
             /* Table optimization for print */
-            table { width: 100% !important; border-collapse: collapse; }
-            th, td { border: 1px solid #000 !important; padding: 4px !important; color: #000 !important; }
+            table { 
+                width: 100% !important; 
+                border-collapse: collapse; 
+                table-layout: fixed; /* Fixes column widths */
+            }
+            th, td { 
+                border: 1px solid #000 !important; 
+                padding: 2px 3px !important; /* Tight padding */
+                overflow: hidden;
+                white-space: nowrap;
+            }
             
-            /* Hide backgrounds to save ink, except where specified */
-            .bg-gray-100, .bg-blue-50 { background-color: transparent !important; }
+            /* Force background for Modern Total Highlight */
+            .print-modern-total {
+                background-color: #000 !important;
+                color: #fff !important;
+                font-weight: 900 !important;
+                border: 2px solid #000 !important;
+                -webkit-print-color-adjust: exact; 
+                print-color-adjust: exact;
+            }
+
+            /* Specific Column Widths for Print (Total ~100%) */
+            th:nth-child(1), td:nth-child(1) { width: 14%; white-space: normal; } /* Sem */
+            th:nth-child(2), td:nth-child(2) { width: 3%; text-align: center; }  /* Sub (Swapped) */
+            th:nth-child(3), td:nth-child(3) { width: 3%; text-align: center; }  /* Cr (Swapped) */
+            th:nth-child(4), td:nth-child(4) { width: 8%; text-align: right; }  /* Tuition */
+            th:nth-child(5), td:nth-child(5) { width: 6%; text-align: right; }  /* Exam */
+            th:nth-child(6), td:nth-child(6) { width: 6%; text-align: right; }  /* Reg */
+            th:nth-child(7), td:nth-child(7) { width: 6%; text-align: right; }  /* Other */
+            th:nth-child(8), td:nth-child(8) { width: 9%; text-align: right; }   /* Total */
+            th:nth-child(9), td:nth-child(9) { width: 5%; text-align: center; }  /* Disc % */
+            th:nth-child(10), td:nth-child(10) { width: 8%; text-align: right; } /* Disc Amt */
+            th:nth-child(11), td:nth-child(11) { width: 10%; text-align: right; font-weight: bold; } /* Net Fee */
+            th:nth-child(12), td:nth-child(12) { width: 10%; text-align: right; } /* Paid */
+            th:nth-child(13), td:nth-child(13) { width: 12%; text-align: right; font-weight: bold; } /* Balance */
+            
+            /* Headers */
+            thead th {
+                background-color: #e5e7eb !important;
+                font-weight: 800;
+                text-transform: uppercase;
+                font-size: 8px;
+            }
         }
     </style>
 </head>
-<body class="bg-gray-100 font-sans text-gray-800 overflow-hidden"> <!-- Added overflow-hidden for dashboard layout -->
+<body class="bg-gray-100 font-sans text-gray-800 overflow-hidden">
     <div id="root"></div>
 
     <script type="text/babel">
@@ -112,7 +153,7 @@
             const [importPreview, setImportPreview] = useState({ show: false, total: 0, newItems: [], duplicates: [], type: '' });
             const [uploadStatus, setUploadStatus] = useState({ active: false, current: 0, total: 0 });
             const [importTerm, setImportTerm] = useState('');
-            const [sidebarOpen, setSidebarOpen] = useState(false); // Mobile Sidebar State
+            const [sidebarOpen, setSidebarOpen] = useState(false);
 
             const TABS = [
                 { id: 'clearance', label: 'Clearance', icon: FileText },
@@ -131,13 +172,11 @@
                 : TABS.filter(t => user.permissions.includes(t.id))
             ) : [];
 
-            // FETCH DATA FROM SERVER
+            // FETCH DATA
             const refreshData = async () => {
                 try {
                     const res = await fetch(API_URL);
                     const json = await res.json();
-                    
-                    // SAFEGUARD: Ensure all arrays exist, defaulting to [] if API returns partial data or error
                     const safeData = {
                         students: Array.isArray(json.students) ? json.students : [],
                         fees: Array.isArray(json.fees) ? json.fees : [],
@@ -148,15 +187,10 @@
                         users: Array.isArray(json.users) ? json.users : [],
                         banks: Array.isArray(json.banks) ? json.banks : []
                     };
-                    
                     setData(safeData);
-
                 } catch(e) { 
                     console.error("Connection Error:", e);
-                    // On error, prevent crash by initializing empty state
-                    setData({
-                        students: [], fees: [], enrollments: [], payments: [], discounts: [], others: [], users: [], banks: []
-                    });
+                    setData({ students: [], fees: [], enrollments: [], payments: [], discounts: [], others: [], users: [], banks: [] });
                 }
             };
 
@@ -171,10 +205,9 @@
                 setTabSearch('');
                 setSortConfig({ key: null, direction: 'asc' }); 
                 setImportTerm(''); 
-                setSidebarOpen(false); // Close sidebar on tab change
+                setSidebarOpen(false); 
             }, [activeTab]);
 
-            // Re-generate report when session filter changes
             useEffect(() => {
                 if (activeTab === 'clearance' && searchReg && clearanceResult) {
                     generateReport();
@@ -184,7 +217,6 @@
             const norm = (str) => str ? str.toString().toLowerCase().replace(/[^a-z0-9]/g, '') : '';
             const num = (n) => parseFloat(n || 0).toLocaleString('en-US');
 
-            // --- FILTERING & SORTING LOGIC ---
             const getProcessedData = () => {
                 let result = (data[activeTab] || []); 
                 if (tabSearch) {
@@ -207,8 +239,6 @@
             };
 
             const filteredData = getProcessedData();
-            
-            // Generate list of unique semesters for filter
             const uniqueSessions = [...new Set(data.enrollments.map(e => e.semester))].sort();
             
             const paymentStats = activeTab === 'payments' ? filteredData.reduce((acc, item) => {
@@ -219,7 +249,6 @@
                  else acc.cash += amt;
                  return acc;
             }, { total: 0, bank: 0, cash: 0 }) : { total: 0, bank: 0, cash: 0 };
-
 
             const postToApi = async (action, payload = {}) => {
                 try {
@@ -292,22 +321,18 @@
                 }
             };
 
-            // --- SORTING ---
             const handleSort = (key) => {
                 let direction = 'asc';
                 if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
                 setSortConfig({ key, direction });
             };
 
-
-            // --- CORE LOGIC ---
             const generateReport = () => {
                 if (!searchReg) return;
                 const cleanReg = norm(searchReg);
                 const student = data.students?.find(s => norm(s.reg_no) === cleanReg);
                 if (!student) { alert("Student not found!"); setClearanceResult(null); return; }
                 
-                // Enhanced Fee Matching
                 let masterFee = data.fees?.find(f => norm(f.degree) === norm(student.degree) && norm(f.batch) === norm(student.batch));
                 if (!masterFee) {
                     masterFee = data.fees?.find(f => norm(f.degree) === norm(student.degree) && (
@@ -317,7 +342,6 @@
                 
                 let studentEnrollments = data.enrollments?.filter(e => norm(e.reg_no) === cleanReg);
 
-                // --- SESSION FILTER LOGIC ---
                 if (filterSession) {
                     const cleanSession = norm(filterSession);
                     studentEnrollments = studentEnrollments.filter(en => norm(en.semester).includes(cleanSession));
@@ -399,7 +423,6 @@
                 setShowModal(true);
             };
 
-            // --- IMPORT HANDLER ---
             const handleImport = (e, type) => {
                 const file = e.target.files[0];
                 if (!file) return;
@@ -417,13 +440,9 @@
                     for (let i = 1; i < rows.length; i++) {
                         const values = rows[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
                         const obj = {};
-                        
-                        // Smart Header Mapping
                         headers.forEach((h, index) => {
                             let val = values[index] ? values[index].trim() : '';
                             if (val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1);
-                            
-                            // Map CSV headers to internal keys
                             if (h.includes('reg') && h.includes('no')) obj['reg_no'] = val;
                             else if (h.includes('name') && !h.includes('user')) obj['name'] = val;
                             else if (h.includes('semester')) obj['semester'] = val;
@@ -439,26 +458,18 @@
                             else if (h.includes('email')) obj['email'] = val;
                             else obj[h] = val; 
                         });
-
                         if(importTerm) {
                             if(type === 'enrollments' || type === 'payments' || type === 'others') obj.semester = importTerm;
                             else if(type === 'discounts') obj.term = importTerm;
                         }
                         if (obj.amount) obj.amount = obj.amount.replace(/[^0-9.-]/g, '');
-
-                        // Duplicate Check
                         const isDuplicate = existingData.some(existing => 
                             norm(existing.reg_no) === norm(obj.reg_no) &&
-                            (
-                                (existing.semester && norm(existing.semester) === norm(obj.semester)) ||
-                                (existing.term && norm(existing.term) === norm(obj.term))
-                            )
+                            ((existing.semester && norm(existing.semester) === norm(obj.semester)) ||
+                             (existing.term && norm(existing.term) === norm(obj.term)))
                         );
-                        
-                        if (isDuplicate) duplicates.push(obj);
-                        else newItems.push(obj);
+                        if (isDuplicate) duplicates.push(obj); else newItems.push(obj);
                     }
-                    
                     setImportPreview({ show: true, total: rows.length - 1, newItems, duplicates, type });
                     e.target.value = null;
                 };
@@ -481,7 +492,6 @@
                 refreshData();
             };
 
-            // --- FILTER & BULK ---
             const handleSelectAll = (e) => {
                 if (e.target.checked) setSelectedIds(new Set(filteredData.map(i => i.id || i.reg_no)));
                 else setSelectedIds(new Set());
@@ -546,31 +556,36 @@
             };
 
             const handleExport = (type) => {
-                const records = data[type];
+                const records = (type === activeTab) ? filteredData : data[type];
                 if (!records || records.length === 0) return alert("No data to export");
                 const headers = getHeaders(type);
+                
                 const csvRows = [
                     headers.join(','),
                     ...records.map(row => headers.map(fieldName => {
                         let val = row[fieldName];
                         if (Array.isArray(val)) val = val.join('|'); 
                         val = String(val || '');
-                        if (val.includes(',')) val = `"${val}"`; 
+                        if (val.search(/("|,|\n)/g) >= 0) val = `"${val.replace(/"/g, '""')}"`;
                         return val;
                     }).join(','))
                 ];
-                const csvContent = "data:text/csv;charset=utf-8," + csvRows.join("\n");
-                const encodedUri = encodeURI(csvContent);
+                
+                const csvString = csvRows.join("\n");
+                
+                const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
                 const link = document.createElement("a");
-                link.setAttribute("href", encodedUri);
-                link.setAttribute("download", `${type}_export.csv`);
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
+                if (link.download !== undefined) {
+                    const url = URL.createObjectURL(blob);
+                    link.setAttribute("href", url);
+                    link.setAttribute("download", `${type}_export_${new Date().toISOString().split('T')[0]}.csv`);
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+                }
             };
             
-            const processedData = getProcessedData();
-
             // --- VIEW ---
             if (!user) {
                 return (
@@ -704,26 +719,15 @@
                                                 <div className="overflow-x-auto">
                                                     <table className="w-full text-xs">
                                                         <thead className="bg-gray-100 text-gray-900 font-bold uppercase">
-                                                            <tr><th className="p-2 border">Sem</th><th className="p-2 border text-center">Cr</th><th className="p-2 border text-center">Sub</th><th className="p-2 border text-right">Tuition</th><th className="p-2 border text-right">Exam</th><th className="p-2 border text-right">Reg</th><th className="p-2 border text-right">Other</th><th className="p-2 border text-right bg-gray-50">Total</th><th className="p-2 border text-center">Disc %</th><th className="p-2 border text-right">Disc Amt</th><th className="p-2 border text-right">Net Fee</th><th className="p-2 border text-right text-green-700">Paid</th><th className="p-2 border text-right">Balance</th></tr>
+                                                            <tr><th className="p-2 border">Sem</th><th className="p-2 border text-center">Sub</th><th className="p-2 border text-center">Cr</th><th className="p-2 border text-right">Tuition</th><th className="p-2 border text-right">Exam</th><th className="p-2 border text-right">Reg</th><th className="p-2 border text-right">Other</th><th className="p-2 border text-right bg-gray-50">Total</th><th className="p-2 border text-center">Disc %</th><th className="p-2 border text-right">D. Amt</th><th className="p-2 border text-right">Net</th><th className="p-2 border text-right text-green-700">Paid</th><th className="p-2 border text-right">Balance</th></tr>
                                                         </thead>
                                                         <tbody className="divide-y divide-gray-200">
                                                             {clearanceResult.rows.map((row, idx) => (
                                                                 <tr key={idx} className="hover:bg-gray-50">
-                                                                    <td className="p-2 border font-medium">{row.semester}</td><td className="p-2 border text-center">{row.cr}</td><td className="p-2 border text-center">{row.courses}</td><td className="p-2 border text-right text-gray-600">{num(row.tuition)}</td><td className="p-2 border text-right text-gray-600">{num(row.exam)}</td><td className="p-2 border text-right text-gray-600">{num(row.reg)}</td><td className="p-2 border text-right text-gray-600">{num(row.other)}</td><td className="p-2 border text-right font-bold bg-gray-50">{num(row.total)}</td><td className="p-2 border text-center text-gray-500">{row.discPct > 0 ? `${row.discPct}%` : '-'}</td><td className="p-2 border text-right text-gray-500">{row.discAmt > 0 ? num(row.discAmt) : '-'}</td><td className="p-2 border text-right font-bold">{num(row.netFee)}</td><td className="p-2 border text-right font-bold text-green-600">{num(row.totalPaid)}</td><td className={`p-2 border text-right font-bold ${row.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>{num(row.balance)}</td>
+                                                                    <td className="p-2 border font-medium">{row.semester}</td><td className="p-2 border text-center">{row.courses}</td><td className="p-2 border text-center">{row.cr}</td><td className="p-2 border text-right text-gray-600">{num(row.tuition)}</td><td className="p-2 border text-right text-gray-600">{num(row.exam)}</td><td className="p-2 border text-right text-gray-600">{num(row.reg)}</td><td className="p-2 border text-right text-gray-600">{num(row.other)}</td><td className="p-2 border text-right font-bold bg-gray-50">{num(row.total)}</td><td className="p-2 border text-center text-gray-500">{row.discPct > 0 ? `${row.discPct}%` : '-'}</td><td className="p-2 border text-right text-gray-500">{row.discAmt > 0 ? num(row.discAmt) : '-'}</td><td className="p-2 border text-right font-bold">{num(row.netFee)}</td><td className="p-2 border text-right font-bold text-green-600">{num(row.totalPaid)}</td><td className={`p-2 border text-right font-bold ${row.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>{num(row.balance)}</td>
                                                                 </tr>
                                                             ))}
-                                                            <tr className="bg-gray-800 text-white font-bold">
-                                                                <td className="p-3 text-right uppercase tracking-wider">Totals</td>
-                                                                <td className="p-3 text-center">{clearanceResult.summary.cr}</td>
-                                                                <td className="p-3 text-center">{clearanceResult.summary.courses}</td>
-                                                                <td colSpan="4" className="p-3"></td>
-                                                                <td className="p-3 text-right">{num(clearanceResult.summary.total)}</td>
-                                                                <td className="p-3 text-center">-</td>
-                                                                <td className="p-3 text-right">{num(clearanceResult.summary.fa)}</td>
-                                                                <td className="p-3 text-right">{num(clearanceResult.summary.total - clearanceResult.summary.fa)}</td>
-                                                                <td className="p-3 text-right text-green-400">{num(clearanceResult.summary.paid)}</td>
-                                                                <td className={`p-3 text-right ${clearanceResult.summary.balance > 0 ? 'text-red-400' : 'text-green-400'}`}>{num(clearanceResult.summary.balance)}</td>
-                                                            </tr>
+                                                            <tr className="bg-gray-800 text-white font-bold"><td className="p-3 text-right uppercase tracking-wider">Totals</td><td className="p-3 text-center">{clearanceResult.summary.courses}</td><td className="p-3 text-center">{clearanceResult.summary.cr}</td><td colSpan="4" className="p-3"></td><td className="p-3 text-right print-modern-total">{num(clearanceResult.summary.total)}</td><td className="p-3 text-center">-</td><td className="p-3 text-right">{num(clearanceResult.summary.fa)}</td><td className="p-3 text-right">{num(clearanceResult.summary.total - clearanceResult.summary.fa)}</td><td className="p-3 text-right text-green-400">{num(clearanceResult.summary.paid)}</td><td className={`p-3 text-right ${clearanceResult.summary.balance > 0 ? 'text-red-400' : 'text-green-400'}`}>{num(clearanceResult.summary.balance)}</td></tr>
                                                         </tbody>
                                                     </table>
                                                 </div>
@@ -758,7 +762,7 @@
                                                 {(activeTab === 'enrollments' || activeTab === 'payments' || activeTab === 'others') && <button onClick={deleteBySemester} className="bg-orange-50 border border-orange-200 text-orange-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-orange-100 flex items-center gap-2"><CalendarX className="h-4 w-4" /> Del Sem</button>}
                                                 {user.role === 'admin' && <button onClick={deleteAllInTab} className="bg-white border border-red-200 text-red-600 px-3 py-2 rounded-lg text-sm font-medium hover:bg-red-50 flex items-center gap-2"><XSquare className="h-4 w-4" /> Delete All</button>}
                                                 <div className="h-8 w-px bg-gray-300 mx-1"></div>
-                                                <button onClick={() => downloadSample(activeTab)} className="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2"><FileSpreadsheet className="h-4 w-4" /></button>
+                                                <button onClick={() => downloadSample(activeTab)} className="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2"><FileSpreadsheet className="h-4 w-4" /> Sample</button>
                                                 <label className="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 cursor-pointer flex items-center gap-2"><Download className="h-4 w-4" /><input type="file" onChange={(e) => handleImport(e, activeTab)} className="hidden" accept=".csv" /></label>
                                                 <button onClick={() => handleExport(activeTab)} className="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2"><Upload className="h-4 w-4" /> Export</button>
                                             </div>
