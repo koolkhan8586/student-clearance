@@ -133,6 +133,8 @@
                 try {
                     const res = await fetch(API_URL);
                     const json = await res.json();
+                    
+                    // SAFEGUARD: Ensure all arrays exist, defaulting to [] if API returns partial data or error
                     const safeData = {
                         students: Array.isArray(json.students) ? json.students : [],
                         fees: Array.isArray(json.fees) ? json.fees : [],
@@ -143,9 +145,15 @@
                         users: Array.isArray(json.users) ? json.users : [],
                         banks: Array.isArray(json.banks) ? json.banks : []
                     };
+                    
                     setData(safeData);
+
                 } catch(e) { 
                     console.error("Connection Error:", e);
+                    // On error, prevent crash by initializing empty state
+                    setData({
+                        students: [], fees: [], enrollments: [], payments: [], discounts: [], others: [], users: [], banks: []
+                    });
                 }
             };
 
@@ -153,15 +161,6 @@
                 refreshData();
                 const storedUser = sessionStorage.getItem('feeUser');
                 if(storedUser) setUser(JSON.parse(storedUser));
-                
-                // Fallback to local storage if API is empty but local has data (for migration)
-                const local = localStorage.getItem('feeSystemData_v2');
-                if(local && data.students.length === 0) {
-                     try {
-                        const parsed = JSON.parse(local);
-                        if(parsed.students && parsed.students.length > 0) setData(parsed);
-                     } catch(e) {}
-                }
             }, []);
 
             useEffect(() => {
@@ -174,31 +173,125 @@
             const norm = (str) => str ? str.toString().toLowerCase().replace(/[^a-z0-9]/g, '') : '';
             const num = (n) => parseFloat(n || 0).toLocaleString('en-US');
 
+            // --- FILTERING & SORTING LOGIC ---
+            const getProcessedData = () => {
+                let result = (data[activeTab] || []); 
+                if (tabSearch) {
+                    result = result.filter(item => Object.values(item).some(val => String(val || '').toLowerCase().includes(tabSearch.toLowerCase())));
+                }
+                if (sortConfig.key) {
+                    result = [...result].sort((a, b) => {
+                        let valA = a[sortConfig.key]?.toString().toLowerCase() || '';
+                        let valB = b[sortConfig.key]?.toString().toLowerCase() || '';
+                        const numA = parseFloat(valA); const numB = parseFloat(valB);
+                        if (!isNaN(numA) && !isNaN(numB) && isFinite(valA) && isFinite(valB)) {
+                             return sortConfig.direction === 'asc' ? numA - numB : numB - numA;
+                        }
+                        if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+                        if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+                        return 0;
+                    });
+                }
+                return result;
+            };
+
+            const filteredData = getProcessedData();
+
+            const postToApi = async (action, payload = {}) => {
+                try {
+                    const res = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ action, ...payload })
+                    });
+                    const json = await res.json();
+                    if(json.status === 'success') { refreshData(); return true; } 
+                    else { alert("Error: " + json.message); return false; }
+                } catch(e) { alert("Network Error"); return false; }
+            };
+
+            const syncBrowserDataToDb = async () => {
+                if(!confirm("Sync browser data to database?")) return;
+                const local = localStorage.getItem('feeSystemData_v2') || localStorage.getItem('fee_system_local');
+                if(!local) return alert("No local data found.");
+                const localData = JSON.parse(local);
+                const categories = ['students', 'fees', 'enrollments', 'payments', 'discounts', 'others', 'banks'];
+                let count = 0;
+                setUploadStatus({ active: true, current: 0, total: 100 }); 
+                for (const cat of categories) {
+                     const items = localData[cat] || [];
+                     for (const item of items) {
+                         let actionType = cat.endsWith('s') ? cat.slice(0, -1) : cat;
+                         if(cat === 'others') actionType = 'other';
+                         await postToApi(`save_${actionType}`, { data: item });
+                         count++;
+                     }
+                }
+                setUploadStatus({ active: false, current: 0, total: 0 });
+                alert(`Sync Complete! Uploaded/Checked ${count} records.`);
+                refreshData();
+            };
+
+            const handleLogin = (e) => {
+                e.preventDefault();
+                const userList = data.users || [];
+                const found = userList.find(u => u.username === loginData.username && u.password === loginData.password);
+                if (found) {
+                    setUser(found);
+                    sessionStorage.setItem('feeUser', JSON.stringify(found));
+                    setLoginData({ username: '', password: '' });
+                    if(found.role === 'admin' || found.permissions.includes('clearance')) setActiveTab('clearance');
+                    else if(found.permissions.length > 0) setActiveTab(found.permissions[0]);
+                } else { alert("Invalid Credentials"); }
+            };
+
+            const handleLogout = () => {
+                setUser(null);
+                sessionStorage.removeItem('feeUser');
+                setClearanceResult(null);
+                setActiveTab('clearance');
+            };
+
+            const handleChangePassword = async (e) => {
+                e.preventDefault();
+                if (passwordData.current !== user.password) return alert("Incorrect current password!");
+                if (passwordData.new !== passwordData.confirm) return alert("New passwords do not match!");
+                const success = await postToApi('save_user', { data: { ...user, password: passwordData.new }, id: user.id });
+                if(success) {
+                    alert("Password changed successfully!");
+                    setShowPasswordModal(false);
+                    setPasswordData({ current: '', new: '', confirm: '' });
+                    const updatedUser = { ...user, password: passwordData.new };
+                    setUser(updatedUser);
+                    sessionStorage.setItem('feeUser', JSON.stringify(updatedUser));
+                    refreshData();
+                }
+            };
+
+            // --- SORTING ---
+            const handleSort = (key) => {
+                let direction = 'asc';
+                if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
+                setSortConfig({ key, direction });
+            };
+
+
             // --- CORE LOGIC ---
             const generateReport = () => {
                 if (!searchReg) return;
                 const cleanReg = norm(searchReg);
                 
-                // Safety check for empty data
+                // --- DIAGNOSTIC CHECK ---
                 if(!data.students || data.students.length === 0) {
-                    alert("No student data loaded. Please sync data or import students.");
+                    alert("System Error: No student records loaded. Please verify database connection or sync data.");
                     return;
                 }
-
-                const student = data.students.find(s => norm(s.reg_no) === cleanReg);
+                
+                const student = data.students?.find(s => norm(s.reg_no) === cleanReg);
                 if (!student) { alert("Student not found!"); setClearanceResult(null); return; }
+                const masterFee = data.fees?.find(f => norm(f.degree) === norm(student.degree) && norm(f.batch) === norm(student.batch));
                 
-                // Enhanced Fee Matching (Try exact, then partial)
-                let masterFee = data.fees.find(f => norm(f.degree) === norm(student.degree) && norm(f.batch) === norm(student.batch));
-                
-                // Fallback: If no exact match, try partial match on batch
-                if (!masterFee) {
-                    masterFee = data.fees.find(f => norm(f.degree) === norm(student.degree) && (
-                        norm(student.batch).includes(norm(f.batch)) || norm(f.batch).includes(norm(student.batch))
-                    ));
-                }
-                
-                const studentEnrollments = data.enrollments.filter(e => norm(e.reg_no) === cleanReg).map(en => {
+                const studentEnrollments = data.enrollments?.filter(e => norm(e.reg_no) === cleanReg).map(en => {
                     const enSem = norm(en.semester);
                     const cr = parseFloat(en.cr || 0);
                     const courses = parseFloat(en.courses || 0);
@@ -206,41 +299,31 @@
                     
                     if (masterFee) {
                         feeDetails.tuition = cr * parseFloat(masterFee.per_cr_fee || 0);
-                        feeDetails.exam = (courses * parseFloat(masterFee.per_course_fee || 0)); 
-                        feeDetails.reg = parseFloat(masterFee.reg_fee || 0);
-                        feeDetails.other = parseFloat(masterFee.other_fee || 0);
+                        feeDetails.exam = (courses * parseFloat(masterFee.per_course_fee || 0)) + parseFloat(masterFee.other_fee || 0); 
+                        feeDetails.reg = 0; 
+                        feeDetails.other = 0;
                     }
-                    
-                    const otherCharges = data.others.filter(o => 
-                        norm(o.reg_no) === cleanReg && 
-                        (norm(o.semester) === enSem || enSem.includes(norm(o.semester)))
-                    );
+                    const otherCharges = data.others?.filter(o => norm(o.reg_no) === cleanReg && (norm(o.semester) === enSem || enSem.includes(norm(o.semester)))) || [];
                     const extraCharges = otherCharges.reduce((sum, o) => sum + parseFloat(o.amount || 0), 0);
                     
-                    // Add extra charges to 'Other' column
                     feeDetails.other += extraCharges;
-                    
-                    // Sum Total
-                    feeDetails.total = feeDetails.tuition + feeDetails.exam + feeDetails.reg + feeDetails.other;
+                    feeDetails.total = feeDetails.tuition + feeDetails.exam + feeDetails.other;
 
-                    const discRecord = data.discounts.find(d => norm(d.reg_no) === cleanReg && norm(d.term) === enSem);
+                    const discRecord = data.discounts?.find(d => norm(d.reg_no) === cleanReg && norm(d.term) === enSem);
                     const discPct = discRecord ? parseFloat(discRecord.discount || 0) : 0;
                     const discAmt = (feeDetails.tuition * discPct) / 100;
                     
                     const netFee = feeDetails.total - discAmt;
                     
-                    const payments = data.payments.filter(p => {
+                    const payments = data.payments?.filter(p => {
                         if (norm(p.reg_no) !== cleanReg) return false;
                         const pSem = norm(p.semester);
-                        return pSem === enSem || 
-                               (enSem.includes(pSem) && pSem.length > 3) || 
-                               (pSem.includes(enSem) && enSem.length > 3);
-                    });
-                    
+                        return pSem === enSem || (enSem.includes(pSem) && pSem.length > 3) || (pSem.includes(enSem) && enSem.length > 3);
+                    }) || [];
                     const totalPaid = payments.reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
                     const balance = netFee - totalPaid;
                     return { ...en, ...feeDetails, discPct, discAmt, netFee, totalPaid, balance };
-                });
+                }) || [];
 
                 const summary = studentEnrollments.reduce((acc, curr) => ({
                     total: acc.total + curr.total, fa: acc.fa + curr.discAmt,
@@ -251,53 +334,11 @@
 
                 setClearanceResult({ student, rows: studentEnrollments, summary, masterFeeFound: !!masterFee, masterFee });
             };
-            
-            // ... (Rest of handlers: handleSave, handleDelete, handleImport, etc.) -> Copied logic for brevity as it works fine
-            const postToApi = async (action, payload = {}) => {
-                try {
-                    const res = await fetch(API_URL, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action,...payload})});
-                    const json = await res.json();
-                    if(json.status === 'success') { refreshData(); return true; } 
-                    else { alert("Error: " + json.message); return false; }
-                } catch(e) { alert("Network Error"); return false; }
-            };
 
-            const syncBrowserDataToDb = async () => {
-                if(!confirm("Sync?")) return;
-                const local = localStorage.getItem('feeSystemData_v2') || localStorage.getItem('fee_system_local');
-                if(!local) return alert("No local data.");
-                const localData = JSON.parse(local);
-                const categories = ['students', 'fees', 'enrollments', 'payments', 'discounts', 'others', 'banks'];
-                let count = 0;
-                setUploadStatus({active:true,current:0,total:100}); 
-                for (const cat of categories) {
-                     const items = localData[cat] || [];
-                     for (const item of items) {
-                         let actionType = cat.endsWith('s') ? cat.slice(0, -1) : cat;
-                         if(cat === 'others') actionType = 'other';
-                         await postToApi(`save_${actionType}`, { data: item });
-                         count++;
-                     }
-                }
-                setUploadStatus({active:false,current:0,total:0});
-                alert(`Sync Complete! ${count} records.`);
+            const handleDelete = async (type, id) => {
+                if(!confirm("Are you sure?")) return;
+                await postToApi(`delete_${type}`, { id });
                 refreshData();
-            };
-
-            const handleLogin = (e) => {
-                e.preventDefault();
-                const userList = data.users || [];
-                const found = userList.find(u => u.username === loginData.username && u.password === loginData.password);
-                if (found) { setUser(found); sessionStorage.setItem('feeUser', JSON.stringify(found)); setLoginData({username:'',password:''}); setActiveTab('clearance'); } 
-                else { alert("Invalid Credentials"); }
-            };
-            const handleLogout = () => { setUser(null); sessionStorage.removeItem('feeUser'); setClearanceResult(null); setActiveTab('clearance'); };
-            const handleChangePassword = async (e) => {
-                e.preventDefault();
-                if(passwordData.current !== user.password) return alert("Incorrect password");
-                if(passwordData.new !== passwordData.confirm) return alert("Mismatch");
-                await postToApi('save_user', {data:{...user, password:passwordData.new}, id:user.id});
-                alert("Updated!"); setShowPasswordModal(false);
             };
 
             const handleSave = async (e) => {
@@ -316,98 +357,17 @@
                 let actionType = modalType.slice(0, -1);
                 if(modalType === 'others') actionType = 'other';
                 const success = await postToApi(`save_${actionType}`, { data: newData, id: editingId });
-                if(success) { setShowModal(false); setFormData({}); setEditingId(null); }
+                if(success) { setShowModal(false); setFormData({}); setEditingId(null); refreshData(); }
             };
-
-            const handleDelete = async (type, id) => {
-                if(!confirm("Are you sure?")) return;
-                await postToApi(`delete_${type}`, { id });
-            };
+            
             const openModal = (type, item = null) => {
                 setModalType(type);
                 if (item) { setFormData(item); setEditingId(item.id || item.reg_no); } 
                 else { setFormData(type==='users' ? {role:'user',permissions:[]} : {}); setEditingId(null); }
                 setShowModal(true);
             };
-            const handleSelectAll = (e) => {
-                 if (e.target.checked) setSelectedIds(new Set(getProcessedData().map(i => i.id || i.reg_no)));
-                 else setSelectedIds(new Set());
-            };
-            const handleSelectRow = (id) => {
-                const newSet = new Set(selectedIds);
-                if (newSet.has(id)) newSet.delete(id); else newSet.add(id);
-                setSelectedIds(newSet);
-            };
-            const deleteSelected = async () => {
-                if (!confirm(`Delete ${selectedIds.size}?`)) return;
-                for (let id of selectedIds) {
-                    let type = activeTab; if(type === 'others') type = 'other'; 
-                    await postToApi(`delete_${type.slice(0,-1)}`, { id });
-                }
-                setSelectedIds(new Set());
-                refreshData();
-            };
-            const deleteAllInTab = async () => {
-                if (!confirm(`Delete ALL ${activeTab}?`)) return;
-                await postToApi('delete_all', { table: activeTab });
-                refreshData();
-            };
-            const deleteBySemester = async () => {
-                const term = prompt("Enter Semester:");
-                if (!term) return;
-                await postToApi('delete_semester', { table: activeTab, term });
-                refreshData();
-            };
-            
-            // --- DATA HELPERS ---
-            const getProcessedData = () => {
-                let result = (data[activeTab] || []); 
-                if (tabSearch) result = result.filter(item => Object.values(item).some(val => String(val || '').toLowerCase().includes(tabSearch.toLowerCase())));
-                if (sortConfig.key) {
-                    result = [...result].sort((a, b) => {
-                        let valA = a[sortConfig.key]?.toString().toLowerCase() || '';
-                        let valB = b[sortConfig.key]?.toString().toLowerCase() || '';
-                        const numA = parseFloat(valA); const numB = parseFloat(valB);
-                        if (!isNaN(numA) && !isNaN(numB)) return sortConfig.direction === 'asc' ? numA - numB : numB - numA;
-                        if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
-                        if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
-                        return 0;
-                    });
-                }
-                return result;
-            };
-            const handleSort = (key) => {
-                let direction = 'asc';
-                if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
-                setSortConfig({ key, direction });
-            };
-            
-            const getHeaders = (type) => {
-                switch(type) {
-                    case 'students': return ['reg_no', 'name', 'degree', 'batch'];
-                    case 'fees': return ['degree', 'batch', 'per_cr_fee', 'per_course_fee', 'reg_fee', 'other_fee'];
-                    case 'enrollments': return ['reg_no', 'name', 'semester', 'cr', 'courses'];
-                    case 'payments': return ['reg_no', 'name', 'semester', 'amount', 'date', 'bank'];
-                    case 'discounts': return ['reg_no', 'name', 'term', 'discount'];
-                    case 'others': return ['reg_no', 'name', 'semester', 'fee_name', 'amount'];
-                    case 'users': return ['username', 'role', 'permissions']; 
-                    case 'banks': return ['name', 'account_no'];
-                    default: return [];
-                }
-            };
 
-            const downloadSample = (type) => {
-                const headers = getHeaders(type);
-                const csvContent = "data:text/csv;charset=utf-8," + headers.join(",");
-                const encodedUri = encodeURI(csvContent);
-                const link = document.createElement("a");
-                link.setAttribute("href", encodedUri);
-                link.setAttribute("download", `${type}_sample.csv`);
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            };
-
+            // --- IMPORT HANDLER ---
             const handleImport = (e, type) => {
                 const file = e.target.files[0];
                 if (!file) return;
@@ -426,12 +386,12 @@
                         const values = rows[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
                         const obj = {};
                         
-                        // Map CSV
+                        // Smart Header Mapping
                         headers.forEach((h, index) => {
                             let val = values[index] ? values[index].trim() : '';
                             if (val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1);
                             
-                            // Field Mapping
+                            // Map CSV headers to internal keys
                             if (h.includes('reg') && h.includes('no')) obj['reg_no'] = val;
                             else if (h.includes('name') && !h.includes('user')) obj['name'] = val;
                             else if (h.includes('semester')) obj['semester'] = val;
@@ -443,7 +403,7 @@
                             else if (h.includes('term')) obj['term'] = val;
                             else if (h.includes('fee') && h.includes('name')) obj['fee_name'] = val;
                             else if (h.includes('bank')) obj['bank'] = val;
-                            else obj[h] = val;
+                            else obj[h] = val; // Fallback
                         });
 
                         if(importTerm) {
@@ -487,7 +447,95 @@
                 refreshData();
             };
 
-            const filteredData = getProcessedData();
+            // --- FILTER & BULK ---
+            const handleSelectAll = (e) => {
+                if (e.target.checked) setSelectedIds(new Set(filteredData.map(i => i.id || i.reg_no)));
+                else setSelectedIds(new Set());
+            };
+            const handleSelectRow = (id) => {
+                const newSet = new Set(selectedIds);
+                if (newSet.has(id)) newSet.delete(id); else newSet.add(id);
+                setSelectedIds(newSet);
+            };
+            const deleteSelected = async () => {
+                if (!confirm(`Delete ${selectedIds.size} records?`)) return;
+                for (let id of selectedIds) {
+                    let type = activeTab;
+                    if(type === 'others') type = 'other'; 
+                    await postToApi(`delete_${type.slice(0,-1)}`, { id });
+                }
+                setSelectedIds(new Set());
+                refreshData();
+            };
+            const deleteAllInTab = async () => {
+                if (!confirm(`Permanently delete ALL ${activeTab} records?`)) return;
+                await postToApi('delete_all', { table: activeTab });
+                refreshData();
+            };
+            const deleteBySemester = async () => {
+                const term = prompt("Enter Semester Name to delete:");
+                if (!term) return;
+                await postToApi('delete_semester', { table: activeTab, term });
+                refreshData();
+            };
+
+            const togglePermission = (tabId) => {
+                const perms = formData.permissions || [];
+                if (perms.includes(tabId)) setFormData({ ...formData, permissions: perms.filter(p => p !== tabId) });
+                else setFormData({ ...formData, permissions: [...perms, tabId] });
+            };
+            
+            const getHeaders = (type) => {
+                switch(type) {
+                    case 'students': return ['reg_no', 'name', 'degree', 'batch'];
+                    case 'fees': return ['degree', 'batch', 'per_cr_fee', 'per_course_fee', 'reg_fee', 'other_fee'];
+                    case 'enrollments': return ['reg_no', 'name', 'semester', 'cr', 'courses'];
+                    case 'payments': return ['reg_no', 'name', 'semester', 'amount', 'date', 'bank'];
+                    case 'discounts': return ['reg_no', 'name', 'term', 'discount'];
+                    case 'others': return ['reg_no', 'name', 'semester', 'fee_name', 'amount'];
+                    case 'users': return ['username', 'password', 'role', 'permissions']; // REMOVED PASSWORD FROM HEADERS
+                    case 'banks': return ['name', 'account_no'];
+                    default: return [];
+                }
+            };
+            
+            const downloadSample = (type) => {
+                const headers = getHeaders(type);
+                const csvContent = "data:text/csv;charset=utf-8," + headers.join(",");
+                const encodedUri = encodeURI(csvContent);
+                const link = document.createElement("a");
+                link.setAttribute("href", encodedUri);
+                link.setAttribute("download", `${type}_sample.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            };
+
+            const handleExport = (type) => {
+                const records = data[type];
+                if (!records || records.length === 0) return alert("No data to export");
+                const headers = getHeaders(type);
+                const csvRows = [
+                    headers.join(','),
+                    ...records.map(row => headers.map(fieldName => {
+                        let val = row[fieldName];
+                        if (Array.isArray(val)) val = val.join('|'); 
+                        val = String(val || '');
+                        if (val.includes(',')) val = `"${val}"`; 
+                        return val;
+                    }).join(','))
+                ];
+                const csvContent = "data:text/csv;charset=utf-8," + csvRows.join("\n");
+                const encodedUri = encodeURI(csvContent);
+                const link = document.createElement("a");
+                link.setAttribute("href", encodedUri);
+                link.setAttribute("download", `${type}_export.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            };
+            
+            const processedData = getProcessedData();
 
             // --- VIEW ---
             if (!user) {
@@ -590,8 +638,8 @@
                                 )}
                             </div>
                         )}
-
-                        {/* OTHER TABS UI */}
+                        
+                        {/* GENERIC DATA TABLE UI */}
                         {activeTab !== 'clearance' && (
                             <div>
                                 <div className="flex flex-col gap-4 mb-6 no-print">
@@ -618,7 +666,6 @@
                                         </div>
                                     )}
                                 </div>
-                                
                                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                                     <div className="overflow-x-auto">
                                         <table className="w-full text-sm text-left">
@@ -629,13 +676,15 @@
                                                 {filteredData.map((item, idx) => (
                                                     <tr key={item.id || idx} className={`hover:bg-gray-50 transition ${selectedIds.has(item.id || item.reg_no) ? 'bg-blue-50' : ''}`}>
                                                         <td className="p-4"><input type="checkbox" checked={selectedIds.has(item.id || item.reg_no)} onChange={() => handleSelectRow(item.id || item.reg_no)} className="rounded" /></td>
+                                                        
+                                                        {/* SPECIFIC ROW RENDERING BASED ON ACTIVE TAB */}
                                                         {activeTab === 'students' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4 font-bold">{item.name}</td><td className="p-4"><span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-bold">{item.degree}</span></td><td className="p-4 text-gray-500">{item.batch}</td></>}
                                                         {activeTab === 'fees' && <><td className="p-4 font-bold">{item.degree}</td><td className="p-4 text-gray-600">{item.batch}</td><td className="p-4 text-right text-gray-500">{num(item.per_cr_fee)}</td><td className="p-4 text-right font-bold text-green-700">{num(item.per_course_fee)}</td><td className="p-4 text-right text-gray-500">{num(item.reg_fee)}</td><td className="p-4 text-right text-gray-500">{num(item.other_fee)}</td></>}
                                                         {activeTab === 'enrollments' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4"><span className="bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-xs font-bold">{item.semester}</span></td><td className="p-4">{item.cr}</td><td className="p-4">{item.courses}</td></>}
                                                         {activeTab === 'payments' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4"><span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-bold">{item.semester}</span></td><td className="p-4 text-right font-bold">{num(item.amount)}</td><td className="p-4 text-gray-500">{item.date}</td><td className="p-4 text-gray-500">{item.bank}</td></>}
                                                         {activeTab === 'others' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4 text-gray-600">{item.semester}</td><td className="p-4"><span className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs font-bold">{item.fee_name}</span></td><td className="p-4 text-right font-bold">{num(item.amount)}</td></>}
                                                         {activeTab === 'discounts' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4 text-gray-500">{item.term}</td><td className="p-4 text-right font-bold text-purple-600">{item.discount}%</td></>}
-                                                        {activeTab === 'users' && <><td className="p-4 font-bold">{item.username}</td><td className="p-4 capitalize">{item.role}</td><td className="p-4 text-xs max-w-xs truncate">{item.role === 'admin' ? 'Full Access' : (Array.isArray(item.permissions) ? item.permissions.join(', ') : '')}</td></>}
+                                                        {activeTab === 'users' && <><td className="p-4 font-bold">{item.username}</td><td className="p-4 capitalize">{item.role}</td><td className="p-4 text-xs max-w-xs truncate">{item.role === 'admin' ? 'Full Access' : (Array.isArray(item.permissions) ? item.permissions.join(', ') : item.permissions)}</td></>}
                                                         {activeTab === 'banks' && <><td className="p-4 font-bold">{item.name}</td><td className="p-4 font-mono text-gray-600">{item.account_no}</td></>}
                                                         
                                                         <td className="p-4 text-center flex justify-center gap-2">
