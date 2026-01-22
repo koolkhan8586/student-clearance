@@ -86,6 +86,7 @@
         const Key = (p) => <Icon d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" {...p} />;
         const CloudUpload = (p) => <Icon d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19a4 4 0 0 0 4 4h11a4 4 0 0 0 4-4v-2.5" {...p} />;
         const Landmark = (p) => <Icon d="M3 22v-8h18v8M12 2L2 7v3h20V7L12 2zM6 10v6M10 10v6M14 10v6M18 10v6" {...p} />;
+        const Menu = (p) => <Icon d="M3 12h18M3 6h18M3 18h18" {...p} />;
 
         function App() {
             // --- STATE MANAGEMENT ---
@@ -95,7 +96,7 @@
                 students: [], fees: [], enrollments: [], payments: [], discounts: [], others: [], users: [], banks: []
             });
             const [searchReg, setSearchReg] = useState('');
-            const [filterSession, setFilterSession] = useState(''); // NEW: Session Filter State
+            const [filterSession, setFilterSession] = useState(''); 
             const [tabSearch, setTabSearch] = useState('');
             const [selectedIds, setSelectedIds] = useState(new Set());
             const [clearanceResult, setClearanceResult] = useState(null);
@@ -110,7 +111,8 @@
             const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
             const [importPreview, setImportPreview] = useState({ show: false, total: 0, newItems: [], duplicates: [], type: '' });
             const [uploadStatus, setUploadStatus] = useState({ active: false, current: 0, total: 0 });
-            const [importTerm, setImportTerm] = useState(''); 
+            const [importTerm, setImportTerm] = useState('');
+            const [sidebarOpen, setSidebarOpen] = useState(false); // Mobile Sidebar State
 
             const TABS = [
                 { id: 'clearance', label: 'Clearance', icon: FileText },
@@ -135,7 +137,7 @@
                     const res = await fetch(API_URL);
                     const json = await res.json();
                     
-                    // SAFEGUARD: Ensure all arrays exist, defaulting to [] if API returns partial data or error
+                    // SAFEGUARD: Ensure all arrays exist
                     const safeData = {
                         students: Array.isArray(json.students) ? json.students : [],
                         fees: Array.isArray(json.fees) ? json.fees : [],
@@ -151,7 +153,6 @@
 
                 } catch(e) { 
                     console.error("Connection Error:", e);
-                    // On error, prevent crash by initializing empty state
                     setData({
                         students: [], fees: [], enrollments: [], payments: [], discounts: [], others: [], users: [], banks: []
                     });
@@ -169,6 +170,7 @@
                 setTabSearch('');
                 setSortConfig({ key: null, direction: 'asc' }); 
                 setImportTerm(''); 
+                setSidebarOpen(false); // Close sidebar on tab change
             }, [activeTab]);
 
             // Re-generate report when session filter changes
@@ -543,20 +545,16 @@
             };
 
             const handleExport = (type) => {
-                // FIXED: Export using filteredData if viewing the current tab, to support search filters.
                 const records = (type === activeTab) ? filteredData : data[type];
-                
                 if (!records || records.length === 0) return alert("No data to export");
                 const headers = getHeaders(type);
                 
-                // Create CSV string
                 const csvRows = [
                     headers.join(','),
                     ...records.map(row => headers.map(fieldName => {
                         let val = row[fieldName];
                         if (Array.isArray(val)) val = val.join('|'); 
                         val = String(val || '');
-                        // Handle quotes and commas properly
                         if (val.search(/("|,|\n)/g) >= 0) {
                             val = `"${val.replace(/"/g, '""')}"`;
                         }
@@ -566,7 +564,6 @@
                 
                 const csvString = csvRows.join("\n");
                 
-                // Use Blob for download to handle large datasets and special chars correctly
                 const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
                 const link = document.createElement("a");
                 if (link.download !== undefined) {
@@ -580,6 +577,8 @@
                 }
             };
             
+            const processedData = getProcessedData();
+
             // --- VIEW ---
             if (!user) {
                 return (
@@ -605,65 +604,72 @@
             return (
                 <div className="flex h-screen bg-gray-100 font-sans text-gray-800 overflow-hidden">
                      {/* Left Sidebar */}
-                    {user && (
-                        <div className="w-64 bg-white shadow-xl border-r border-gray-200 h-full flex flex-col no-print z-30">
-                            {/* Header Section */}
-                            <div className="p-6 border-b border-gray-200 bg-gray-50">
-                                <div className="flex items-center gap-3 mb-4">
-                                    <div className="bg-blue-600 text-white p-2 rounded-lg shadow-sm"><BookOpen className="h-6 w-6" /></div>
-                                    <div><h1 className="text-lg font-bold text-gray-900 leading-tight">Fee Manager</h1><p className="text-xs text-gray-500 font-medium">SCS & Finance</p></div>
-                                </div>
-                                <div className="flex flex-col gap-2">
-                                    <div className="text-sm font-bold text-gray-800">{user.username}</div>
-                                    <div className="text-xs text-gray-500 uppercase tracking-wide bg-gray-200 px-2 py-0.5 rounded w-fit">{user.role}</div>
-                                </div>
+                     <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-xl border-r border-gray-200 h-full flex flex-col no-print transition-transform duration-300 ease-in-out md:relative md:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+                        {/* Header Section */}
+                        <div className="p-6 border-b border-gray-200 bg-gray-50">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="bg-blue-600 text-white p-2 rounded-lg shadow-sm"><BookOpen className="h-6 w-6" /></div>
+                                <div><h1 className="text-lg font-bold text-gray-900 leading-tight">Fee Manager</h1><p className="text-xs text-gray-500 font-medium">SCS & Finance</p></div>
                             </div>
-                            
-                            {/* Navigation */}
-                            <div className="flex-1 overflow-y-auto py-4">
-                                <nav className="space-y-1 px-3">
-                                    {availableTabs.map(tab => (
-                                        <div key={tab.id}>
-                                            <button 
-                                                onClick={() => setActiveTab(tab.id)} 
-                                                className={`w-full flex items-center justify-between px-4 py-3 text-sm font-medium rounded-lg transition-all duration-200 ${
-                                                    activeTab === tab.id 
-                                                    ? 'bg-blue-50 text-blue-700 border border-blue-100 shadow-sm' 
-                                                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                                                }`}
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    <div className={`${activeTab === tab.id ? 'text-blue-600' : 'text-gray-400'}`}>
-                                                        <tab.icon className="h-5 w-5" />
-                                                    </div>
-                                                    {tab.label}
-                                                </div>
-                                                
-                                                {/* Total Count Badge: Dynamic update based on filter */}
-                                                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                                                    activeTab === tab.id ? 'bg-blue-200 text-blue-800' : 'bg-gray-200 text-gray-600'
-                                                }`}>
-                                                    {tab.id === 'clearance' ? '-' : (activeTab === tab.id ? filteredData.length : (data[tab.id]?.length || 0))}
-                                                </span>
-                                            </button>
-                                        </div>
-                                    ))}
-                                </nav>
-                            </div>
-
-                            {/* Footer Actions */}
-                            <div className="p-4 border-t border-gray-200 bg-gray-50 space-y-2">
-                                <button onClick={syncBrowserDataToDb} className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition shadow-sm" title="Sync Data"><CloudUpload className="h-4 w-4" /> Sync Data</button>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <button onClick={() => setShowPasswordModal(true)} className="flex items-center justify-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-100 transition shadow-sm"><Key className="h-3 w-3" /> Password</button>
-                                    <button onClick={handleLogout} className="flex items-center justify-center gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs font-medium text-red-600 hover:bg-red-100 transition shadow-sm"><LogOut className="h-3 w-3" /> Logout</button>
-                                </div>
+                            <div className="flex flex-col gap-2">
+                                <div className="text-sm font-bold text-gray-800">{user.username}</div>
+                                <div className="text-xs text-gray-500 uppercase tracking-wide bg-gray-200 px-2 py-0.5 rounded w-fit">{user.role}</div>
                             </div>
                         </div>
-                    )}
+                        
+                        {/* Navigation */}
+                        <div className="flex-1 overflow-y-auto py-4">
+                            <nav className="space-y-1 px-3">
+                                {availableTabs.map(tab => (
+                                    <div key={tab.id}>
+                                        <button 
+                                            onClick={() => setActiveTab(tab.id)} 
+                                            className={`w-full flex items-center justify-between px-4 py-3 text-sm font-medium rounded-lg transition-all duration-200 ${
+                                                activeTab === tab.id 
+                                                ? 'bg-blue-50 text-blue-700 border border-blue-100 shadow-sm' 
+                                                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div className={`${activeTab === tab.id ? 'text-blue-600' : 'text-gray-400'}`}>
+                                                    <tab.icon className="h-5 w-5" />
+                                                </div>
+                                                {tab.label}
+                                            </div>
+                                            
+                                            {/* Total Count Badge: Dynamic update based on filter */}
+                                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                                                activeTab === tab.id ? 'bg-blue-200 text-blue-800' : 'bg-gray-200 text-gray-600'
+                                            }`}>
+                                                {tab.id === 'clearance' ? '-' : (activeTab === tab.id ? filteredData.length : (data[tab.id]?.length || 0))}
+                                            </span>
+                                        </button>
+                                    </div>
+                                ))}
+                            </nav>
+                        </div>
+
+                        {/* Footer Actions */}
+                        <div className="p-4 border-t border-gray-200 bg-gray-50 space-y-2">
+                            <button onClick={syncBrowserDataToDb} className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition shadow-sm" title="Sync Data"><CloudUpload className="h-4 w-4" /> Sync Data</button>
+                            <div className="grid grid-cols-2 gap-2">
+                                <button onClick={() => setShowPasswordModal(true)} className="flex items-center justify-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-100 transition shadow-sm"><Key className="h-3 w-3" /> Password</button>
+                                <button onClick={handleLogout} className="flex items-center justify-center gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-xs font-medium text-red-600 hover:bg-red-100 transition shadow-sm"><LogOut className="h-3 w-3" /> Logout</button>
+                            </div>
+                        </div>
+                    </div>
 
                     {/* Main Content Area - Right Side */}
                     <div className="flex-1 flex flex-col h-full relative overflow-hidden">
+                        {/* Mobile Header Toggle */}
+                        <div className="md:hidden bg-white border-b p-4 flex items-center justify-between no-print">
+                            <button onClick={() => setSidebarOpen(true)} className="p-2 text-gray-600 rounded-lg hover:bg-gray-100">
+                                <Menu className="h-6 w-6" />
+                            </button>
+                            <span className="font-bold text-gray-700">Student Fee System</span>
+                            <div className="w-10"></div> {/* Spacer balance */}
+                        </div>
+
                         <div className="flex-1 overflow-y-auto p-4 md:p-8" id="main-content">
                             {/* ... Clearance Tab (unchanged) ... */}
                             {activeTab === 'clearance' && (
@@ -874,6 +880,7 @@
                             </div>
                         </div>
                     )}
+                    {/* ... (Password Modal, Import Preview Modal kept same) */}
                     {showPasswordModal && (
                         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
                             <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6">
