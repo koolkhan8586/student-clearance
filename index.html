@@ -95,7 +95,7 @@
                 students: [], fees: [], enrollments: [], payments: [], discounts: [], others: [], users: [], banks: []
             });
             const [searchReg, setSearchReg] = useState('');
-            const [filterSession, setFilterSession] = useState(''); 
+            const [filterSession, setFilterSession] = useState(''); // NEW: Session Filter State
             const [tabSearch, setTabSearch] = useState('');
             const [selectedIds, setSelectedIds] = useState(new Set());
             const [clearanceResult, setClearanceResult] = useState(null);
@@ -135,6 +135,7 @@
                     const res = await fetch(API_URL);
                     const json = await res.json();
                     
+                    // SAFEGUARD: Ensure all arrays exist, defaulting to [] if API returns partial data or error
                     const safeData = {
                         students: Array.isArray(json.students) ? json.students : [],
                         fees: Array.isArray(json.fees) ? json.fees : [],
@@ -150,6 +151,7 @@
 
                 } catch(e) { 
                     console.error("Connection Error:", e);
+                    // On error, prevent crash by initializing empty state
                     setData({
                         students: [], fees: [], enrollments: [], payments: [], discounts: [], others: [], users: [], banks: []
                     });
@@ -180,7 +182,6 @@
             const num = (n) => parseFloat(n || 0).toLocaleString('en-US');
 
             // --- FILTERING & SORTING LOGIC ---
-            // MOVED UP to be available for Export logic
             const getProcessedData = () => {
                 let result = (data[activeTab] || []); 
                 if (tabSearch) {
@@ -204,6 +205,7 @@
 
             const filteredData = getProcessedData();
             
+            // Generate list of unique semesters for filter
             const uniqueSessions = [...new Set(data.enrollments.map(e => e.semester))].sort();
             
             const paymentStats = activeTab === 'payments' ? filteredData.reduce((acc, item) => {
@@ -287,6 +289,7 @@
                 }
             };
 
+            // --- SORTING ---
             const handleSort = (key) => {
                 let direction = 'asc';
                 if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
@@ -311,6 +314,7 @@
                 
                 let studentEnrollments = data.enrollments?.filter(e => norm(e.reg_no) === cleanReg);
 
+                // --- SESSION FILTER LOGIC ---
                 if (filterSession) {
                     const cleanSession = norm(filterSession);
                     studentEnrollments = studentEnrollments.filter(en => norm(en.semester).includes(cleanSession));
@@ -411,11 +415,12 @@
                         const values = rows[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
                         const obj = {};
                         
+                        // Smart Header Mapping
                         headers.forEach((h, index) => {
                             let val = values[index] ? values[index].trim() : '';
                             if (val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1);
                             
-                            // Map CSV headers
+                            // Map CSV headers to internal keys
                             if (h.includes('reg') && h.includes('no')) obj['reg_no'] = val;
                             else if (h.includes('name') && !h.includes('user')) obj['name'] = val;
                             else if (h.includes('semester')) obj['semester'] = val;
