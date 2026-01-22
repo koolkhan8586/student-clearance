@@ -101,12 +101,10 @@
         const Shield = () => <Icon d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />;
         const Key = () => <Icon d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />;
         const Landmark = () => <Icon d="M3 22h18M6 18v-7M10 18v-7M14 18v-7M18 18v-7M12 2l8 5H4z" />;
-        const PieChart = () => <Icon d="M21.21 15.89A10 10 0 1 1 8 2.83M22 12A10 10 0 0 0 12 2v10z" />;
 
         // --- GLOBAL CONFIG ---
         const TABS = [
             { id: 'clearance', label: 'Clearance', icon: FileText },
-            { id: 'summary', label: 'Summary', icon: PieChart }, 
             { id: 'students', label: 'Students', icon: Users },
             { id: 'fees', label: 'Fee Structure', icon: DollarSign },
             { id: 'others', label: 'Other Charges', icon: AlertCircle },
@@ -141,8 +139,6 @@
             const [importPreview, setImportPreview] = useState({ show: false, total: 0, newItems: [], duplicates: [], type: '' });
             const [uploadStatus, setUploadStatus] = useState({ active: false, current: 0, total: 0, title: '' });
             const [importTerm, setImportTerm] = useState(''); 
-            const [summaryTerm, setSummaryTerm] = useState('');
-            const [summaryData, setSummaryData] = useState(null);
 
             const isAdmin = user && ((user.role && user.role.toLowerCase() === 'admin') || (user.username && user.username.toLowerCase() === 'admin'));
             
@@ -526,40 +522,6 @@
                 setClearanceResult({ student, rows, summary, masterFeeFound: !!masterFee, masterFee });
             };
 
-            const generateSummary = () => {
-                if(!summaryTerm) return;
-                const term = norm(summaryTerm);
-                const enrs = data.enrollments.filter(e => norm(e.semester).includes(term));
-                let proj = 0, disc = 0, rec = 0;
-                let t_tui = 0, t_exm = 0, t_oth = 0;
-                enrs.forEach(en => {
-                    const st = data.students.find(s => norm(s.reg_no) === norm(en.reg_no));
-                    if(st) {
-                        const fee = data.fees.find(f => norm(f.degree) === norm(st.degree) && norm(f.batch) === norm(st.batch));
-                        if(fee) {
-                            const cr = parseFloat(en.cr||0);
-                            const c = parseFloat(en.courses||0);
-                            const t = cr * parseFloat(fee.per_cr_fee||0);
-                            const x = (c * parseFloat(fee.per_course_fee||0)) + parseFloat(fee.other_fee||0);
-                            const o = parseFloat(fee.reg_fee||0);
-                            t_tui += t; t_exm += x; t_oth += o;
-                            const sub = t + x + o;
-                            proj += sub;
-                            const d = data.discounts.find(dx => norm(dx.reg_no) === norm(en.reg_no) && norm(dx.term).includes(term));
-                            if(d) disc += (t * parseFloat(d.discount||0))/100;
-                        }
-                    }
-                });
-                const manualOth = data.others.filter(o => norm(o.semester).includes(term)).reduce((a,c) => a + parseFloat(c.amount||0), 0);
-                rec = data.payments.filter(p => norm(p.semester).includes(term)).reduce((a,c) => a + parseFloat(c.amount||0), 0);
-                t_oth += manualOth; proj += manualOth;
-
-                setSummaryData({
-                    enrollmentCount: enrs.length, totalProjected: proj, totalTuition: t_tui, totalExamFee: t_exm,
-                    totalOthers: t_oth, totalDiscounts: disc, netReceivable: proj - disc, totalReceived: rec, balance: (proj - disc) - rec
-                });
-            };
-
             // --- COMPONENTS ---
             const TableHeader = () => (
                 <thead className="bg-gray-100 text-gray-700 font-bold text-xs uppercase border-b">
@@ -597,8 +559,8 @@
                         <div className="flex justify-center mb-6"><img src="src/UOL-Green-V1.png" className="h-24 object-contain" /></div>
                         <h2 className="text-center text-xl font-bold mb-6">LSAF Fee Management</h2>
                         <form onSubmit={handleLogin} className="space-y-4">
-                            <input className="w-full border p-3 rounded-lg" placeholder="Username" value={loginData.username} onChange={e => setLoginData({...loginData, username: e.target.value})} />
-                            <input className="w-full border p-3 rounded-lg" type="password" placeholder="Password" value={loginData.password} onChange={e => setLoginData({...loginData, password: e.target.value})} />
+                            <input className="w-full border p-3 rounded-lg" placeholder="Username" value={loginData.username} onChange={e=>setLoginData({...loginData, username:e.target.value})} />
+                            <input className="w-full border p-3 rounded-lg" type="password" placeholder="Password" value={loginData.password} onChange={e=>setLoginData({...loginData, password:e.target.value})} />
                             <button className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 transition">Sign In</button>
                         </form>
                     </div>
@@ -632,7 +594,7 @@
                     </div>
 
                     <div className="max-w-7xl mx-auto p-6">
-                        {activeTab === 'clearance' ? (
+                        {activeTab === 'clearance' && (
                             <div className="space-y-6">
                                 <div className="bg-white p-6 rounded-xl shadow-sm flex gap-4 no-print">
                                     <input className="flex-1 border p-3 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter Registration No (e.g. BSCAF052530040)" value={searchReg} onChange={e=>setSearchReg(e.target.value)} onKeyDown={e=>e.key==='Enter' && generateReport()} />
@@ -722,80 +684,60 @@
                                     </div>
                                 )}
                             </div>
-                        ) : activeTab === 'summary' ? (
-                             <div className="space-y-6">
-                                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                                    <label className="block text-sm font-bold text-gray-700 mb-2">Term Financial Summary</label>
-                                    <div className="flex gap-3">
-                                        <input type="text" value={summaryTerm} onChange={(e) => setSummaryTerm(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && generateSummary()} placeholder="Enter Term (e.g. Fall 2024)" className="flex-1 block w-full rounded-lg border-gray-300 border p-3 focus:ring-2 focus:ring-blue-500 outline-none" />
-                                        <button onClick={generateSummary} className="bg-purple-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-purple-700 transition flex items-center gap-2"><Search /> Calculate</button>
+                        )}
+
+                        {/* OTHER TABS UI */}
+                        {activeTab !== 'clearance' && (
+                            <div>
+                                <div className="flex flex-col gap-4 mb-6 no-print">
+                                    <div className="flex justify-between items-center"><h2 className="text-2xl font-bold text-gray-800 capitalize">{activeTab} Directory {data[activeTab] && <span className="ml-3 bg-gray-200 text-gray-700 text-sm py-1 px-3 rounded-full">{data[activeTab].length}</span>}</h2><div className="flex gap-2">{(user.role === 'admin' || user.permissions.includes(activeTab)) && <button onClick={() => openModal(activeTab)} className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700 transition flex items-center gap-2 shadow-sm"><Plus className="h-5 w-5" /> Add New</button>}</div></div>
+                                    <div className="bg-white p-3 rounded-xl border border-gray-200 flex flex-wrap gap-3 items-center justify-between shadow-sm">
+                                        <div className="relative flex-grow max-w-md"><Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" /><input type="text" value={tabSearch} onChange={(e) => setTabSearch(e.target.value)} placeholder={`Filter ${activeTab}...`} className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" /></div>
+                                        <div className="flex gap-2">
+                                            {selectedIds.size > 0 && <button onClick={deleteSelected} className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm font-bold hover:bg-red-100 flex items-center gap-2"><Trash2 className="h-4 w-4" /> Delete ({selectedIds.size})</button>}
+                                            {(activeTab === 'enrollments' || activeTab === 'payments' || activeTab === 'others') && <button onClick={deleteBySemester} className="bg-orange-50 border border-orange-200 text-orange-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-orange-100 flex items-center gap-2"><CalendarX className="h-4 w-4" /> Del Sem</button>}
+                                            {user.role === 'admin' && <button onClick={deleteAllInTab} className="bg-white border border-red-200 text-red-600 px-3 py-2 rounded-lg text-sm font-medium hover:bg-red-50 flex items-center gap-2"><XSquare className="h-4 w-4" /> Delete All</button>}
+                                            <div className="h-8 w-px bg-gray-300 mx-1"></div>
+                                            <button onClick={() => downloadSample(activeTab)} className="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2"><FileSpreadsheet className="h-4 w-4" /> Sample</button>
+                                            <label className="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 cursor-pointer flex items-center gap-2"><Download className="h-4 w-4" /> Import<input type="file" onChange={(e) => handleImport(e, activeTab)} className="hidden" accept=".csv" /></label>
+                                            {['enrollments', 'payments', 'others', 'discounts'].includes(activeTab) && <input type="text" value={importTerm} onChange={(e) => setImportTerm(e.target.value)} placeholder="Term (e.g. Fall 2024)" className="border border-gray-300 px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-48" />}
+                                            <button onClick={() => handleExport(activeTab)} className="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2"><Upload className="h-4 w-4" /> Export</button>
+                                        </div>
                                     </div>
                                 </div>
-                                {summaryData && (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                                        <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-blue-500">
-                                            <p className="text-xs font-bold text-gray-500 uppercase">Projected Revenue</p>
-                                            <h3 className="text-2xl font-bold text-gray-900 mt-1">{num(summaryData.totalProjected)}</h3>
-                                            <p className="text-xs text-gray-400 mt-1">Based on {summaryData.enrollmentCount} Enrollments</p>
-                                        </div>
-                                        <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-purple-500">
-                                            <p className="text-xs font-bold text-gray-500 uppercase">Tuition Fee</p>
-                                            <h3 className="text-2xl font-bold text-purple-600 mt-1">{num(summaryData.totalTuition)}</h3>
-                                        </div>
-                                        <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-indigo-500">
-                                            <p className="text-xs font-bold text-gray-500 uppercase">Exam Fee</p>
-                                            <h3 className="text-2xl font-bold text-indigo-600 mt-1">{num(summaryData.totalExamFee)}</h3>
-                                        </div>
-                                        <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-yellow-500">
-                                            <p className="text-xs font-bold text-gray-500 uppercase">Other Charges</p>
-                                            <h3 className="text-2xl font-bold text-yellow-600 mt-1">{num(summaryData.totalOthers)}</h3>
-                                        </div>
-                                        <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-orange-500">
-                                            <p className="text-xs font-bold text-gray-500 uppercase">Discounts Given</p>
-                                            <h3 className="text-2xl font-bold text-orange-600 mt-1">{num(summaryData.totalDiscounts)}</h3>
-                                        </div>
-                                        <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-teal-500">
-                                            <p className="text-xs font-bold text-gray-500 uppercase">Net Receivable</p>
-                                            <h3 className="text-2xl font-bold text-teal-600 mt-1">{num(summaryData.netReceivable)}</h3>
-                                        </div>
-                                        <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-green-500">
-                                            <p className="text-xs font-bold text-gray-500 uppercase">Total Received</p>
-                                            <h3 className="text-2xl font-bold text-green-600 mt-1">{num(summaryData.totalReceived)}</h3>
-                                        </div>
-                                        <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-red-500">
-                                            <p className="text-xs font-bold text-gray-500 uppercase">Outstanding Balance</p>
-                                            <h3 className="text-2xl font-bold text-red-600 mt-1">{num(summaryData.balance)}</h3>
-                                            <p className="text-xs text-gray-400 mt-1">Receivable Amount</p>
-                                        </div>
-                                    </div>
-                                )}
-                             </div>
-                        ) : (
-                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                                <div className="p-4 border-b bg-gray-50 flex justify-between items-center no-print">
-                                    <div className="flex gap-2 w-full max-w-xl">
-                                        <input className="border p-2 rounded flex-1 outline-none focus:ring-1" placeholder="Search..." value={tabSearch} onChange={e=>setTabSearch(e.target.value)} />
-                                    </div>
-                                    <div className="flex gap-2">
-                                        {/* Import Term Input */}
-                                        {['enrollments','payments','others','discounts'].includes(activeTab) && 
-                                            <input className="border p-2 rounded w-32 text-sm" placeholder="Import Term" value={importTerm} onChange={e=>setImportTerm(e.target.value)} />
-                                        }
-                                        <button onClick={()=>openModal(activeTab)} className="bg-blue-600 text-white px-4 py-2 rounded font-bold text-sm"><Plus /> Add</button>
-                                        <label className="bg-white border px-3 py-2 rounded cursor-pointer text-sm font-bold text-gray-600"><Download /> Import <input type="file" className="hidden" onChange={e=>handleImport(e, activeTab)} /></label>
-                                        <button onClick={()=>handleExport(activeTab)} className="bg-white border px-3 py-2 rounded text-sm font-bold text-gray-600"><Upload /> Export</button>
-                                        <button onClick={()=>downloadSample(activeTab)} className="bg-white border px-3 py-2 rounded text-sm font-bold text-gray-600"><FileSpreadsheet /> Sample</button>
-                                        {user.role === 'admin' && <button onClick={()=>deleteAll(activeTab)} className="bg-red-50 text-red-600 border border-red-200 px-3 py-2 rounded text-sm font-bold"><XSquare /> Del All</button>}
-                                        {(activeTab === 'enrollments' || activeTab === 'payments' || activeTab === 'others') && <button onClick={deleteSem} className="bg-orange-50 text-orange-600 border border-orange-200 px-3 py-2 rounded text-sm font-bold"><CalendarX /> Del Sem</button>}
-                                        {selectedIds.size > 0 && <button onClick={deleteSelected} className="bg-red-600 text-white px-3 py-2 rounded text-sm font-bold animate-pulse">Delete ({selectedIds.size})</button>}
-                                    </div>
-                                </div>
-                                <div className="overflow-x-auto">
+                                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                                     <table className="w-full text-sm text-left">
-                                        <TableHeader />
+                                        <thead className="bg-gray-50 text-gray-700 uppercase font-bold text-xs border-b border-gray-200">
+                                            <tr>
+                                                <th className="p-4 w-10"><input type="checkbox" onChange={handleSelectAll} checked={filteredData.length > 0 && selectedIds.size === filteredData.length} className="rounded" /></th>
+                                                {/* Header rendering based on tab */}
+                                                {activeTab === 'students' && <><th className="p-4 cursor-pointer hover:text-blue-600" onClick={() => handleSort('reg_no')}>Reg No {sortConfig.key === 'reg_no' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th><th className="p-4 cursor-pointer hover:text-blue-600" onClick={() => handleSort('name')}>Name {sortConfig.key === 'name' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th><th className="p-4">Degree</th><th className="p-4">Batch</th><th className="p-4">Mobile</th><th className="p-4">Email</th></>}
+                                                {activeTab === 'fees' && <><th className="p-4">Degree</th><th className="p-4">Batch</th><th className="p-4 text-right">Fee/Cr</th><th className="p-4 text-right">Fee/Sub</th><th className="p-4 text-right">Reg Fee</th><th className="p-4 text-right">Other</th></>}
+                                                {activeTab === 'enrollments' && <><th className="p-4">Reg No</th><th className="p-4">Name</th><th className="p-4">Semester</th><th className="p-4">Cr Hrs</th><th className="p-4">Courses</th></>}
+                                                {activeTab === 'payments' && <><th className="p-4">Reg No</th><th className="p-4">Name</th><th className="p-4">Semester</th><th className="p-4 text-right">Amount</th><th className="p-4">Date</th><th className="p-4">Bank</th></>}
+                                                {activeTab === 'others' && <><th className="p-4">Reg No</th><th className="p-4">Name</th><th className="p-4">Semester</th><th className="p-4">Fee Name</th><th className="p-4 text-right">Amount</th></>}
+                                                {activeTab === 'discounts' && <><th className="p-4">Reg No</th><th className="p-4">Name</th><th className="p-4">Term</th><th className="p-4 text-right">Discount</th></>}
+                                                {activeTab === 'users' && <><th className="p-4">Username</th><th className="p-4">Role</th><th className="p-4">Permissions</th></>}
+                                                {activeTab === 'banks' && <><th className="p-4">Bank Name</th><th className="p-4">Account No</th></>}
+                                                <th className="p-4 text-center">Actions</th>
+                                            </tr>
+                                        </thead>
                                         <tbody className="divide-y divide-gray-100">
-                                            {list.map((item, idx) => <TableRow key={item.id||idx} item={item} idx={idx} />)}
-                                            {list.length === 0 && <tr><td colSpan="10" className="p-8 text-center text-gray-400">No records found.</td></tr>}
+                                            {filteredData.map((item, idx) => (
+                                                <tr key={item.id || idx} className={`hover:bg-gray-50 transition ${selectedIds.has(item.id || item.reg_no) ? 'bg-blue-50' : ''}`}>
+                                                    <td className="p-4"><input type="checkbox" checked={selectedIds.has(item.id || item.reg_no)} onChange={() => handleSelectRow(item.id || item.reg_no)} className="rounded" /></td>
+                                                    {activeTab === 'students' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4 font-bold">{item.name}</td><td className="p-4"><span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-bold">{item.degree}</span></td><td className="p-4 text-gray-500">{item.batch}</td><td className="p-4 text-gray-500">{item.mobile || '-'}</td><td className="p-4 text-gray-500">{item.email || '-'}</td></>}
+                                                    {activeTab === 'fees' && <><td className="p-4 font-bold">{item.degree}</td><td className="p-4 text-gray-600">{item.batch}</td><td className="p-4 text-right text-gray-500">{num(item.per_cr_fee)}</td><td className="p-4 text-right font-bold text-green-700">{num(item.per_course_fee)}</td><td className="p-4 text-right text-gray-500">{num(item.reg_fee)}</td><td className="p-4 text-right text-gray-500">{num(item.other_fee)}</td></>}
+                                                    {activeTab === 'enrollments' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4"><span className="bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-xs font-bold">{item.semester}</span></td><td className="p-4">{item.cr}</td><td className="p-4">{item.courses}</td></>}
+                                                    {activeTab === 'payments' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4"><span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-bold">{item.semester}</span></td><td className="p-4 text-right font-bold">{num(item.amount)}</td><td className="p-4 text-gray-500">{item.date}</td><td className="p-4 text-gray-500">{item.bank}</td></>}
+                                                    {activeTab === 'others' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4 text-gray-600">{item.semester}</td><td className="p-4"><span className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs font-bold">{item.fee_name}</span></td><td className="p-4 text-right font-bold">{num(item.amount)}</td></>}
+                                                    {activeTab === 'discounts' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4 text-gray-500">{item.term}</td><td className="p-4 text-right font-bold text-purple-600">{item.discount}%</td></>}
+                                                    {activeTab === 'users' && <><td className="p-4 font-bold">{item.username}</td><td className="p-4 capitalize">{item.role}</td><td className="p-4 text-xs max-w-xs truncate">{item.role === 'admin' ? 'Full Access' : (Array.isArray(item.permissions) ? item.permissions.join(', ') : item.permissions)}</td></>}
+                                                    {activeTab === 'banks' && <><td className="p-4 font-bold">{item.name}</td><td className="p-4 font-mono text-gray-600">{item.account_no}</td></>}
+                                                    <td className="p-4 text-center flex justify-center gap-2"><button onClick={() => openModal(activeTab, item)} className="p-2 text-blue-600 hover:bg-blue-50 rounded"><i className="fas fa-edit"></i> Edit</button><button onClick={() => handleDelete(activeTab, item.id || item.reg_no)} className="p-2 text-red-600 hover:bg-red-50 rounded"><Trash2 className="h-4 w-4" /></button></td>
+                                                </tr>
+                                            ))}
+                                            {filteredData.length === 0 && <tr><td colSpan="10" className="p-8 text-center text-gray-400">No records found.</td></tr>}
                                         </tbody>
                                     </table>
                                 </div>
