@@ -27,19 +27,27 @@
             body * { visibility: hidden; }
             #printableArea, #printableArea * { visibility: visible; }
             #printableArea {
-                position: absolute; left: 0; top: 0; width: 100%; height: 100%;
-                margin: 0; padding: 10px; background: white;
-                transform: scale(0.85); transform-origin: top left;
+                position: absolute; left: 0; top: 0; width: 100%; min-height: 100%;
+                margin: 0; padding: 20px; background: white;
+                transform: scale(0.95); transform-origin: top center;
+                color-adjust: exact; -webkit-print-color-adjust: exact;
             }
-            #printableArea table { width: 100%; font-size: 10px; border-collapse: collapse; }
-            #printableArea th, #printableArea td { padding: 4px; border: 1px solid #ddd; }
-            /* Summary Box Specifics for Print */
-            #summary-box { border: 2px solid #000 !important; }
-            @page { size: A4; margin: 0; }
+            #printableArea table { width: 100%; font-size: 11px; border-collapse: collapse; border: 2px solid #000; }
+            #printableArea th { background-color: #f3f4f6 !important; font-weight: 800; border: 1px solid #000; padding: 4px; }
+            #printableArea td { border: 1px solid #000; padding: 4px; }
+            #printableArea .bg-gray-200 { background-color: #e5e7eb !important; }
+            #printableArea .bg-black { background-color: #000 !important; color: #fff !important; }
+            
+            /* Attachment Box Style for Print */
+            #summary-box { 
+                border: 2px solid #000 !important; 
+                background-color: #fff !important; 
+            }
+            
+            @page { size: A4 portrait; margin: 5mm; }
             .no-print { display: none !important; }
         }
 
-        /* Error Overlay */
         #js-error-display {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: #fff0f0; color: #d8000c; z-index: 9999; padding: 2rem; font-family: monospace;
@@ -70,9 +78,8 @@
         const { useState, useEffect, useMemo } = React;
         const API_URL = 'api.php';
 
-        // --- ICONS (SVG Components) ---
+        // --- ICONS ---
         const Icon = ({ d }) => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>;
-        
         const Search = () => <Icon d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />;
         const Plus = () => <Icon d="M12 5v14m-7-7h14" />;
         const Trash2 = () => <Icon d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />;
@@ -344,7 +351,7 @@
                 const map = {
                     students: ['Reg No', 'Name', 'Degree', 'Batch', 'Mobile', 'Email'],
                     fees: ['Degree', 'Batch', 'Fee/Cr', 'Fee/Sub', 'Reg Fee', 'Other'],
-                    enrollments: ['Reg No', 'Name', 'Semester', 'Cr Hrs', 'Courses'],
+                    enrollments: ['Reg No', 'Name', 'Semester', 'Courses', 'Cr Hrs'], // SWAPPED COLUMNS
                     payments: ['Reg No', 'Name', 'Semester', 'Amount', 'Date', 'Bank'],
                     discounts: ['Reg No', 'Name', 'Term', 'Discount'],
                     others: ['Reg No', 'Name', 'Semester', 'Fee Name', 'Amount'],
@@ -484,7 +491,7 @@
                     let t = 0, x = 0, r = 0, o = 0;
                     if(masterFee) {
                         t = cr * parseFloat(masterFee.per_cr_fee||0);
-                        // Exam Fee logic: (Courses * Rate) + Fixed Other Fees from structure
+                        // Exam Fee now includes fee structure other_fee
                         x = (courses * parseFloat(masterFee.per_course_fee||0)) + parseFloat(masterFee.other_fee||0);
                         r = parseFloat(masterFee.reg_fee||0);
                         o = 0; 
@@ -529,9 +536,12 @@
                 <tr className="border-b hover:bg-gray-50 text-sm">
                     <td className="p-4 text-gray-400">{idx+1}</td>
                     <td className="p-4"><input type="checkbox" checked={selectedIds.has(item.id || item.reg_no)} onChange={() => handleSelectRow(item.id || item.reg_no)} /></td>
-                    {activeTab === 'students' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4 font-bold">{item.name}</td><td className="p-4"><span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-bold">{item.degree}</span></td><td className="p-4 text-gray-500">{item.batch}</td><td className="p-4 text-gray-500">{item.mobile || '-'}</td><td className="p-4 text-gray-500">{item.email || '-'}</td></>}
+                    {activeTab === 'students' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4 font-bold">{item.name}</td><td className="p-4">{item.degree}</td><td className="p-4">{item.batch}</td><td className="p-4">{item.mobile}</td><td className="p-4">{item.email}</td></>}
                     {activeTab === 'fees' && <><td className="p-4 font-bold">{item.degree}</td><td className="p-4">{item.batch}</td><td className="p-4 text-right">{num(item.per_cr_fee)}</td><td className="p-4 text-right">{num(item.per_course_fee)}</td><td className="p-4 text-right">{num(item.reg_fee)}</td><td className="p-4 text-right">{num(item.other_fee)}</td></>}
-                    {activeTab === 'enrollments' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4"><span className="bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-xs font-bold">{item.semester}</span></td><td className="p-4">{item.cr}</td><td className="p-4">{item.courses}</td></>}
+                    
+                    {/* ENROLLMENT SWAPPED COLUMNS */}
+                    {activeTab === 'enrollments' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4"><span className="bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-xs font-bold">{item.semester}</span></td><td className="p-4">{item.courses}</td><td className="p-4">{item.cr}</td></>}
+                    
                     {activeTab === 'payments' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4"><span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-bold">{item.semester}</span></td><td className="p-4 text-right font-bold">{num(item.amount)}</td><td className="p-4 text-gray-500">{item.date}</td><td className="p-4 text-gray-500">{item.bank}</td></>}
                     {activeTab === 'others' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4 text-gray-600">{item.semester}</td><td className="p-4"><span className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs font-bold">{item.fee_name}</span></td><td className="p-4 text-right font-bold">{num(item.amount)}</td></>}
                     {activeTab === 'discounts' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4 text-gray-500">{item.term}</td><td className="p-4 text-right font-bold text-purple-600">{item.discount}%</td></>}
@@ -572,7 +582,10 @@
                             {user.role === 'admin' || user.username === 'admin' ? TABS.concat({id:'users', label:'Users', icon:Users}).map(t => (
                                 <button key={t.id} onClick={() => setActiveTab(t.id)} className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition ${activeTab === t.id ? 'bg-blue-600 text-white shadow-lg' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
                                     <t.icon /> {t.label} 
-                                    {data[t.id] && Array.isArray(data[t.id]) && <span className={`ml-2 text-xs font-bold px-2 py-0.5 rounded-full ${activeTab === t.id ? 'bg-blue-200 text-blue-800' : 'bg-gray-200 text-gray-600'}`}>{data[t.id].length}</span>}
+                                    {data[t.id] && Array.isArray(data[t.id]) && <span className={`ml-2 text-xs font-bold px-2 py-0.5 rounded-full ${activeTab === t.id ? 'bg-blue-200 text-blue-800' : 'bg-gray-200 text-gray-600'}`}>
+                                        {/* Dynamic Count: Show Filtered / Total */}
+                                        {list.length !== data[t.id].length ? `${list.length} / ${data[t.id].length}` : data[t.id].length}
+                                    </span>}
                                 </button>
                             )) : TABS.filter(t => user.permissions?.includes(t.id)).map(t => (
                                 <button key={t.id} onClick={() => setActiveTab(t.id)} className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition ${activeTab === t.id ? 'bg-blue-600 text-white' : 'bg-gray-100'}`}><t.icon /> {t.label}</button>
