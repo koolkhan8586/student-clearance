@@ -137,7 +137,7 @@
                     const res = await fetch(API_URL);
                     const json = await res.json();
                     
-                    // SAFEGUARD: Ensure all arrays exist
+                    // SAFEGUARD: Ensure all arrays exist, defaulting to [] if API returns partial data or error
                     const safeData = {
                         students: Array.isArray(json.students) ? json.students : [],
                         fees: Array.isArray(json.fees) ? json.fees : [],
@@ -153,6 +153,7 @@
 
                 } catch(e) { 
                     console.error("Connection Error:", e);
+                    // On error, prevent crash by initializing empty state
                     setData({
                         students: [], fees: [], enrollments: [], payments: [], discounts: [], others: [], users: [], banks: []
                     });
@@ -545,36 +546,27 @@
             };
 
             const handleExport = (type) => {
-                const records = (type === activeTab) ? filteredData : data[type];
+                const records = data[type];
                 if (!records || records.length === 0) return alert("No data to export");
                 const headers = getHeaders(type);
-                
                 const csvRows = [
                     headers.join(','),
                     ...records.map(row => headers.map(fieldName => {
                         let val = row[fieldName];
                         if (Array.isArray(val)) val = val.join('|'); 
                         val = String(val || '');
-                        if (val.search(/("|,|\n)/g) >= 0) {
-                            val = `"${val.replace(/"/g, '""')}"`;
-                        }
+                        if (val.includes(',')) val = `"${val}"`; 
                         return val;
                     }).join(','))
                 ];
-                
-                const csvString = csvRows.join("\n");
-                
-                const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+                const csvContent = "data:text/csv;charset=utf-8," + csvRows.join("\n");
+                const encodedUri = encodeURI(csvContent);
                 const link = document.createElement("a");
-                if (link.download !== undefined) {
-                    const url = URL.createObjectURL(blob);
-                    link.setAttribute("href", url);
-                    link.setAttribute("download", `${type}_export_${new Date().toISOString().split('T')[0]}.csv`);
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    URL.revokeObjectURL(url);
-                }
+                link.setAttribute("href", encodedUri);
+                link.setAttribute("download", `${type}_export.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
             };
             
             const processedData = getProcessedData();
@@ -720,7 +712,18 @@
                                                                     <td className="p-2 border font-medium">{row.semester}</td><td className="p-2 border text-center">{row.cr}</td><td className="p-2 border text-center">{row.courses}</td><td className="p-2 border text-right text-gray-600">{num(row.tuition)}</td><td className="p-2 border text-right text-gray-600">{num(row.exam)}</td><td className="p-2 border text-right text-gray-600">{num(row.reg)}</td><td className="p-2 border text-right text-gray-600">{num(row.other)}</td><td className="p-2 border text-right font-bold bg-gray-50">{num(row.total)}</td><td className="p-2 border text-center text-gray-500">{row.discPct > 0 ? `${row.discPct}%` : '-'}</td><td className="p-2 border text-right text-gray-500">{row.discAmt > 0 ? num(row.discAmt) : '-'}</td><td className="p-2 border text-right font-bold">{num(row.netFee)}</td><td className="p-2 border text-right font-bold text-green-600">{num(row.totalPaid)}</td><td className={`p-2 border text-right font-bold ${row.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>{num(row.balance)}</td>
                                                                 </tr>
                                                             ))}
-                                                            <tr className="bg-gray-800 text-white font-bold"><td colSpan="7" className="p-3 text-right uppercase tracking-wider">Grand Totals</td><td className="p-3 text-right">{num(clearanceResult.summary.total)}</td><td className="p-3 text-center">-</td><td className="p-3 text-right">{num(clearanceResult.summary.fa)}</td><td className="p-3 text-right">{num(clearanceResult.summary.total - clearanceResult.summary.fa)}</td><td className="p-3 text-right text-green-400">{num(clearanceResult.summary.paid)}</td><td className={`p-3 text-right ${clearanceResult.summary.balance > 0 ? 'text-red-400' : 'text-green-400'}`}>{num(clearanceResult.summary.balance)}</td></tr>
+                                                            <tr className="bg-gray-800 text-white font-bold">
+                                                                <td className="p-3 text-right uppercase tracking-wider">Totals</td>
+                                                                <td className="p-3 text-center">{clearanceResult.summary.cr}</td>
+                                                                <td className="p-3 text-center">{clearanceResult.summary.courses}</td>
+                                                                <td colSpan="4" className="p-3"></td>
+                                                                <td className="p-3 text-right">{num(clearanceResult.summary.total)}</td>
+                                                                <td className="p-3 text-center">-</td>
+                                                                <td className="p-3 text-right">{num(clearanceResult.summary.fa)}</td>
+                                                                <td className="p-3 text-right">{num(clearanceResult.summary.total - clearanceResult.summary.fa)}</td>
+                                                                <td className="p-3 text-right text-green-400">{num(clearanceResult.summary.paid)}</td>
+                                                                <td className={`p-3 text-right ${clearanceResult.summary.balance > 0 ? 'text-red-400' : 'text-green-400'}`}>{num(clearanceResult.summary.balance)}</td>
+                                                            </tr>
                                                         </tbody>
                                                     </table>
                                                 </div>
