@@ -423,6 +423,7 @@
                 setShowModal(true);
             };
 
+            // --- IMPORT HANDLER ---
             const handleImport = (e, type) => {
                 const file = e.target.files[0];
                 if (!file) return;
@@ -458,16 +459,37 @@
                             else if (h.includes('email')) obj['email'] = val;
                             else obj[h] = val; 
                         });
+                        
+                        // NEW: DUPLICATE CHECK FOR PAYMENTS (Registration #, Amount, Date, Bank)
+                        let isDuplicate = false;
+                        if (type === 'payments') {
+                             isDuplicate = existingData.some(existing => 
+                                norm(existing.reg_no) === norm(obj.reg_no) &&
+                                Math.abs(parseFloat(existing.amount || 0) - parseFloat(obj.amount || 0)) < 0.01 && 
+                                existing.date === obj.date && 
+                                norm(existing.bank) === norm(obj.bank)
+                            );
+                        } else if (type === 'students') {
+                             isDuplicate = existingData.some(existing => norm(existing.reg_no) === norm(obj.reg_no));
+                        } else if (type === 'fees') {
+                             isDuplicate = existingData.some(existing => norm(existing.degree) === norm(obj.degree) && norm(existing.batch) === norm(obj.batch));
+                        } else {
+                             // Default check for Enrollments, Discounts, Others (Reg No + Semester/Term)
+                             isDuplicate = existingData.some(existing => 
+                                norm(existing.reg_no) === norm(obj.reg_no) &&
+                                (
+                                    (existing.semester && norm(existing.semester) === norm(obj.semester)) ||
+                                    (existing.term && norm(existing.term) === norm(obj.term))
+                                )
+                             );
+                        }
+
                         if(importTerm) {
                             if(type === 'enrollments' || type === 'payments' || type === 'others') obj.semester = importTerm;
                             else if(type === 'discounts') obj.term = importTerm;
                         }
                         if (obj.amount) obj.amount = obj.amount.replace(/[^0-9.-]/g, '');
-                        const isDuplicate = existingData.some(existing => 
-                            norm(existing.reg_no) === norm(obj.reg_no) &&
-                            ((existing.semester && norm(existing.semester) === norm(obj.semester)) ||
-                             (existing.term && norm(existing.term) === norm(obj.term)))
-                        );
+                        
                         if (isDuplicate) duplicates.push(obj); else newItems.push(obj);
                     }
                     setImportPreview({ show: true, total: rows.length - 1, newItems, duplicates, type });
@@ -492,6 +514,7 @@
                 refreshData();
             };
 
+            // --- FILTER & BULK ---
             const handleSelectAll = (e) => {
                 if (e.target.checked) setSelectedIds(new Set(filteredData.map(i => i.id || i.reg_no)));
                 else setSelectedIds(new Set());
@@ -566,7 +589,9 @@
                         let val = row[fieldName];
                         if (Array.isArray(val)) val = val.join('|'); 
                         val = String(val || '');
-                        if (val.search(/("|,|\n)/g) >= 0) val = `"${val.replace(/"/g, '""')}"`;
+                        if (val.search(/("|,|\n)/g) >= 0) {
+                            val = `"${val.replace(/"/g, '""')}"`;
+                        }
                         return val;
                     }).join(','))
                 ];
