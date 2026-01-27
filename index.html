@@ -94,6 +94,11 @@
                 text-transform: uppercase;
                 font-size: 8px;
             }
+
+            /* Landscape for Summary Detail if needed, but keeping simple portrait for now to match clearance style */
+            .landscape-mode-print {
+                /* optional: @page { size: A4 landscape; } */
+            }
         }
     </style>
 </head>
@@ -129,6 +134,7 @@
         const Landmark = (p) => <Icon d="M3 22v-8h18v8M12 2L2 7v3h20V7L12 2zM6 10v6M10 10v6M14 10v6M18 10v6" {...p} />;
         const Menu = (p) => <Icon d="M3 12h18M3 6h18M3 18h18" {...p} />;
         const BarChart = (p) => <Icon d="M12 20V10M18 20V4M6 20v-4" {...p} />;
+        const Eye = (p) => <Icon d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z M12 5c-3.866 0-7 3.134-7 7s3.134 7 7 7 7-3.134 7-7-3.134-7-7-7z M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z" {...p} />;
 
         function App() {
             // --- STATE MANAGEMENT ---
@@ -156,6 +162,8 @@
             const [uploadStatus, setUploadStatus] = useState({ active: false, current: 0, total: 0 });
             const [importTerm, setImportTerm] = useState('');
             const [sidebarOpen, setSidebarOpen] = useState(false);
+            // NEW: State for Session Detail Modal
+            const [sessionDetail, setSessionDetail] = useState(null);
 
             const TABS = [
                 { id: 'clearance', label: 'Clearance', icon: FileText },
@@ -243,7 +251,7 @@
 
             const filteredData = getProcessedData();
             
-            // --- Custom Sort for Semesters (Fall -> Spring -> Summer) ---
+            // --- Custom Sort for Semesters ---
             const termOrder = { 'fall': 1, 'spring': 2, 'summer': 3 };
             const getTermRank = (sem) => {
                 const s = sem.toLowerCase();
@@ -274,17 +282,25 @@
                      discountMap.set(k, parseFloat(d.discount) || 0);
                 });
                 const summary = new Map();
+                const sessionDetailsMap = new Map(); // Store details for modal
+
                 data.enrollments.forEach(en => {
                     const sem = en.semester; 
                     const semKey = norm(sem);
                     if (summaryFilterSession && !semKey.includes(norm(summaryFilterSession))) return;
                     if(!summary.has(semKey)) {
                          summary.set(semKey, { session: sem, enrolled: new Set(), charged: 0, discount: 0, other: 0, paid: 0 });
+                         sessionDetailsMap.set(semKey, []);
                     }
                     const entry = summary.get(semKey);
+                    const detailList = sessionDetailsMap.get(semKey);
+
                     entry.enrolled.add(norm(en.reg_no));
+                    
                     const student = studentMap.get(norm(en.reg_no));
-                    let feeDetails = { total: 0, other: 0 };
+                    let feeDetails = { total: 0, other: 0, tuition: 0 };
+                    
+                    // Fee Calculation
                     if (student) {
                          let fee = data.fees.find(f => norm(f.degree) === norm(student.degree) && norm(f.batch) === norm(student.batch));
                          if(!fee) {
@@ -299,6 +315,8 @@
                              const exam = courses * parseFloat(fee.per_course_fee || 0);
                              const reg = parseFloat(fee.reg_fee || 0);
                              const otherBase = parseFloat(fee.other_fee || 0);
+                             
+                             feeDetails.tuition = tuition;
                              feeDetails.total = tuition + exam + reg + otherBase;
                              feeDetails.other = otherBase;
                          }
@@ -307,11 +325,39 @@
                     feeDetails.other += specificOther;
                     feeDetails.total += specificOther;
                     const discPct = discountMap.get(`${norm(en.reg_no)}_${semKey}`) || 0;
-                    const discAmt = (feeDetails.total * discPct) / 100;
+                    const discAmt = (feeDetails.tuition * discPct) / 100;
+                    
+                    // Add Payment Calculation Per Student for Detail View
+                    let studentPaid = 0;
+                     data.payments.forEach(p => {
+                         // Check reg no and loose semester match
+                        if(norm(p.reg_no) === norm(en.reg_no)) {
+                             const pSem = norm(p.semester);
+                             if (pSem === semKey || (semKey.includes(pSem) && pSem.length > 3) || (pSem.includes(semKey) && semKey.length > 3)) {
+                                studentPaid += parseFloat(p.amount || 0);
+                             }
+                        }
+                    });
+
                     entry.charged += feeDetails.total;
                     entry.discount += discAmt;
                     entry.other += feeDetails.other;
+                    
+                    // Add to detailed list for modal
+                    detailList.push({
+                        reg_no: en.reg_no,
+                        name: en.name,
+                        courses: en.courses,
+                        cr: en.cr,
+                        tuition: feeDetails.tuition,
+                        other: feeDetails.other,
+                        discount: discAmt,
+                        paid: studentPaid,
+                        balance: (feeDetails.total - discAmt) - studentPaid
+                    });
                 });
+                
+                // Aggregate payments for summary total
                 data.payments.forEach(p => {
                     const pSem = norm(p.semester);
                     if (summaryFilterSession && !pSem.includes(norm(summaryFilterSession))) return;
@@ -326,6 +372,7 @@
                         summary.get(targetKey).paid += parseFloat(p.amount || 0);
                     }
                 });
+
                 return Array.from(summary.values()).sort((a,b) => {
                      const yearA = parseInt(a.session.replace(/\D/g, '')) || 0;
                      const yearB = parseInt(b.session.replace(/\D/g, '')) || 0;
@@ -334,11 +381,16 @@
                 }).map(s => ({
                     ...s,
                     enrolled: s.enrolled.size,
-                    balance: (s.charged - s.discount) - s.paid
+                    balance: (s.charged - s.discount) - s.paid,
+                    details: sessionDetailsMap.get(norm(s.session)) || []
                 }));
             }, [activeTab, data, summaryFilterSession]);
 
-            // --- PAYMENT DASHBOARD UPDATED LABELS ---
+            // --- OPEN SESSION DETAIL ---
+            const openSessionDetail = (sessionData) => {
+                setSessionDetail(sessionData);
+            };
+
             const paymentStats = activeTab === 'payments' ? filteredData.reduce((acc, item) => {
                  const amt = parseFloat(item.amount) || 0;
                  acc.total += amt;
@@ -505,7 +557,6 @@
                     newData.total_fee = newData.tuition_fee + newData.exam_fee + parseFloat(newData.reg_fee||0) + parseFloat(newData.other_fee||0);
                 }
                 
-                // AUTO-NAME LOGIC UPDATED FOR ALL RELEVANT TABS
                 if ((modalType === 'payments' || modalType === 'others' || modalType === 'discounts') && !newData.name) {
                     const s = data.students.find(st => norm(st.reg_no) === norm(newData.reg_no));
                     if(s) newData.name = s.name;
@@ -561,8 +612,8 @@
                             
                             // Map CSV headers to internal keys
                             if (h.includes('reg') && h.includes('no')) obj['reg_no'] = val;
-                            else if ((h.includes('fee') || h.includes('charge') || h.includes('head')) && (h.includes('name') || h.includes('head'))) obj['fee_name'] = val; // Prioritize fee name
-                            else if (h.includes('name') && !h.includes('user') && !h.includes('fee') && !h.includes('head')) obj['name'] = val; // Strict name check
+                            else if ((h.includes('fee') || h.includes('charge') || h.includes('head')) && (h.includes('name') || h.includes('head'))) obj['fee_name'] = val; 
+                            else if (h.includes('name') && !h.includes('user') && !h.includes('fee') && !h.includes('head')) obj['name'] = val; 
                             else if (h.includes('semester')) obj['semester'] = val;
                             else if (h.includes('amount')) obj['amount'] = val;
                             else if (h === 'cr') obj['cr'] = val;
@@ -589,10 +640,8 @@
                             if (student) obj.name = student.name;
                         }
 
-                        // FIXED DUPLICATE CHECK FOR PAYMENTS
                         let isDuplicate = false;
                         if (type === 'payments') {
-                             // STRICT CHECK: Matches Reg, Amount, Date, and Bank (ignores Semester)
                              isDuplicate = existingData.some(existing => 
                                 norm(existing.reg_no) === norm(obj.reg_no) &&
                                 Math.abs(parseFloat(existing.amount || 0) - parseFloat(obj.amount || 0)) < 0.01 && 
@@ -604,13 +653,10 @@
                         } else if (type === 'fees') {
                              isDuplicate = existingData.some(existing => norm(existing.degree) === norm(obj.degree) && norm(existing.batch) === norm(obj.batch));
                         } else {
-                             // Default check for Enrollments, Discounts, Others (Reg No + Semester/Term)
                              isDuplicate = existingData.some(existing => 
                                 norm(existing.reg_no) === norm(obj.reg_no) &&
-                                (
-                                    (existing.semester && norm(existing.semester) === norm(obj.semester)) ||
-                                    (existing.term && norm(existing.term) === norm(obj.term))
-                                )
+                                ((existing.semester && norm(existing.semester) === norm(obj.semester)) ||
+                                (existing.term && norm(existing.term) === norm(obj.term)))
                              );
                         }
                         
@@ -929,8 +975,10 @@
                                                 </thead>
                                                 <tbody className="divide-y divide-gray-100">
                                                     {getSummaryData.map((row, idx) => (
-                                                        <tr key={idx} className="hover:bg-gray-50 transition">
-                                                            <td className="p-4 font-bold">{row.session}</td>
+                                                        <tr key={idx} className="hover:bg-gray-50 transition cursor-pointer" onClick={() => openSessionDetail(row)}>
+                                                            <td className="p-4 font-bold text-blue-600 hover:text-blue-800 flex items-center gap-2">
+                                                                <Eye className="h-4 w-4" /> {row.session}
+                                                            </td>
                                                             <td className="p-4 text-center"><span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-bold">{row.enrolled}</span></td>
                                                             <td className="p-4 text-right font-mono font-bold text-gray-800">{num(row.charged)}</td>
                                                             <td className="p-4 text-right font-mono text-orange-600">{num(row.discount)}</td>
@@ -1048,6 +1096,89 @@
                             )}
                         </div>
                     </div>
+
+                    {/* NEW: SESSION DETAIL MODAL */}
+                    {sessionDetail && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                            <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col">
+                                <div className="p-6 border-b flex justify-between items-center bg-gray-50 rounded-t-xl no-print">
+                                    <h3 className="text-xl font-bold">Session Detail: {sessionDetail.session}</h3>
+                                    <div className="flex gap-2">
+                                        <button onClick={() => window.print()} className="bg-gray-700 text-white px-4 py-2 rounded hover:bg-gray-800"><Printer className="h-4 w-4 inline mr-2"/> Print Report</button>
+                                        <button onClick={() => setSessionDetail(null)} className="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+                                    </div>
+                                </div>
+                                
+                                <div className="flex-1 overflow-auto p-6" id="printableArea">
+                                    <div className="mb-4 hidden print-only">
+                                        <h2 className="text-2xl font-bold text-center">Session Financial Report: {sessionDetail.session}</h2>
+                                        <p className="text-center text-sm text-gray-500">Generated on: {new Date().toLocaleDateString()}</p>
+                                    </div>
+
+                                    {/* Summary Cards for Detail View */}
+                                    <div className="grid grid-cols-5 gap-4 mb-6 text-sm">
+                                        <div className="bg-blue-50 p-3 rounded border border-blue-100">
+                                            <div className="text-gray-500">Total Enrolled</div>
+                                            <div className="font-bold text-lg">{sessionDetail.enrolled}</div>
+                                        </div>
+                                        <div className="bg-gray-50 p-3 rounded border border-gray-200">
+                                            <div className="text-gray-500">Total Charged</div>
+                                            <div className="font-bold text-lg">{num(sessionDetail.charged)}</div>
+                                        </div>
+                                        <div className="bg-orange-50 p-3 rounded border border-orange-100">
+                                            <div className="text-gray-500">Total Discount</div>
+                                            <div className="font-bold text-lg">{num(sessionDetail.discount)}</div>
+                                        </div>
+                                        <div className="bg-green-50 p-3 rounded border border-green-100">
+                                            <div className="text-gray-500">Total Paid</div>
+                                            <div className="font-bold text-lg text-green-700">{num(sessionDetail.paid)}</div>
+                                        </div>
+                                        <div className="bg-red-50 p-3 rounded border border-red-100">
+                                            <div className="text-gray-500">Pending Balance</div>
+                                            <div className="font-bold text-lg text-red-600">{num(sessionDetail.balance)}</div>
+                                        </div>
+                                    </div>
+
+                                    <table className="w-full text-xs text-left border-collapse">
+                                        <thead className="bg-gray-100 uppercase font-bold text-gray-700">
+                                            <tr>
+                                                <th className="p-2 border">#</th>
+                                                <th className="p-2 border">Reg No</th>
+                                                <th className="p-2 border">Name</th>
+                                                <th className="p-2 border text-center">Courses</th>
+                                                <th className="p-2 border text-center">Cr</th>
+                                                <th className="p-2 border text-right">Tuition</th>
+                                                <th className="p-2 border text-right">Other</th>
+                                                <th className="p-2 border text-right">Discount</th>
+                                                <th className="p-2 border text-right bg-gray-50">Total</th>
+                                                <th className="p-2 border text-right text-green-700">Paid</th>
+                                                <th className="p-2 border text-right">Balance</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {sessionDetail.details.map((s, idx) => (
+                                                <tr key={idx} className="border-b hover:bg-gray-50">
+                                                    <td className="p-2 border">{idx + 1}</td>
+                                                    <td className="p-2 border font-mono">{s.reg_no}</td>
+                                                    <td className="p-2 border">{s.name}</td>
+                                                    <td className="p-2 border text-center">{s.courses}</td>
+                                                    <td className="p-2 border text-center">{s.cr}</td>
+                                                    <td className="p-2 border text-right">{num(s.tuition)}</td>
+                                                    <td className="p-2 border text-right">{num(s.other)}</td>
+                                                    <td className="p-2 border text-right text-red-500">{num(s.discount)}</td>
+                                                    <td className="p-2 border text-right font-bold bg-gray-50">{num(s.tuition + s.other - s.discount)}</td>
+                                                    <td className="p-2 border text-right font-bold text-green-700">{num(s.paid)}</td>
+                                                    <td className={`p-2 border text-right font-bold ${s.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>{num(s.balance)}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {/* ... (Other Modals: showModal, showPasswordModal, importPreview - Keep SAME as previous) ... */}
                     {showModal && (
                         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
                             <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
@@ -1060,7 +1191,7 @@
                                         </div>
                                     </>}
                                     {modalType === 'fees' && <><div className="bg-blue-50 p-3 rounded text-xs text-blue-800 mb-2"><strong>Note:</strong> Fee Structure applies to ALL semesters for this Degree & Batch.</div><div className="grid grid-cols-2 gap-4"><input required placeholder="Degree" className="w-full border p-2 rounded" value={formData.degree || ''} onChange={e => setFormData({...formData, degree: e.target.value})} /><input required placeholder="Batch" className="w-full border p-2 rounded" value={formData.batch || ''} onChange={e => setFormData({...formData, batch: e.target.value})} /></div><div className="grid grid-cols-2 gap-4"><input type="number" placeholder="Fee Per Credit Hour" className="w-full border p-2 rounded" value={formData.per_cr_fee || ''} onChange={e => setFormData({...formData, per_cr_fee: e.target.value})} /><input type="number" placeholder="Fee Per Subject/Course" className="w-full border p-2 rounded" value={formData.per_course_fee || ''} onChange={e => setFormData({...formData, per_course_fee: e.target.value})} /></div><div className="grid grid-cols-2 gap-4"><input type="number" placeholder="Registration Fee (Semester)" className="w-full border p-2 rounded" value={formData.reg_fee || ''} onChange={e => setFormData({...formData, reg_fee: e.target.value})} /><input type="number" placeholder="Other Charges (Semester)" className="w-full border p-2 rounded" value={formData.other_fee || ''} onChange={e => setFormData({...formData, other_fee: e.target.value})} /></div></>}
-                                    {modalType === 'enrollments' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={handleRegChange} /><input placeholder="Student Name" className="w-full border p-2 rounded bg-gray-50 font-bold text-gray-700" value={formData.name || ''} readOnly /><input required placeholder="Semester (e.g. Spring 2024)" className="w-full border p-2 rounded" value={formData.semester || ''} onChange={e => setFormData({...formData, semester: e.target.value})} /><div className="grid grid-cols-2 gap-4"><input type="number" placeholder="Credit Hours" className="w-full border p-2 rounded" value={formData.cr || ''} onChange={e => setFormData({...formData, cr: e.target.value})} /><input type="number" placeholder="No. of Courses" className="w-full border p-2 rounded" value={formData.courses || ''} onChange={e => setFormData({...formData, courses: e.target.value})} /></div></>}
+                                    {modalType === 'enrollments' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={e => setFormData({...formData, reg_no: e.target.value})} /><input placeholder="Student Name" className="w-full border p-2 rounded" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} /><input required placeholder="Semester (e.g. Spring 2024)" className="w-full border p-2 rounded" value={formData.semester || ''} onChange={e => setFormData({...formData, semester: e.target.value})} /><div className="grid grid-cols-2 gap-4"><input type="number" placeholder="Credit Hours" className="w-full border p-2 rounded" value={formData.cr || ''} onChange={e => setFormData({...formData, cr: e.target.value})} /><input type="number" placeholder="No. of Courses" className="w-full border p-2 rounded" value={formData.courses || ''} onChange={e => setFormData({...formData, courses: e.target.value})} /></div></>}
                                     {modalType === 'payments' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={handleRegChange} /><input placeholder="Student Name" className="w-full border p-2 rounded bg-gray-50 font-bold text-gray-700" value={formData.name || ''} readOnly /><input required placeholder="Semester (e.g. Spring 2024)" className="w-full border p-2 rounded" value={formData.semester || ''} onChange={e => setFormData({...formData, semester: e.target.value})} /><input required type="number" placeholder="Amount Paid" className="w-full border p-2 rounded font-bold text-lg" value={formData.amount || ''} onChange={e => setFormData({...formData, amount: e.target.value})} /><input type="date" className="w-full border p-2 rounded" value={formData.date || ''} onChange={e => setFormData({...formData, date: e.target.value})} />
                                     <label className="block text-sm font-bold text-gray-700 mt-2 mb-1">Payment Through (Bank)</label>
                                     <select className="w-full border p-2 rounded bg-white" value={formData.bank || ''} onChange={e => setFormData({...formData, bank: e.target.value})}>
