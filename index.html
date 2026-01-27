@@ -477,16 +477,30 @@
                             if (student) obj.name = student.name;
                         }
 
-                        // Duplicate Check
-                        const isDuplicate = existingData.some(existing => 
-                            norm(existing.reg_no) === norm(obj.reg_no) &&
-                            (
-                                (existing.semester && norm(existing.semester) === norm(obj.semester)) ||
-                                (existing.term && norm(existing.term) === norm(obj.term)) ||
-                                // For Payments, check all fields to allow multiple same-sem payments
-                                (type === 'payments' && existing.date === obj.date && parseFloat(existing.amount) === parseFloat(obj.amount) && norm(existing.bank) === norm(obj.bank))
-                            )
-                        );
+                        // FIXED DUPLICATE CHECK FOR PAYMENTS
+                        let isDuplicate = false;
+                        if (type === 'payments') {
+                             // STRICT CHECK: Matches Reg, Amount, Date, and Bank (ignores Semester)
+                             isDuplicate = existingData.some(existing => 
+                                norm(existing.reg_no) === norm(obj.reg_no) &&
+                                Math.abs(parseFloat(existing.amount || 0) - parseFloat(obj.amount || 0)) < 0.01 && 
+                                existing.date === obj.date && 
+                                norm(existing.bank) === norm(obj.bank)
+                            );
+                        } else if (type === 'students') {
+                             isDuplicate = existingData.some(existing => norm(existing.reg_no) === norm(obj.reg_no));
+                        } else if (type === 'fees') {
+                             isDuplicate = existingData.some(existing => norm(existing.degree) === norm(obj.degree) && norm(existing.batch) === norm(obj.batch));
+                        } else {
+                             // Default check for Enrollments, Discounts, Others (Reg No + Semester/Term)
+                             isDuplicate = existingData.some(existing => 
+                                norm(existing.reg_no) === norm(obj.reg_no) &&
+                                (
+                                    (existing.semester && norm(existing.semester) === norm(obj.semester)) ||
+                                    (existing.term && norm(existing.term) === norm(obj.term))
+                                )
+                             );
+                        }
                         
                         if (isDuplicate) duplicates.push(obj);
                         else newItems.push(obj);
