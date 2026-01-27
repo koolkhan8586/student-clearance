@@ -24,10 +24,6 @@
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         
         @media print {
-            @page {
-                size: A4 portrait;
-                margin: 5mm; /* Reduced margin */
-            }
             body * {
                 visibility: hidden;
             }
@@ -44,20 +40,19 @@
                 padding: 5px;
                 background: white;
                 font-family: 'Arial', sans-serif;
-                font-size: 9px; /* Reduced font for better fit */
+                font-size: 9px; 
                 color: black;
             }
             .no-print { display: none !important; }
             
-            /* Table optimization for print */
             table { 
                 width: 100% !important; 
                 border-collapse: collapse; 
-                table-layout: fixed; /* Fixes column widths */
+                table-layout: fixed; 
             }
             th, td { 
                 border: 1px solid #000 !important; 
-                padding: 2px 3px !important; /* Tight padding */
+                padding: 2px 3px !important; 
                 overflow: hidden;
                 white-space: nowrap;
             }
@@ -72,32 +67,14 @@
                 print-color-adjust: exact;
             }
 
-            /* Specific Column Widths for Print (Total ~100%) */
-            th:nth-child(1), td:nth-child(1) { width: 14%; white-space: normal; } /* Sem */
-            th:nth-child(2), td:nth-child(2) { width: 3%; text-align: center; }  /* Sub (Swapped) */
-            th:nth-child(3), td:nth-child(3) { width: 3%; text-align: center; }  /* Cr (Swapped) */
-            th:nth-child(4), td:nth-child(4) { width: 8%; text-align: right; }  /* Tuition */
-            th:nth-child(5), td:nth-child(5) { width: 6%; text-align: right; }  /* Exam */
-            th:nth-child(6), td:nth-child(6) { width: 6%; text-align: right; }  /* Reg */
-            th:nth-child(7), td:nth-child(7) { width: 6%; text-align: right; }  /* Other */
-            th:nth-child(8), td:nth-child(8) { width: 9%; text-align: right; }   /* Total */
-            th:nth-child(9), td:nth-child(9) { width: 5%; text-align: center; }  /* Disc % */
-            th:nth-child(10), td:nth-child(10) { width: 8%; text-align: right; } /* Disc Amt */
-            th:nth-child(11), td:nth-child(11) { width: 10%; text-align: right; font-weight: bold; } /* Net Fee */
-            th:nth-child(12), td:nth-child(12) { width: 10%; text-align: right; } /* Paid */
-            th:nth-child(13), td:nth-child(13) { width: 12%; text-align: right; font-weight: bold; } /* Balance */
+            /* --- CONDITIONAL PAGE ORIENTATION --- */
+            /* Default Portrait for Clearance */
+            @page { size: A4 portrait; margin: 5mm; }
             
-            /* Headers */
-            thead th {
-                background-color: #e5e7eb !important;
-                font-weight: 800;
-                text-transform: uppercase;
-                font-size: 8px;
-            }
-
             /* Landscape for Summary Detail if needed, but keeping simple portrait for now to match clearance style */
             .landscape-mode-print {
-                /* optional: @page { size: A4 landscape; } */
+                 /* Force landscape for summary reports if desired */
+                 /* @page { size: A4 landscape; } */
             }
         }
     </style>
@@ -612,8 +589,8 @@
                             
                             // Map CSV headers to internal keys
                             if (h.includes('reg') && h.includes('no')) obj['reg_no'] = val;
-                            else if ((h.includes('fee') || h.includes('charge') || h.includes('head')) && (h.includes('name') || h.includes('head'))) obj['fee_name'] = val; 
-                            else if (h.includes('name') && !h.includes('user') && !h.includes('fee') && !h.includes('head')) obj['name'] = val; 
+                            else if ((h.includes('fee') || h.includes('charge') || h.includes('head')) && (h.includes('name') || h.includes('head'))) obj['fee_name'] = val; // Prioritize fee name
+                            else if (h.includes('name') && !h.includes('user') && !h.includes('fee') && !h.includes('head')) obj['name'] = val; // Strict name check
                             else if (h.includes('semester')) obj['semester'] = val;
                             else if (h.includes('amount')) obj['amount'] = val;
                             else if (h === 'cr') obj['cr'] = val;
@@ -640,8 +617,10 @@
                             if (student) obj.name = student.name;
                         }
 
+                        // FIXED DUPLICATE CHECK FOR PAYMENTS
                         let isDuplicate = false;
                         if (type === 'payments') {
+                             // STRICT CHECK: Matches Reg, Amount, Date, and Bank (ignores Semester)
                              isDuplicate = existingData.some(existing => 
                                 norm(existing.reg_no) === norm(obj.reg_no) &&
                                 Math.abs(parseFloat(existing.amount || 0) - parseFloat(obj.amount || 0)) < 0.01 && 
@@ -653,10 +632,13 @@
                         } else if (type === 'fees') {
                              isDuplicate = existingData.some(existing => norm(existing.degree) === norm(obj.degree) && norm(existing.batch) === norm(obj.batch));
                         } else {
+                             // Default check for Enrollments, Discounts, Others (Reg No + Semester/Term)
                              isDuplicate = existingData.some(existing => 
                                 norm(existing.reg_no) === norm(obj.reg_no) &&
-                                ((existing.semester && norm(existing.semester) === norm(obj.semester)) ||
-                                (existing.term && norm(existing.term) === norm(obj.term)))
+                                (
+                                    (existing.semester && norm(existing.semester) === norm(obj.semester)) ||
+                                    (existing.term && norm(existing.term) === norm(obj.term))
+                                )
                              );
                         }
                         
@@ -1096,89 +1078,6 @@
                             )}
                         </div>
                     </div>
-
-                    {/* NEW: SESSION DETAIL MODAL */}
-                    {sessionDetail && (
-                        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-                            <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col">
-                                <div className="p-6 border-b flex justify-between items-center bg-gray-50 rounded-t-xl no-print">
-                                    <h3 className="text-xl font-bold">Session Detail: {sessionDetail.session}</h3>
-                                    <div className="flex gap-2">
-                                        <button onClick={() => window.print()} className="bg-gray-700 text-white px-4 py-2 rounded hover:bg-gray-800"><Printer className="h-4 w-4 inline mr-2"/> Print Report</button>
-                                        <button onClick={() => setSessionDetail(null)} className="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
-                                    </div>
-                                </div>
-                                
-                                <div className="flex-1 overflow-auto p-6" id="printableArea">
-                                    <div className="mb-4 hidden print-only">
-                                        <h2 className="text-2xl font-bold text-center">Session Financial Report: {sessionDetail.session}</h2>
-                                        <p className="text-center text-sm text-gray-500">Generated on: {new Date().toLocaleDateString()}</p>
-                                    </div>
-
-                                    {/* Summary Cards for Detail View */}
-                                    <div className="grid grid-cols-5 gap-4 mb-6 text-sm">
-                                        <div className="bg-blue-50 p-3 rounded border border-blue-100">
-                                            <div className="text-gray-500">Total Enrolled</div>
-                                            <div className="font-bold text-lg">{sessionDetail.enrolled}</div>
-                                        </div>
-                                        <div className="bg-gray-50 p-3 rounded border border-gray-200">
-                                            <div className="text-gray-500">Total Charged</div>
-                                            <div className="font-bold text-lg">{num(sessionDetail.charged)}</div>
-                                        </div>
-                                        <div className="bg-orange-50 p-3 rounded border border-orange-100">
-                                            <div className="text-gray-500">Total Discount</div>
-                                            <div className="font-bold text-lg">{num(sessionDetail.discount)}</div>
-                                        </div>
-                                        <div className="bg-green-50 p-3 rounded border border-green-100">
-                                            <div className="text-gray-500">Total Paid</div>
-                                            <div className="font-bold text-lg text-green-700">{num(sessionDetail.paid)}</div>
-                                        </div>
-                                        <div className="bg-red-50 p-3 rounded border border-red-100">
-                                            <div className="text-gray-500">Pending Balance</div>
-                                            <div className="font-bold text-lg text-red-600">{num(sessionDetail.balance)}</div>
-                                        </div>
-                                    </div>
-
-                                    <table className="w-full text-xs text-left border-collapse">
-                                        <thead className="bg-gray-100 uppercase font-bold text-gray-700">
-                                            <tr>
-                                                <th className="p-2 border">#</th>
-                                                <th className="p-2 border">Reg No</th>
-                                                <th className="p-2 border">Name</th>
-                                                <th className="p-2 border text-center">Courses</th>
-                                                <th className="p-2 border text-center">Cr</th>
-                                                <th className="p-2 border text-right">Tuition</th>
-                                                <th className="p-2 border text-right">Other</th>
-                                                <th className="p-2 border text-right">Discount</th>
-                                                <th className="p-2 border text-right bg-gray-50">Total</th>
-                                                <th className="p-2 border text-right text-green-700">Paid</th>
-                                                <th className="p-2 border text-right">Balance</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {sessionDetail.details.map((s, idx) => (
-                                                <tr key={idx} className="border-b hover:bg-gray-50">
-                                                    <td className="p-2 border">{idx + 1}</td>
-                                                    <td className="p-2 border font-mono">{s.reg_no}</td>
-                                                    <td className="p-2 border">{s.name}</td>
-                                                    <td className="p-2 border text-center">{s.courses}</td>
-                                                    <td className="p-2 border text-center">{s.cr}</td>
-                                                    <td className="p-2 border text-right">{num(s.tuition)}</td>
-                                                    <td className="p-2 border text-right">{num(s.other)}</td>
-                                                    <td className="p-2 border text-right text-red-500">{num(s.discount)}</td>
-                                                    <td className="p-2 border text-right font-bold bg-gray-50">{num(s.tuition + s.other - s.discount)}</td>
-                                                    <td className="p-2 border text-right font-bold text-green-700">{num(s.paid)}</td>
-                                                    <td className={`p-2 border text-right font-bold ${s.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>{num(s.balance)}</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                    
-                    {/* ... (Other Modals: showModal, showPasswordModal, importPreview - Keep SAME as previous) ... */}
                     {showModal && (
                         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
                             <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
@@ -1289,6 +1188,86 @@
                                 <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
                                     <button onClick={() => { setImportPreview({show:false, newItems:[], duplicates:[], total:0, type:''}); }} className="px-4 py-2 bg-gray-100 rounded font-bold hover:bg-gray-200">Cancel</button>
                                     {importPreview.newItems.length > 0 && <button onClick={confirmImport} className="px-6 py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700">Import {importPreview.newItems.length} Records</button>}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    {/* NEW: SESSION DETAIL MODAL */}
+                    {sessionDetail && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                            <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col">
+                                <div className="p-6 border-b flex justify-between items-center bg-gray-50 rounded-t-xl no-print">
+                                    <h3 className="text-xl font-bold">Session Detail: {sessionDetail.session}</h3>
+                                    <div className="flex gap-2">
+                                        <button onClick={() => window.print()} className="bg-gray-700 text-white px-4 py-2 rounded hover:bg-gray-800"><Printer className="h-4 w-4 inline mr-2"/> Print Report</button>
+                                        <button onClick={() => setSessionDetail(null)} className="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+                                    </div>
+                                </div>
+                                
+                                <div className="flex-1 overflow-auto p-6" id="printableArea">
+                                    <div className="mb-4 hidden print-only">
+                                        <h2 className="text-2xl font-bold text-center">Session Financial Report: {sessionDetail.session}</h2>
+                                        <p className="text-center text-sm text-gray-500">Generated on: {new Date().toLocaleDateString()}</p>
+                                    </div>
+
+                                    {/* Summary Cards for Detail View */}
+                                    <div className="grid grid-cols-5 gap-4 mb-6 text-sm">
+                                        <div className="bg-blue-50 p-3 rounded border border-blue-100">
+                                            <div className="text-gray-500">Total Enrolled</div>
+                                            <div className="font-bold text-lg">{sessionDetail.enrolled}</div>
+                                        </div>
+                                        <div className="bg-gray-50 p-3 rounded border border-gray-200">
+                                            <div className="text-gray-500">Total Charged</div>
+                                            <div className="font-bold text-lg">{num(sessionDetail.charged)}</div>
+                                        </div>
+                                        <div className="bg-orange-50 p-3 rounded border border-orange-100">
+                                            <div className="text-gray-500">Total Discount</div>
+                                            <div className="font-bold text-lg">{num(sessionDetail.discount)}</div>
+                                        </div>
+                                        <div className="bg-green-50 p-3 rounded border border-green-100">
+                                            <div className="text-gray-500">Total Paid</div>
+                                            <div className="font-bold text-lg text-green-700">{num(sessionDetail.paid)}</div>
+                                        </div>
+                                        <div className="bg-red-50 p-3 rounded border border-red-100">
+                                            <div className="text-gray-500">Pending Balance</div>
+                                            <div className="font-bold text-lg text-red-600">{num(sessionDetail.balance)}</div>
+                                        </div>
+                                    </div>
+
+                                    <table className="w-full text-xs text-left border-collapse">
+                                        <thead className="bg-gray-100 uppercase font-bold text-gray-700">
+                                            <tr>
+                                                <th className="p-2 border">#</th>
+                                                <th className="p-2 border">Reg No</th>
+                                                <th className="p-2 border">Name</th>
+                                                <th className="p-2 border text-center">Courses</th>
+                                                <th className="p-2 border text-center">Cr</th>
+                                                <th className="p-2 border text-right">Tuition</th>
+                                                <th className="p-2 border text-right">Exam Fee</th>
+                                                <th className="p-2 border text-right">Discount</th>
+                                                <th className="p-2 border text-right bg-gray-50">Total</th>
+                                                <th className="p-2 border text-right text-green-700">Paid</th>
+                                                <th className="p-2 border text-right">Balance</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {sessionDetail.details.map((s, idx) => (
+                                                <tr key={idx} className="border-b hover:bg-gray-50">
+                                                    <td className="p-2 border">{idx + 1}</td>
+                                                    <td className="p-2 border font-mono">{s.reg_no}</td>
+                                                    <td className="p-2 border">{s.name}</td>
+                                                    <td className="p-2 border text-center">{s.courses}</td>
+                                                    <td className="p-2 border text-center">{s.cr}</td>
+                                                    <td className="p-2 border text-right">{num(s.tuition)}</td>
+                                                    <td className="p-2 border text-right">{num(s.other)}</td>
+                                                    <td className="p-2 border text-right text-red-500">{num(s.discount)}</td>
+                                                    <td className="p-2 border text-right font-bold bg-gray-50">{num(s.tuition + s.other - s.discount)}</td>
+                                                    <td className="p-2 border text-right font-bold text-green-700">{num(s.paid)}</td>
+                                                    <td className={`p-2 border text-right font-bold ${s.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>{num(s.balance)}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
                         </div>
