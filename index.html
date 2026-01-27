@@ -26,7 +26,7 @@
         @media print {
             @page {
                 size: A4 portrait;
-                margin: 5mm; /* Reduced margin */
+                margin: 5mm;
             }
             body * {
                 visibility: hidden;
@@ -41,28 +41,26 @@
                 width: 100%;
                 height: 100%;
                 margin: 0;
-                padding: 5px;
+                padding: 10px;
                 background: white;
                 font-family: 'Arial', sans-serif;
-                font-size: 9px; /* Reduced font for better fit */
+                font-size: 9px;
                 color: black;
             }
             .no-print { display: none !important; }
             
-            /* Table optimization for print */
             table { 
                 width: 100% !important; 
                 border-collapse: collapse; 
-                table-layout: fixed; /* Fixes column widths */
+                table-layout: fixed; 
             }
             th, td { 
                 border: 1px solid #000 !important; 
-                padding: 2px 3px !important; /* Tight padding */
+                padding: 2px 3px !important; 
                 overflow: hidden;
                 white-space: nowrap;
             }
             
-            /* Force background for Modern Total Highlight */
             .print-modern-total {
                 background-color: #000 !important;
                 color: #fff !important;
@@ -72,22 +70,20 @@
                 print-color-adjust: exact;
             }
 
-            /* Specific Column Widths for Print (Total ~100%) */
-            th:nth-child(1), td:nth-child(1) { width: 14%; white-space: normal; } /* Sem */
-            th:nth-child(2), td:nth-child(2) { width: 3%; text-align: center; }  /* Sub (Swapped) */
-            th:nth-child(3), td:nth-child(3) { width: 3%; text-align: center; }  /* Cr (Swapped) */
-            th:nth-child(4), td:nth-child(4) { width: 8%; text-align: right; }  /* Tuition */
-            th:nth-child(5), td:nth-child(5) { width: 6%; text-align: right; }  /* Exam */
-            th:nth-child(6), td:nth-child(6) { width: 6%; text-align: right; }  /* Reg */
-            th:nth-child(7), td:nth-child(7) { width: 6%; text-align: right; }  /* Other */
-            th:nth-child(8), td:nth-child(8) { width: 9%; text-align: right; }   /* Total */
-            th:nth-child(9), td:nth-child(9) { width: 5%; text-align: center; }  /* Disc % */
-            th:nth-child(10), td:nth-child(10) { width: 8%; text-align: right; } /* Disc Amt */
-            th:nth-child(11), td:nth-child(11) { width: 10%; text-align: right; font-weight: bold; } /* Net Fee */
-            th:nth-child(12), td:nth-child(12) { width: 10%; text-align: right; } /* Paid */
-            th:nth-child(13), td:nth-child(13) { width: 12%; text-align: right; font-weight: bold; } /* Balance */
+            th:nth-child(1), td:nth-child(1) { width: 14%; white-space: normal; } 
+            th:nth-child(2), td:nth-child(2) { width: 3%; text-align: center; }  
+            th:nth-child(3), td:nth-child(3) { width: 3%; text-align: center; }  
+            th:nth-child(4), td:nth-child(4) { width: 8%; text-align: right; }  
+            th:nth-child(5), td:nth-child(5) { width: 6%; text-align: right; }  
+            th:nth-child(6), td:nth-child(6) { width: 6%; text-align: right; }  
+            th:nth-child(7), td:nth-child(7) { width: 6%; text-align: right; }  
+            th:nth-child(8), td:nth-child(8) { width: 9%; text-align: right; }   
+            th:nth-child(9), td:nth-child(9) { width: 5%; text-align: center; }  
+            th:nth-child(10), td:nth-child(10) { width: 8%; text-align: right; } 
+            th:nth-child(11), td:nth-child(11) { width: 10%; text-align: right; font-weight: bold; } 
+            th:nth-child(12), td:nth-child(12) { width: 10%; text-align: right; } 
+            th:nth-child(13), td:nth-child(13) { width: 12%; text-align: right; font-weight: bold; } 
             
-            /* Headers */
             thead th {
                 background-color: #e5e7eb !important;
                 font-weight: 800;
@@ -101,7 +97,7 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect } = React;
+        const { useState, useEffect, useMemo } = React;
         const API_URL = 'api.php'; 
 
         // --- ICONS ---
@@ -128,6 +124,7 @@
         const CloudUpload = (p) => <Icon d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19a4 4 0 0 0 4 4h11a4 4 0 0 0 4-4v-2.5" {...p} />;
         const Landmark = (p) => <Icon d="M3 22v-8h18v8M12 2L2 7v3h20V7L12 2zM6 10v6M10 10v6M14 10v6M18 10v6" {...p} />;
         const Menu = (p) => <Icon d="M3 12h18M3 6h18M3 18h18" {...p} />;
+        const BarChart = (p) => <Icon d="M12 20V10M18 20V4M6 20v-4" {...p} />;
 
         function App() {
             // --- STATE MANAGEMENT ---
@@ -157,6 +154,7 @@
 
             const TABS = [
                 { id: 'clearance', label: 'Clearance', icon: FileText },
+                { id: 'summary', label: 'Summary', icon: BarChart }, // NEW TAB
                 { id: 'students', label: 'Students', icon: Users },
                 { id: 'fees', label: 'Fee Structure', icon: DollarSign },
                 { id: 'others', label: 'Other Charges', icon: AlertCircle },
@@ -241,6 +239,97 @@
             const filteredData = getProcessedData();
             const uniqueSessions = [...new Set(data.enrollments.map(e => e.semester))].sort();
             
+            // --- NEW: SUMMARY LOGIC ---
+            const getSummaryData = useMemo(() => {
+                if(activeTab !== 'summary') return [];
+                
+                // Helper Maps
+                const studentMap = new Map(data.students.map(s => [norm(s.reg_no), s]));
+                const otherChargesMap = new Map();
+                data.others.forEach(o => {
+                     const k = `${norm(o.reg_no)}_${norm(o.semester)}`;
+                     otherChargesMap.set(k, (otherChargesMap.get(k) || 0) + (parseFloat(o.amount) || 0));
+                });
+                const discountMap = new Map();
+                data.discounts.forEach(d => {
+                     const k = `${norm(d.reg_no)}_${norm(d.term)}`;
+                     discountMap.set(k, parseFloat(d.discount) || 0);
+                });
+
+                const summary = new Map();
+
+                // 1. Calculate Charges (from Enrollments)
+                data.enrollments.forEach(en => {
+                    const sem = en.semester; // Keep display format
+                    const semKey = norm(sem);
+                    if(!summary.has(semKey)) {
+                         summary.set(semKey, { session: sem, enrolled: new Set(), charged: 0, discount: 0, other: 0, paid: 0 });
+                    }
+                    const entry = summary.get(semKey);
+                    entry.enrolled.add(norm(en.reg_no));
+                    
+                    const student = studentMap.get(norm(en.reg_no));
+                    let feeDetails = { total: 0, other: 0 };
+                    
+                    if (student) {
+                         let fee = data.fees.find(f => norm(f.degree) === norm(student.degree) && norm(f.batch) === norm(student.batch));
+                         if(!fee) {
+                            fee = data.fees.find(f => norm(f.degree) === norm(student.degree) && (
+                                norm(student.batch).includes(norm(f.batch)) || norm(f.batch).includes(norm(student.batch))
+                            ));
+                         }
+
+                         if (fee) {
+                             const cr = parseFloat(en.cr || 0);
+                             const courses = parseFloat(en.courses || 0);
+                             const tuition = cr * parseFloat(fee.per_cr_fee || 0);
+                             const exam = courses * parseFloat(fee.per_course_fee || 0);
+                             const reg = parseFloat(fee.reg_fee || 0);
+                             const otherBase = parseFloat(fee.other_fee || 0);
+                             
+                             feeDetails.total = tuition + exam + reg + otherBase;
+                             feeDetails.other = otherBase;
+                         }
+                    }
+
+                    // Add Specific Other Charges
+                    const specificOther = otherChargesMap.get(`${norm(en.reg_no)}_${semKey}`) || 0;
+                    feeDetails.other += specificOther;
+                    feeDetails.total += specificOther;
+
+                    // Calculate Discount
+                    const discPct = discountMap.get(`${norm(en.reg_no)}_${semKey}`) || 0;
+                    const discAmt = (feeDetails.total * discPct) / 100;
+
+                    entry.charged += feeDetails.total;
+                    entry.discount += discAmt;
+                    entry.other += feeDetails.other;
+                });
+
+                // 2. Calculate Payments
+                data.payments.forEach(p => {
+                    const pSem = norm(p.semester);
+                    // Match to existing session keys
+                    let targetKey = null;
+                    for (let key of summary.keys()) {
+                        if (pSem === key || (key.includes(pSem) && pSem.length > 3) || (pSem.includes(key) && key.length > 3)) {
+                            targetKey = key;
+                            break;
+                        }
+                    }
+                    if(targetKey) {
+                        summary.get(targetKey).paid += parseFloat(p.amount || 0);
+                    }
+                });
+                
+                return Array.from(summary.values()).map(s => ({
+                    ...s,
+                    enrolled: s.enrolled.size,
+                    balance: (s.charged - s.discount) - s.paid
+                }));
+
+            }, [activeTab, data]);
+
             const paymentStats = activeTab === 'payments' ? filteredData.reduce((acc, item) => {
                  const amt = parseFloat(item.amount) || 0;
                  acc.total += amt;
@@ -780,7 +869,55 @@
                                 </div>
                             )}
 
-                            {activeTab !== 'clearance' && (
+                            {activeTab === 'summary' && (
+                                <div>
+                                    <h2 className="text-2xl font-bold text-gray-800 capitalize mb-6">Financial Summary</h2>
+                                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-sm text-left">
+                                                <thead className="bg-gray-50 text-gray-700 uppercase font-bold text-xs border-b border-gray-200">
+                                                    <tr>
+                                                        <th className="p-4">Session</th>
+                                                        <th className="p-4 text-center">Enrolled</th>
+                                                        <th className="p-4 text-right">Total Charged</th>
+                                                        <th className="p-4 text-right">Discounts</th>
+                                                        <th className="p-4 text-right">Other Charges</th>
+                                                        <th className="p-4 text-right">Total Paid</th>
+                                                        <th className="p-4 text-right">Balance</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-gray-100">
+                                                    {getSummaryData.map((row, idx) => (
+                                                        <tr key={idx} className="hover:bg-gray-50 transition">
+                                                            <td className="p-4 font-bold">{row.session}</td>
+                                                            <td className="p-4 text-center"><span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-bold">{row.enrolled}</span></td>
+                                                            <td className="p-4 text-right font-mono font-bold text-gray-800">{num(row.charged)}</td>
+                                                            <td className="p-4 text-right font-mono text-orange-600">{num(row.discount)}</td>
+                                                            <td className="p-4 text-right font-mono text-gray-600">{num(row.other)}</td>
+                                                            <td className="p-4 text-right font-mono font-bold text-green-600">{num(row.paid)}</td>
+                                                            <td className={`p-4 text-right font-mono font-bold ${row.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>{num(row.balance)}</td>
+                                                        </tr>
+                                                    ))}
+                                                    {getSummaryData.length === 0 && <tr><td colSpan="7" className="p-8 text-center text-gray-400">No session data available.</td></tr>}
+                                                    {getSummaryData.length > 0 && (
+                                                        <tr className="bg-gray-800 text-white font-bold">
+                                                            <td className="p-4">TOTALS</td>
+                                                            <td className="p-4 text-center">{getSummaryData.reduce((s, r) => s + r.enrolled, 0)}</td>
+                                                            <td className="p-4 text-right">{num(getSummaryData.reduce((s, r) => s + r.charged, 0))}</td>
+                                                            <td className="p-4 text-right">{num(getSummaryData.reduce((s, r) => s + r.discount, 0))}</td>
+                                                            <td className="p-4 text-right">{num(getSummaryData.reduce((s, r) => s + r.other, 0))}</td>
+                                                            <td className="p-4 text-right text-green-400">{num(getSummaryData.reduce((s, r) => s + r.paid, 0))}</td>
+                                                            <td className="p-4 text-right text-red-400">{num(getSummaryData.reduce((s, r) => s + r.balance, 0))}</td>
+                                                        </tr>
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab !== 'clearance' && activeTab !== 'summary' && (
                                 <div>
                                     <div className="flex flex-col gap-4 mb-6 no-print">
                                         <div className="flex justify-between items-center"><h2 className="text-2xl font-bold text-gray-800 capitalize">{activeTab} Directory</h2><div className="flex gap-2">{(user.role === 'admin' || user.permissions.includes(activeTab)) && <button onClick={() => openModal(activeTab)} className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700 transition flex items-center gap-2 shadow-sm"><Plus className="h-5 w-5" /> Add New</button>}</div></div>
