@@ -441,9 +441,13 @@
                     for (let i = 1; i < rows.length; i++) {
                         const values = rows[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
                         const obj = {};
+                        
+                        // Smart Header Mapping
                         headers.forEach((h, index) => {
                             let val = values[index] ? values[index].trim() : '';
                             if (val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1);
+                            
+                            // Map CSV headers to internal keys
                             if (h.includes('reg') && h.includes('no')) obj['reg_no'] = val;
                             else if (h.includes('name') && !h.includes('user')) obj['name'] = val;
                             else if (h.includes('semester')) obj['semester'] = val;
@@ -459,39 +463,28 @@
                             else if (h.includes('email')) obj['email'] = val;
                             else obj[h] = val; 
                         });
-                        
-                        // NEW: DUPLICATE CHECK FOR PAYMENTS (Registration #, Amount, Date, Bank)
-                        let isDuplicate = false;
-                        if (type === 'payments') {
-                             isDuplicate = existingData.some(existing => 
-                                norm(existing.reg_no) === norm(obj.reg_no) &&
-                                Math.abs(parseFloat(existing.amount || 0) - parseFloat(obj.amount || 0)) < 0.01 && 
-                                existing.date === obj.date && 
-                                norm(existing.bank) === norm(obj.bank)
-                            );
-                        } else if (type === 'students') {
-                             isDuplicate = existingData.some(existing => norm(existing.reg_no) === norm(obj.reg_no));
-                        } else if (type === 'fees') {
-                             isDuplicate = existingData.some(existing => norm(existing.degree) === norm(obj.degree) && norm(existing.batch) === norm(obj.batch));
-                        } else {
-                             // Default check for Enrollments, Discounts, Others (Reg No + Semester/Term)
-                             isDuplicate = existingData.some(existing => 
-                                norm(existing.reg_no) === norm(obj.reg_no) &&
-                                (
-                                    (existing.semester && norm(existing.semester) === norm(obj.semester)) ||
-                                    (existing.term && norm(existing.term) === norm(obj.term))
-                                )
-                             );
-                        }
 
                         if(importTerm) {
                             if(type === 'enrollments' || type === 'payments' || type === 'others') obj.semester = importTerm;
                             else if(type === 'discounts') obj.term = importTerm;
                         }
                         if (obj.amount) obj.amount = obj.amount.replace(/[^0-9.-]/g, '');
+
+                        // Duplicate Check
+                        const isDuplicate = existingData.some(existing => 
+                            norm(existing.reg_no) === norm(obj.reg_no) &&
+                            (
+                                (existing.semester && norm(existing.semester) === norm(obj.semester)) ||
+                                (existing.term && norm(existing.term) === norm(obj.term)) ||
+                                // For Payments, check all fields to allow multiple same-sem payments
+                                (type === 'payments' && existing.date === obj.date && parseFloat(existing.amount) === parseFloat(obj.amount) && norm(existing.bank) === norm(obj.bank))
+                            )
+                        );
                         
-                        if (isDuplicate) duplicates.push(obj); else newItems.push(obj);
+                        if (isDuplicate) duplicates.push(obj);
+                        else newItems.push(obj);
                     }
+                    
                     setImportPreview({ show: true, total: rows.length - 1, newItems, duplicates, type });
                     e.target.value = null;
                 };
@@ -589,9 +582,7 @@
                         let val = row[fieldName];
                         if (Array.isArray(val)) val = val.join('|'); 
                         val = String(val || '');
-                        if (val.search(/("|,|\n)/g) >= 0) {
-                            val = `"${val.replace(/"/g, '""')}"`;
-                        }
+                        if (val.search(/("|,|\n)/g) >= 0) val = `"${val.replace(/"/g, '""')}"`;
                         return val;
                     }).join(','))
                 ];
