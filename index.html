@@ -606,7 +606,7 @@
                     newData.total_fee = newData.tuition_fee + newData.exam_fee + parseFloat(newData.reg_fee||0) + parseFloat(newData.other_fee||0);
                 }
                 
-                if ((modalType === 'payments' || modalType === 'others' || modalType === 'discounts') && !newData.name) {
+                if ((modalType === 'payments' || modalType === 'others') && !newData.name) {
                     const s = data.students.find(st => norm(st.reg_no) === norm(newData.reg_no));
                     if(s) newData.name = s.name;
                 }
@@ -689,10 +689,8 @@
                             if (student) obj.name = student.name;
                         }
 
-                        // FIXED DUPLICATE CHECK FOR PAYMENTS
                         let isDuplicate = false;
                         if (type === 'payments') {
-                             // STRICT CHECK: Matches Reg, Amount, Date, and Bank (ignores Semester)
                              isDuplicate = existingData.some(existing => 
                                 norm(existing.reg_no) === norm(obj.reg_no) &&
                                 Math.abs(parseFloat(existing.amount || 0) - parseFloat(obj.amount || 0)) < 0.01 && 
@@ -704,13 +702,10 @@
                         } else if (type === 'fees') {
                              isDuplicate = existingData.some(existing => norm(existing.degree) === norm(obj.degree) && norm(existing.batch) === norm(obj.batch));
                         } else {
-                             // Default check for Enrollments, Discounts, Others (Reg No + Semester/Term)
                              isDuplicate = existingData.some(existing => 
                                 norm(existing.reg_no) === norm(obj.reg_no) &&
-                                (
-                                    (existing.semester && norm(existing.semester) === norm(obj.semester)) ||
-                                    (existing.term && norm(existing.term) === norm(obj.term))
-                                )
+                                ((existing.semester && norm(existing.semester) === norm(obj.semester)) ||
+                                (existing.term && norm(existing.term) === norm(obj.term)))
                              );
                         }
                         
@@ -785,7 +780,7 @@
                     case 'enrollments': return ['reg_no', 'name', 'semester', 'cr', 'courses'];
                     case 'payments': return ['reg_no', 'name', 'semester', 'amount', 'date', 'bank'];
                     case 'discounts': return ['reg_no', 'name', 'term', 'discount'];
-                    case 'others': return ['reg_no', 'name', 'semester', 'fee_name', 'amount']; // CHANGED TO FEE HEAD
+                    case 'others': return ['reg_no', 'name', 'semester', 'fee_name', 'amount']; 
                     case 'users': return ['username', 'password', 'role', 'permissions']; 
                     case 'banks': return ['name', 'account_no'];
                     default: return [];
