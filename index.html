@@ -24,10 +24,6 @@
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         
         @media print {
-            @page {
-                size: A4 portrait;
-                margin: 5mm; /* Reduced margin */
-            }
             body * {
                 visibility: hidden;
             }
@@ -41,23 +37,22 @@
                 width: 100%;
                 height: 100%;
                 margin: 0;
-                padding: 5px;
+                padding: 10px;
                 background: white;
                 font-family: 'Arial', sans-serif;
-                font-size: 9px; /* Reduced font for better fit */
+                font-size: 9px; 
                 color: black;
             }
             .no-print { display: none !important; }
             
-            /* Table optimization for print */
             table { 
                 width: 100% !important; 
                 border-collapse: collapse; 
-                table-layout: fixed; /* Fixes column widths */
+                table-layout: fixed; 
             }
             th, td { 
                 border: 1px solid #000 !important; 
-                padding: 2px 3px !important; /* Tight padding */
+                padding: 2px 3px !important; 
                 overflow: hidden;
                 white-space: nowrap;
             }
@@ -72,29 +67,26 @@
                 print-color-adjust: exact;
             }
 
-            /* Specific Column Widths for Print (Total ~100%) */
-            th:nth-child(1), td:nth-child(1) { width: 14%; white-space: normal; } /* Sem */
-            th:nth-child(2), td:nth-child(2) { width: 3%; text-align: center; }  /* Sub (Swapped) */
-            th:nth-child(3), td:nth-child(3) { width: 3%; text-align: center; }  /* Cr (Swapped) */
-            th:nth-child(4), td:nth-child(4) { width: 8%; text-align: right; }  /* Tuition */
-            th:nth-child(5), td:nth-child(5) { width: 6%; text-align: right; }  /* Exam */
-            th:nth-child(6), td:nth-child(6) { width: 6%; text-align: right; }  /* Reg */
-            th:nth-child(7), td:nth-child(7) { width: 6%; text-align: right; }  /* Other */
-            th:nth-child(8), td:nth-child(8) { width: 9%; text-align: right; }   /* Total */
-            th:nth-child(9), td:nth-child(9) { width: 5%; text-align: center; }  /* Disc % */
-            th:nth-child(10), td:nth-child(10) { width: 8%; text-align: right; } /* Disc Amt */
-            th:nth-child(11), td:nth-child(11) { width: 10%; text-align: right; font-weight: bold; } /* Net Fee */
-            th:nth-child(12), td:nth-child(12) { width: 10%; text-align: right; } /* Paid */
-            th:nth-child(13), td:nth-child(13) { width: 12%; text-align: right; font-weight: bold; } /* Balance */
+            /* --- CONDITIONAL PAGE ORIENTATION --- */
+            /* Default Portrait for Clearance */
+            @page { size: A4 portrait; margin: 5mm; }
             
-            /* Headers */
-            thead th {
-                background-color: #e5e7eb !important;
-                font-weight: 800;
-                text-transform: uppercase;
-                font-size: 8px;
+            /* Landscape for Summary if the container has class 'landscape-print' */
+            .landscape-print-container {
+                page-break-before: always;
+            }
+            @page :first {
+                 /* This helps some browsers, but JS/CSS switching is safer */
             }
         }
+        
+        /* Force Landscape via CSS class for specific print area */
+        .landscape-mode-print {
+             @media print {
+                 @page { size: A4 landscape; }
+             }
+        }
+
     </style>
 </head>
 <body class="bg-gray-100 font-sans text-gray-800 overflow-hidden">
@@ -139,7 +131,7 @@
             });
             const [searchReg, setSearchReg] = useState('');
             const [filterSession, setFilterSession] = useState(''); 
-            const [summaryFilterSession, setSummaryFilterSession] = useState(''); // NEW: Summary Filter
+            const [summaryFilterSession, setSummaryFilterSession] = useState(''); 
             const [tabSearch, setTabSearch] = useState('');
             const [selectedIds, setSelectedIds] = useState(new Set());
             const [clearanceResult, setClearanceResult] = useState(null);
@@ -259,11 +251,9 @@
                 return getTermRank(a) - getTermRank(b);
             });
             
-            // --- NEW: SUMMARY LOGIC ---
+            // --- SUMMARY LOGIC ---
             const getSummaryData = useMemo(() => {
                 if(activeTab !== 'summary') return [];
-                
-                // Helper Maps
                 const studentMap = new Map(data.students.map(s => [norm(s.reg_no), s]));
                 const otherChargesMap = new Map();
                 data.others.forEach(o => {
@@ -275,26 +265,18 @@
                      const k = `${norm(d.reg_no)}_${norm(d.term)}`;
                      discountMap.set(k, parseFloat(d.discount) || 0);
                 });
-
                 const summary = new Map();
-
-                // 1. Calculate Charges (from Enrollments)
                 data.enrollments.forEach(en => {
                     const sem = en.semester; 
                     const semKey = norm(sem);
-                    
-                    // Filter Logic applied here
                     if (summaryFilterSession && !semKey.includes(norm(summaryFilterSession))) return;
-
                     if(!summary.has(semKey)) {
                          summary.set(semKey, { session: sem, enrolled: new Set(), charged: 0, discount: 0, other: 0, paid: 0 });
                     }
                     const entry = summary.get(semKey);
                     entry.enrolled.add(norm(en.reg_no));
-                    
                     const student = studentMap.get(norm(en.reg_no));
                     let feeDetails = { total: 0, other: 0 };
-                    
                     if (student) {
                          let fee = data.fees.find(f => norm(f.degree) === norm(student.degree) && norm(f.batch) === norm(student.batch));
                          if(!fee) {
@@ -302,7 +284,6 @@
                                 norm(student.batch).includes(norm(f.batch)) || norm(f.batch).includes(norm(student.batch))
                             ));
                          }
-
                          if (fee) {
                              const cr = parseFloat(en.cr || 0);
                              const courses = parseFloat(en.courses || 0);
@@ -310,32 +291,22 @@
                              const exam = courses * parseFloat(fee.per_course_fee || 0);
                              const reg = parseFloat(fee.reg_fee || 0);
                              const otherBase = parseFloat(fee.other_fee || 0);
-                             
                              feeDetails.total = tuition + exam + reg + otherBase;
                              feeDetails.other = otherBase;
                          }
                     }
-
-                    // Add Specific Other Charges
                     const specificOther = otherChargesMap.get(`${norm(en.reg_no)}_${semKey}`) || 0;
                     feeDetails.other += specificOther;
                     feeDetails.total += specificOther;
-
-                    // Calculate Discount
                     const discPct = discountMap.get(`${norm(en.reg_no)}_${semKey}`) || 0;
                     const discAmt = (feeDetails.total * discPct) / 100;
-
                     entry.charged += feeDetails.total;
                     entry.discount += discAmt;
                     entry.other += feeDetails.other;
                 });
-
-                // 2. Calculate Payments
                 data.payments.forEach(p => {
                     const pSem = norm(p.semester);
                     if (summaryFilterSession && !pSem.includes(norm(summaryFilterSession))) return;
-
-                    // Match to existing session keys
                     let targetKey = null;
                     for (let key of summary.keys()) {
                         if (pSem === key || (key.includes(pSem) && pSem.length > 3) || (pSem.includes(key) && key.length > 3)) {
@@ -347,8 +318,6 @@
                         summary.get(targetKey).paid += parseFloat(p.amount || 0);
                     }
                 });
-                
-                // Sort
                 return Array.from(summary.values()).sort((a,b) => {
                      const yearA = parseInt(a.session.replace(/\D/g, '')) || 0;
                      const yearB = parseInt(b.session.replace(/\D/g, '')) || 0;
@@ -359,9 +328,9 @@
                     enrolled: s.enrolled.size,
                     balance: (s.charged - s.discount) - s.paid
                 }));
-
             }, [activeTab, data, summaryFilterSession]);
 
+            // --- PAYMENT DASHBOARD UPDATED LABELS ---
             const paymentStats = activeTab === 'payments' ? filteredData.reduce((acc, item) => {
                  const amt = parseFloat(item.amount) || 0;
                  acc.total += amt;
@@ -468,14 +437,6 @@
                     studentEnrollments = studentEnrollments.filter(en => norm(en.semester).includes(cleanSession));
                 }
                 
-                // Sort Enrollments by Term
-                studentEnrollments = studentEnrollments.sort((a,b) => {
-                    const yearA = parseInt(a.semester.replace(/\D/g, '')) || 0;
-                    const yearB = parseInt(b.semester.replace(/\D/g, '')) || 0;
-                    if (yearA !== yearB) return yearA - yearB;
-                    return getTermRank(a.semester) - getTermRank(b.semester);
-                });
-                
                 studentEnrollments = studentEnrollments.map(en => {
                     const enSem = norm(en.semester);
                     const cr = parseFloat(en.cr || 0);
@@ -552,7 +513,6 @@
                 setShowModal(true);
             };
 
-            // --- IMPORT HANDLER ---
             const handleImport = (e, type) => {
                 const file = e.target.files[0];
                 if (!file) return;
@@ -570,16 +530,12 @@
                     for (let i = 1; i < rows.length; i++) {
                         const values = rows[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
                         const obj = {};
-                        
-                        // Smart Header Mapping
                         headers.forEach((h, index) => {
                             let val = values[index] ? values[index].trim() : '';
                             if (val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1);
-                            
-                            // Map CSV headers to internal keys
                             if (h.includes('reg') && h.includes('no')) obj['reg_no'] = val;
-                            else if ((h.includes('fee') || h.includes('charge') || h.includes('head')) && (h.includes('name') || h.includes('head'))) obj['fee_name'] = val; // Prioritize fee name
-                            else if (h.includes('name') && !h.includes('user') && !h.includes('fee') && !h.includes('head')) obj['name'] = val; // Strict name check
+                            else if ((h.includes('fee') || h.includes('charge') || h.includes('head')) && (h.includes('name') || h.includes('head'))) obj['fee_name'] = val; 
+                            else if (h.includes('name') && !h.includes('user') && !h.includes('fee') && !h.includes('head')) obj['name'] = val; 
                             else if (h.includes('semester')) obj['semester'] = val;
                             else if (h.includes('amount')) obj['amount'] = val;
                             else if (h === 'cr') obj['cr'] = val;
@@ -593,23 +549,17 @@
                             else if (h.includes('email')) obj['email'] = val;
                             else obj[h] = val; 
                         });
-
                         if(importTerm) {
                             if(type === 'enrollments' || type === 'payments' || type === 'others') obj.semester = importTerm;
                             else if(type === 'discounts') obj.term = importTerm;
                         }
                         if (obj.amount) obj.amount = obj.amount.replace(/[^0-9.-]/g, '');
-
-                        // AUTO-FILL NAME FROM DIRECTORY (UPDATED)
                         if (!obj.name && obj.reg_no) {
                             const student = data.students.find(s => norm(s.reg_no) === norm(obj.reg_no));
                             if (student) obj.name = student.name;
                         }
-
-                        // FIXED DUPLICATE CHECK FOR PAYMENTS
                         let isDuplicate = false;
                         if (type === 'payments') {
-                             // STRICT CHECK: Matches Reg, Amount, Date, and Bank (ignores Semester)
                              isDuplicate = existingData.some(existing => 
                                 norm(existing.reg_no) === norm(obj.reg_no) &&
                                 Math.abs(parseFloat(existing.amount || 0) - parseFloat(obj.amount || 0)) < 0.01 && 
@@ -621,20 +571,14 @@
                         } else if (type === 'fees') {
                              isDuplicate = existingData.some(existing => norm(existing.degree) === norm(obj.degree) && norm(existing.batch) === norm(obj.batch));
                         } else {
-                             // Default check for Enrollments, Discounts, Others (Reg No + Semester/Term)
                              isDuplicate = existingData.some(existing => 
                                 norm(existing.reg_no) === norm(obj.reg_no) &&
-                                (
-                                    (existing.semester && norm(existing.semester) === norm(obj.semester)) ||
-                                    (existing.term && norm(existing.term) === norm(obj.term))
-                                )
+                                ((existing.semester && norm(existing.semester) === norm(obj.semester)) ||
+                                (existing.term && norm(existing.term) === norm(obj.term)))
                              );
                         }
-                        
-                        if (isDuplicate) duplicates.push(obj);
-                        else newItems.push(obj);
+                        if (isDuplicate) duplicates.push(obj); else newItems.push(obj);
                     }
-                    
                     setImportPreview({ show: true, total: rows.length - 1, newItems, duplicates, type });
                     e.target.value = null;
                 };
@@ -657,7 +601,6 @@
                 refreshData();
             };
 
-            // --- FILTER & BULK ---
             const handleSelectAll = (e) => {
                 if (e.target.checked) setSelectedIds(new Set(filteredData.map(i => i.id || i.reg_no)));
                 else setSelectedIds(new Set());
@@ -702,7 +645,7 @@
                     case 'enrollments': return ['reg_no', 'name', 'semester', 'cr', 'courses'];
                     case 'payments': return ['reg_no', 'name', 'semester', 'amount', 'date', 'bank'];
                     case 'discounts': return ['reg_no', 'name', 'term', 'discount'];
-                    case 'others': return ['reg_no', 'name', 'semester', 'fee_name', 'amount'];
+                    case 'others': return ['reg_no', 'name', 'semester', 'fee_name', 'amount']; // CHANGED TO FEE HEAD
                     case 'users': return ['username', 'password', 'role', 'permissions']; 
                     case 'banks': return ['name', 'account_no'];
                     default: return [];
@@ -711,7 +654,7 @@
             
             const downloadSample = (type) => {
                 const headers = getHeaders(type);
-                const displayHeaders = headers.map(h => h === 'fee_name' ? 'fee_head' : h); // Use 'fee_head' for display
+                const displayHeaders = headers.map(h => h === 'fee_name' ? 'fee_head' : h); 
                 const csvContent = "data:text/csv;charset=utf-8," + displayHeaders.join(",");
                 const encodedUri = encodeURI(csvContent);
                 const link = document.createElement("a");
@@ -912,7 +855,7 @@
                             )}
 
                             {activeTab === 'summary' && (
-                                <div>
+                                <div className="landscape-mode-print">
                                     <h2 className="text-2xl font-bold text-gray-800 capitalize mb-6">Financial Summary</h2>
                                     <div className="flex items-center gap-3 mb-4 no-print">
                                         <label className="font-medium text-sm">Filter Semester:</label>
@@ -1021,11 +964,11 @@
                                                 <div className="text-xs text-green-600 mt-1">Based on current filter</div>
                                             </div>
                                             <div className="bg-white p-4 rounded-xl shadow-sm border-l-4 border-blue-500">
-                                                <div className="text-xs font-bold text-gray-500 uppercase">Via Bank</div>
+                                                <div className="text-xs font-bold text-gray-500 uppercase">JT Branch</div>
                                                 <div className="text-2xl font-bold text-gray-800">{num(paymentStats.bank)}</div>
                                             </div>
                                             <div className="bg-white p-4 rounded-xl shadow-sm border-l-4 border-orange-500">
-                                                <div className="text-xs font-bold text-gray-500 uppercase">Non-Bank / Cash</div>
+                                                <div className="text-xs font-bold text-gray-500 uppercase">Other Bank</div>
                                                 <div className="text-2xl font-bold text-gray-800">{num(paymentStats.cash)}</div>
                                             </div>
                                         </div>
