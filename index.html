@@ -26,7 +26,7 @@
         @media print {
             @page {
                 size: A4 portrait;
-                margin: 5mm;
+                margin: 5mm; /* Reduced margin */
             }
             body * {
                 visibility: hidden;
@@ -41,26 +41,28 @@
                 width: 100%;
                 height: 100%;
                 margin: 0;
-                padding: 10px;
+                padding: 5px;
                 background: white;
                 font-family: 'Arial', sans-serif;
-                font-size: 9px;
+                font-size: 9px; /* Reduced font for better fit */
                 color: black;
             }
             .no-print { display: none !important; }
             
+            /* Table optimization for print */
             table { 
                 width: 100% !important; 
                 border-collapse: collapse; 
-                table-layout: fixed; 
+                table-layout: fixed; /* Fixes column widths */
             }
             th, td { 
                 border: 1px solid #000 !important; 
-                padding: 2px 3px !important; 
+                padding: 2px 3px !important; /* Tight padding */
                 overflow: hidden;
                 white-space: nowrap;
             }
             
+            /* Force background for Modern Total Highlight */
             .print-modern-total {
                 background-color: #000 !important;
                 color: #fff !important;
@@ -70,20 +72,22 @@
                 print-color-adjust: exact;
             }
 
-            th:nth-child(1), td:nth-child(1) { width: 14%; white-space: normal; } 
-            th:nth-child(2), td:nth-child(2) { width: 3%; text-align: center; }  
-            th:nth-child(3), td:nth-child(3) { width: 3%; text-align: center; }  
-            th:nth-child(4), td:nth-child(4) { width: 8%; text-align: right; }  
-            th:nth-child(5), td:nth-child(5) { width: 6%; text-align: right; }  
-            th:nth-child(6), td:nth-child(6) { width: 6%; text-align: right; }  
-            th:nth-child(7), td:nth-child(7) { width: 6%; text-align: right; }  
-            th:nth-child(8), td:nth-child(8) { width: 9%; text-align: right; }   
-            th:nth-child(9), td:nth-child(9) { width: 5%; text-align: center; }  
-            th:nth-child(10), td:nth-child(10) { width: 8%; text-align: right; } 
-            th:nth-child(11), td:nth-child(11) { width: 10%; text-align: right; font-weight: bold; } 
-            th:nth-child(12), td:nth-child(12) { width: 10%; text-align: right; } 
-            th:nth-child(13), td:nth-child(13) { width: 12%; text-align: right; font-weight: bold; } 
+            /* Specific Column Widths for Print (Total ~100%) */
+            th:nth-child(1), td:nth-child(1) { width: 14%; white-space: normal; } /* Sem */
+            th:nth-child(2), td:nth-child(2) { width: 3%; text-align: center; }  /* Sub (Swapped) */
+            th:nth-child(3), td:nth-child(3) { width: 3%; text-align: center; }  /* Cr (Swapped) */
+            th:nth-child(4), td:nth-child(4) { width: 8%; text-align: right; }  /* Tuition */
+            th:nth-child(5), td:nth-child(5) { width: 6%; text-align: right; }  /* Exam */
+            th:nth-child(6), td:nth-child(6) { width: 6%; text-align: right; }  /* Reg */
+            th:nth-child(7), td:nth-child(7) { width: 6%; text-align: right; }  /* Other */
+            th:nth-child(8), td:nth-child(8) { width: 9%; text-align: right; }   /* Total */
+            th:nth-child(9), td:nth-child(9) { width: 5%; text-align: center; }  /* Disc % */
+            th:nth-child(10), td:nth-child(10) { width: 8%; text-align: right; } /* Disc Amt */
+            th:nth-child(11), td:nth-child(11) { width: 10%; text-align: right; font-weight: bold; } /* Net Fee */
+            th:nth-child(12), td:nth-child(12) { width: 10%; text-align: right; } /* Paid */
+            th:nth-child(13), td:nth-child(13) { width: 12%; text-align: right; font-weight: bold; } /* Balance */
             
+            /* Headers */
             thead th {
                 background-color: #e5e7eb !important;
                 font-weight: 800;
@@ -135,6 +139,7 @@
             });
             const [searchReg, setSearchReg] = useState('');
             const [filterSession, setFilterSession] = useState(''); 
+            const [summaryFilterSession, setSummaryFilterSession] = useState(''); // NEW: Summary Filter
             const [tabSearch, setTabSearch] = useState('');
             const [selectedIds, setSelectedIds] = useState(new Set());
             const [clearanceResult, setClearanceResult] = useState(null);
@@ -154,7 +159,7 @@
 
             const TABS = [
                 { id: 'clearance', label: 'Clearance', icon: FileText },
-                { id: 'summary', label: 'Summary', icon: BarChart }, // NEW TAB
+                { id: 'summary', label: 'Summary', icon: BarChart }, 
                 { id: 'students', label: 'Students', icon: Users },
                 { id: 'fees', label: 'Fee Structure', icon: DollarSign },
                 { id: 'others', label: 'Other Charges', icon: AlertCircle },
@@ -237,7 +242,22 @@
             };
 
             const filteredData = getProcessedData();
-            const uniqueSessions = [...new Set(data.enrollments.map(e => e.semester))].sort();
+            
+            // --- Custom Sort for Semesters (Fall -> Spring -> Summer) ---
+            const termOrder = { 'fall': 1, 'spring': 2, 'summer': 3 };
+            const getTermRank = (sem) => {
+                const s = sem.toLowerCase();
+                if(s.includes('fall')) return 1;
+                if(s.includes('spring')) return 2;
+                if(s.includes('summer')) return 3;
+                return 4;
+            };
+            const uniqueSessions = [...new Set(data.enrollments.map(e => e.semester))].sort((a, b) => {
+                const yearA = parseInt(a.replace(/\D/g, '')) || 0;
+                const yearB = parseInt(b.replace(/\D/g, '')) || 0;
+                if (yearA !== yearB) return yearA - yearB;
+                return getTermRank(a) - getTermRank(b);
+            });
             
             // --- NEW: SUMMARY LOGIC ---
             const getSummaryData = useMemo(() => {
@@ -260,8 +280,12 @@
 
                 // 1. Calculate Charges (from Enrollments)
                 data.enrollments.forEach(en => {
-                    const sem = en.semester; // Keep display format
+                    const sem = en.semester; 
                     const semKey = norm(sem);
+                    
+                    // Filter Logic applied here
+                    if (summaryFilterSession && !semKey.includes(norm(summaryFilterSession))) return;
+
                     if(!summary.has(semKey)) {
                          summary.set(semKey, { session: sem, enrolled: new Set(), charged: 0, discount: 0, other: 0, paid: 0 });
                     }
@@ -309,6 +333,8 @@
                 // 2. Calculate Payments
                 data.payments.forEach(p => {
                     const pSem = norm(p.semester);
+                    if (summaryFilterSession && !pSem.includes(norm(summaryFilterSession))) return;
+
                     // Match to existing session keys
                     let targetKey = null;
                     for (let key of summary.keys()) {
@@ -322,13 +348,19 @@
                     }
                 });
                 
-                return Array.from(summary.values()).map(s => ({
+                // Sort
+                return Array.from(summary.values()).sort((a,b) => {
+                     const yearA = parseInt(a.session.replace(/\D/g, '')) || 0;
+                     const yearB = parseInt(b.session.replace(/\D/g, '')) || 0;
+                     if (yearA !== yearB) return yearA - yearB;
+                     return getTermRank(a.session) - getTermRank(b.session);
+                }).map(s => ({
                     ...s,
                     enrolled: s.enrolled.size,
                     balance: (s.charged - s.discount) - s.paid
                 }));
 
-            }, [activeTab, data]);
+            }, [activeTab, data, summaryFilterSession]);
 
             const paymentStats = activeTab === 'payments' ? filteredData.reduce((acc, item) => {
                  const amt = parseFloat(item.amount) || 0;
@@ -435,6 +467,14 @@
                     const cleanSession = norm(filterSession);
                     studentEnrollments = studentEnrollments.filter(en => norm(en.semester).includes(cleanSession));
                 }
+                
+                // Sort Enrollments by Term
+                studentEnrollments = studentEnrollments.sort((a,b) => {
+                    const yearA = parseInt(a.semester.replace(/\D/g, '')) || 0;
+                    const yearB = parseInt(b.semester.replace(/\D/g, '')) || 0;
+                    if (yearA !== yearB) return yearA - yearB;
+                    return getTermRank(a.semester) - getTermRank(b.semester);
+                });
                 
                 studentEnrollments = studentEnrollments.map(en => {
                     const enSem = norm(en.semester);
@@ -671,7 +711,8 @@
             
             const downloadSample = (type) => {
                 const headers = getHeaders(type);
-                const csvContent = "data:text/csv;charset=utf-8," + headers.join(",");
+                const displayHeaders = headers.map(h => h === 'fee_name' ? 'fee_head' : h); // Use 'fee_head' for display
+                const csvContent = "data:text/csv;charset=utf-8," + displayHeaders.join(",");
                 const encodedUri = encodeURI(csvContent);
                 const link = document.createElement("a");
                 link.setAttribute("href", encodedUri);
@@ -684,10 +725,11 @@
             const handleExport = (type) => {
                 const records = (type === activeTab) ? filteredData : data[type];
                 if (!records || records.length === 0) return alert("No data to export");
-                const headers = getHeaders(type);
-                
+                let headers = getHeaders(type);
+                let displayHeaders = headers.map(h => h === 'fee_name' ? 'fee_head' : h);
+
                 const csvRows = [
-                    headers.join(','),
+                    displayHeaders.join(','),
                     ...records.map(row => headers.map(fieldName => {
                         let val = row[fieldName];
                         if (Array.isArray(val)) val = val.join('|'); 
@@ -872,7 +914,23 @@
                             {activeTab === 'summary' && (
                                 <div>
                                     <h2 className="text-2xl font-bold text-gray-800 capitalize mb-6">Financial Summary</h2>
-                                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                                    <div className="flex items-center gap-3 mb-4 no-print">
+                                        <label className="font-medium text-sm">Filter Semester:</label>
+                                        <select 
+                                            value={summaryFilterSession} 
+                                            onChange={(e) => setSummaryFilterSession(e.target.value)} 
+                                            className="w-48 rounded-lg border-gray-300 border p-2 focus:ring-2 focus:ring-blue-500 outline-none bg-white text-sm"
+                                        >
+                                            <option value="">All Semesters</option>
+                                            {uniqueSessions.map(s => <option key={s} value={s}>{s}</option>)}
+                                        </select>
+                                        <button onClick={() => window.print()} className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg" title="Print Summary"><Printer className="h-5 w-5" /></button>
+                                    </div>
+                                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden" id="printableArea">
+                                        <div className="p-4 hidden print-only">
+                                            <h2 className="text-xl font-bold text-center uppercase mb-4">Financial Summary Report</h2>
+                                            {summaryFilterSession && <p className="text-center text-sm mb-4">Filter: {summaryFilterSession}</p>}
+                                        </div>
                                         <div className="overflow-x-auto">
                                             <table className="w-full text-sm text-left">
                                                 <thead className="bg-gray-50 text-gray-700 uppercase font-bold text-xs border-b border-gray-200">
