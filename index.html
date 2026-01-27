@@ -458,6 +458,7 @@
                             else if (h.includes('degree')) obj['degree'] = val;
                             else if (h.includes('batch')) obj['batch'] = val;
                             else if (h.includes('term')) obj['term'] = val;
+                            else if (h.includes('fee') && h.includes('name')) obj['fee_name'] = val;
                             else if (h.includes('bank')) obj['bank'] = val;
                             else if (h.includes('mobile')) obj['mobile'] = val;
                             else if (h.includes('email')) obj['email'] = val;
@@ -469,6 +470,12 @@
                             else if(type === 'discounts') obj.term = importTerm;
                         }
                         if (obj.amount) obj.amount = obj.amount.replace(/[^0-9.-]/g, '');
+
+                        // AUTO-FILL NAME FROM DIRECTORY (UPDATED)
+                        if (!obj.name && obj.reg_no) {
+                            const student = data.students.find(s => norm(s.reg_no) === norm(obj.reg_no));
+                            if (student) obj.name = student.name;
+                        }
 
                         // Duplicate Check
                         const isDuplicate = existingData.some(existing => 
@@ -552,7 +559,7 @@
                     case 'enrollments': return ['reg_no', 'name', 'semester', 'cr', 'courses'];
                     case 'payments': return ['reg_no', 'name', 'semester', 'amount', 'date', 'bank'];
                     case 'discounts': return ['reg_no', 'name', 'term', 'discount'];
-                    case 'others': return ['reg_no', 'name', 'semester', 'fee_name', 'amount']; // CHANGED TO FEE HEAD
+                    case 'others': return ['reg_no', 'name', 'semester', 'fee_name', 'amount'];
                     case 'users': return ['username', 'password', 'role', 'permissions']; 
                     case 'banks': return ['name', 'account_no'];
                     default: return [];
@@ -561,9 +568,7 @@
             
             const downloadSample = (type) => {
                 const headers = getHeaders(type);
-                // Adjust header for Other Charges export/sample
-                const displayHeaders = headers.map(h => h === 'fee_name' ? 'fee_head' : h);
-                const csvContent = "data:text/csv;charset=utf-8," + displayHeaders.join(",");
+                const csvContent = "data:text/csv;charset=utf-8," + headers.join(",");
                 const encodedUri = encodeURI(csvContent);
                 const link = document.createElement("a");
                 link.setAttribute("href", encodedUri);
@@ -576,12 +581,10 @@
             const handleExport = (type) => {
                 const records = (type === activeTab) ? filteredData : data[type];
                 if (!records || records.length === 0) return alert("No data to export");
-                let headers = getHeaders(type);
-                // Swap fee_name to fee_head for export visibility
-                let displayHeaders = headers.map(h => h === 'fee_name' ? 'fee_head' : h);
+                const headers = getHeaders(type);
                 
                 const csvRows = [
-                    displayHeaders.join(','),
+                    headers.join(','),
                     ...records.map(row => headers.map(fieldName => {
                         let val = row[fieldName];
                         if (Array.isArray(val)) val = val.join('|'); 
