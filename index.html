@@ -19,89 +19,72 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     
     <style>
-        /* Custom Scrollbar */
+        /* Custom Scrollbar for a cleaner look */
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         
         @media print {
             @page {
-                size: A4 portrait;
+                size: A4 portrait; /* Default to Portrait, JS handles Landscape switch for Summary */
                 margin: 5mm; 
             }
-            
-            /* RESET EVERYTHING FOR PRINT */
-            html, body {
-                height: auto !important;
-                overflow: visible !important;
-                margin: 0 !important;
-                padding: 0 !important;
-                width: 100% !important;
-            }
-
-            /* HIDE EVERYTHING... */
             body * {
                 visibility: hidden;
             }
-
-            /* ...EXCEPT THE PRINT AREA */
             #printableArea, #printableArea * {
                 visibility: visible;
             }
-
-            /* POSITION THE PRINT AREA */
             #printableArea {
                 position: absolute;
                 left: 0;
                 top: 0;
                 width: 100%;
-                /* Remove height limit so it spans pages */
+                /* REMOVED fixed height/overflow hidden to allow multi-page printing */
                 height: auto !important; 
+                overflow: visible !important;
                 margin: 0;
                 padding: 0;
                 background: white;
                 font-family: 'Arial', sans-serif;
-                font-size: 9px; 
+                font-size: 10px; /* Slightly larger base font for readability */
                 color: black;
-                z-index: 9999;
             }
-            
             .no-print { display: none !important; }
             
-            /* TABLE STYLING FOR PRINT */
+            /* General Table optimization for print */
             table { 
                 width: 100% !important; 
                 border-collapse: collapse; 
+                /* Removed table-layout: fixed to allow auto-sizing based on content where needed, 
+                   but we'll apply it specifically for reports that need strict columns */
             }
-            
-            thead { display: table-header-group; }
-            tfoot { display: table-footer-group; }
-            tr { page-break-inside: avoid; }
-
             th, td { 
                 border: 1px solid #000 !important; 
-                padding: 2px 3px !important; 
+                padding: 4px !important; 
                 overflow: hidden;
                 white-space: normal; /* Allow wrapping */
                 vertical-align: middle;
             }
             
-            /* SPECIFIC COLUMN WIDTHS for Clearance (Total ~100%) */
-            .clearance-table { table-layout: fixed; }
+            /* --- CLEARANCE REPORT SPECIFIC --- */
+            /* Target tables inside clearance report specifically if possible, or rely on structure */
+            .clearance-table {
+                table-layout: fixed;
+            }
             .clearance-table th:nth-child(1), .clearance-table td:nth-child(1) { width: 14%; } /* Sem */
-            .clearance-table th:nth-child(2), .clearance-table td:nth-child(2) { width: 4%; text-align: center; }  /* Sub */
-            .clearance-table th:nth-child(3), .clearance-table td:nth-child(3) { width: 4%; text-align: center; }  /* Cr */
-            .clearance-table th:nth-child(4), .clearance-table td:nth-child(4) { width: 8%; text-align: right; }  /* Tuition */
-            .clearance-table th:nth-child(5), .clearance-table td:nth-child(5) { width: 6%; text-align: right; }  /* Exam */
-            .clearance-table th:nth-child(6), .clearance-table td:nth-child(6) { width: 6%; text-align: right; }  /* Reg */
-            .clearance-table th:nth-child(7), .clearance-table td:nth-child(7) { width: 6%; text-align: right; }  /* Other */
-            .clearance-table th:nth-child(8), .clearance-table td:nth-child(8) { width: 9%; text-align: right; background-color: #f3f4f6 !important; font-weight: bold; } /* Total */
-            .clearance-table th:nth-child(9), .clearance-table td:nth-child(9) { width: 5%; text-align: center; }  /* Disc % */
-            .clearance-table th:nth-child(10), .clearance-table td:nth-child(10) { width: 7%; text-align: right; } /* D. Amt */
-            .clearance-table th:nth-child(11), .clearance-table td:nth-child(11) { width: 9%; text-align: right; font-weight: bold; } /* Net */
-            .clearance-table th:nth-child(12), .clearance-table td:nth-child(12) { width: 9%; text-align: right; } /* Paid */
-            .clearance-table th:nth-child(13), .clearance-table td:nth-child(13) { width: 13%; text-align: right; font-weight: bold; } /* Balance */
-            
-            /* Highlight Total */
+            .clearance-table th:nth-child(2), .clearance-table td:nth-child(2) { width: 4%; text-align: center; } /* Sub */
+            .clearance-table th:nth-child(3), .clearance-table td:nth-child(3) { width: 4%; text-align: center; } /* Cr */
+            .clearance-table th:nth-child(4), .clearance-table td:nth-child(4) { width: 8%; text-align: right; } /* Tuition */
+            /* ... adjust others as needed ... */
+
+            /* --- SUMMARY & DETAIL REPORT SPECIFIC --- */
+            /* Ensure these tables use full width and reasonable spacing */
+            .summary-table th, .summary-table td {
+                padding: 6px !important;
+                font-size: 11px; /* Slightly larger for summary */
+            }
+
+            /* Force background for Modern Total Highlight */
             .print-modern-total {
                 background-color: #000 !important;
                 color: #fff !important;
@@ -110,14 +93,28 @@
                 -webkit-print-color-adjust: exact; 
                 print-color-adjust: exact;
             }
-
+            
+            /* Header Styling */
             thead th {
                 background-color: #e5e7eb !important;
                 font-weight: 800;
                 text-transform: uppercase;
-                font-size: 8px;
                 -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
             }
+            
+            /* Landscape class to apply via JS */
+            .landscape-mode {
+                width: 100vw; /* Ensure full width in landscape */
+            }
+        }
+        
+        /* Force Landscape via CSS class for specific print area container */
+        .landscape-print-mode {
+             @media print {
+                 @page { size: A4 landscape; margin: 5mm; }
+                 #printableArea { width: 100%; }
+             }
         }
     </style>
 </head>
@@ -181,6 +178,7 @@
             const [uploadStatus, setUploadStatus] = useState({ active: false, current: 0, total: 0 });
             const [importTerm, setImportTerm] = useState('');
             const [sidebarOpen, setSidebarOpen] = useState(false);
+            // NEW: State for Session Detail Modal
             const [sessionDetail, setSessionDetail] = useState(null);
 
             const TABS = [
@@ -269,7 +267,7 @@
 
             const filteredData = getProcessedData();
             
-            // Custom Sort for Semesters
+            // --- Custom Sort for Semesters ---
             const termOrder = { 'fall': 1, 'spring': 2, 'summer': 3 };
             const getTermRank = (sem) => {
                 const s = sem.toLowerCase();
@@ -300,7 +298,7 @@
                      discountMap.set(k, parseFloat(d.discount) || 0);
                 });
                 const summary = new Map();
-                const sessionDetailsMap = new Map(); 
+                const sessionDetailsMap = new Map(); // Store details for modal
 
                 data.enrollments.forEach(en => {
                     const sem = en.semester; 
@@ -318,6 +316,7 @@
                     const student = studentMap.get(norm(en.reg_no));
                     let feeDetails = { total: 0, other: 0, tuition: 0, exam: 0 };
                     
+                    // Fee Calculation
                     if (student) {
                          let fee = data.fees.find(f => norm(f.degree) === norm(student.degree) && norm(f.batch) === norm(student.batch));
                          if(!fee) {
@@ -346,8 +345,10 @@
                     const discPct = discountMap.get(`${norm(en.reg_no)}_${semKey}`) || 0;
                     const discAmt = (feeDetails.tuition * discPct) / 100;
                     
+                    // Add Payment Calculation Per Student for Detail View
                     let studentPaid = 0;
                      data.payments.forEach(p => {
+                         // Check reg no and loose semester match
                         if(norm(p.reg_no) === norm(en.reg_no)) {
                              const pSem = norm(p.semester);
                              if (pSem === semKey || (semKey.includes(pSem) && pSem.length > 3) || (pSem.includes(semKey) && semKey.length > 3)) {
@@ -360,7 +361,7 @@
                     entry.discount += discAmt;
                     entry.other += feeDetails.other;
                     
-                    // Add to detailed list
+                    // Add to detailed list for modal
                     detailList.push({
                         reg_no: en.reg_no,
                         name: en.name,
@@ -375,6 +376,7 @@
                     });
                 });
                 
+                // Aggregate payments for summary total
                 data.payments.forEach(p => {
                     const pSem = norm(p.semester);
                     if (summaryFilterSession && !pSem.includes(norm(summaryFilterSession))) return;
@@ -403,6 +405,7 @@
                 }));
             }, [activeTab, data, summaryFilterSession]);
 
+            // --- OPEN SESSION DETAIL ---
             const openSessionDetail = (sessionData) => {
                 setSessionDetail(sessionData);
             };
@@ -573,7 +576,7 @@
                     newData.total_fee = newData.tuition_fee + newData.exam_fee + parseFloat(newData.reg_fee||0) + parseFloat(newData.other_fee||0);
                 }
                 
-                if ((modalType === 'payments' || modalType === 'others' || modalType === 'discounts') && !newData.name) {
+                if ((modalType === 'payments' || modalType === 'others') && !newData.name) {
                     const s = data.students.find(st => norm(st.reg_no) === norm(newData.reg_no));
                     if(s) newData.name = s.name;
                 }
@@ -591,6 +594,7 @@
                 setShowModal(true);
             };
 
+            // NEW: Auto-populate name on Reg No Change
             const handleRegChange = (e) => {
                 const reg = e.target.value;
                 const student = data.students.find(s => norm(s.reg_no) === norm(reg));
@@ -620,9 +624,12 @@
                         const values = rows[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
                         const obj = {};
                         
+                        // Smart Header Mapping
                         headers.forEach((h, index) => {
                             let val = values[index] ? values[index].trim() : '';
                             if (val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1);
+                            
+                            // Map CSV headers to internal keys
                             if (h.includes('reg') && h.includes('no')) obj['reg_no'] = val;
                             else if ((h.includes('fee') || h.includes('charge') || h.includes('head')) && (h.includes('name') || h.includes('head'))) obj['fee_name'] = val; 
                             else if (h.includes('name') && !h.includes('user') && !h.includes('fee') && !h.includes('head')) obj['name'] = val; 
@@ -646,13 +653,16 @@
                         }
                         if (obj.amount) obj.amount = obj.amount.replace(/[^0-9.-]/g, '');
 
+                        // AUTO-FILL NAME FROM DIRECTORY (UPDATED)
                         if (!obj.name && obj.reg_no) {
                             const student = data.students.find(s => norm(s.reg_no) === norm(obj.reg_no));
                             if (student) obj.name = student.name;
                         }
 
+                        // FIXED DUPLICATE CHECK FOR PAYMENTS
                         let isDuplicate = false;
                         if (type === 'payments') {
+                             // STRICT CHECK: Matches Reg, Amount, Date, and Bank (ignores Semester)
                              isDuplicate = existingData.some(existing => 
                                 norm(existing.reg_no) === norm(obj.reg_no) &&
                                 Math.abs(parseFloat(existing.amount || 0) - parseFloat(obj.amount || 0)) < 0.01 && 
@@ -664,10 +674,13 @@
                         } else if (type === 'fees') {
                              isDuplicate = existingData.some(existing => norm(existing.degree) === norm(obj.degree) && norm(existing.batch) === norm(obj.batch));
                         } else {
+                             // Default check for Enrollments, Discounts, Others (Reg No + Semester/Term)
                              isDuplicate = existingData.some(existing => 
                                 norm(existing.reg_no) === norm(obj.reg_no) &&
-                                ((existing.semester && norm(existing.semester) === norm(obj.semester)) ||
-                                (existing.term && norm(existing.term) === norm(obj.term)))
+                                (
+                                    (existing.semester && norm(existing.semester) === norm(obj.semester)) ||
+                                    (existing.term && norm(existing.term) === norm(obj.term))
+                                )
                              );
                         }
                         
@@ -742,7 +755,7 @@
                     case 'enrollments': return ['reg_no', 'name', 'semester', 'cr', 'courses'];
                     case 'payments': return ['reg_no', 'name', 'semester', 'amount', 'date', 'bank'];
                     case 'discounts': return ['reg_no', 'name', 'term', 'discount'];
-                    case 'others': return ['reg_no', 'name', 'semester', 'fee_name', 'amount']; 
+                    case 'others': return ['reg_no', 'name', 'semester', 'fee_name', 'amount']; // CHANGED TO FEE HEAD
                     case 'users': return ['username', 'password', 'role', 'permissions']; 
                     case 'banks': return ['name', 'account_no'];
                     default: return [];
@@ -927,7 +940,7 @@
                                                     <div className="flex justify-between border-b border-gray-200 py-1"><span className="font-bold text-gray-600">Rate (Per Cr. Hr):</span><span className="text-gray-900">{clearanceResult.masterFee ? num(clearanceResult.masterFee.per_cr_fee) : '-'}</span></div>
                                                 </div>
                                                 <div className="overflow-x-auto">
-                                                    <table className="w-full text-xs clearance-table">
+                                                    <table className="w-full text-xs">
                                                         <thead className="bg-gray-100 text-gray-900 font-bold uppercase">
                                                             <tr><th className="p-2 border">Sem</th><th className="p-2 border text-center">Sub</th><th className="p-2 border text-center">Cr</th><th className="p-2 border text-right">Tuition</th><th className="p-2 border text-right">Exam</th><th className="p-2 border text-right">Reg</th><th className="p-2 border text-right">Other</th><th className="p-2 border text-right bg-gray-50">Total</th><th className="p-2 border text-center">Disc %</th><th className="p-2 border text-right">D. Amt</th><th className="p-2 border text-right">Net</th><th className="p-2 border text-right text-green-700">Paid</th><th className="p-2 border text-right">Balance</th></tr>
                                                         </thead>
@@ -972,7 +985,7 @@
                                             {summaryFilterSession && <p className="text-center text-sm mb-4">Filter: {summaryFilterSession}</p>}
                                         </div>
                                         <div className="overflow-x-auto">
-                                            <table className="w-full text-sm text-left summary-table">
+                                            <table className="w-full text-sm text-left">
                                                 <thead className="bg-gray-50 text-gray-700 uppercase font-bold text-xs border-b border-gray-200">
                                                     <tr>
                                                         <th className="p-4">Session</th>
@@ -1019,7 +1032,6 @@
 
                             {activeTab !== 'clearance' && activeTab !== 'summary' && (
                                 <div>
-                                    {/* (Existing List View UI same as before) */}
                                     <div className="flex flex-col gap-4 mb-6 no-print">
                                         <div className="flex justify-between items-center"><h2 className="text-2xl font-bold text-gray-800 capitalize">{activeTab} Directory</h2><div className="flex gap-2">{(user.role === 'admin' || user.permissions.includes(activeTab)) && <button onClick={() => openModal(activeTab)} className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700 transition flex items-center gap-2 shadow-sm"><Plus className="h-5 w-5" /> Add New</button>}</div></div>
                                         <div className="bg-white p-3 rounded-xl border border-gray-200 flex flex-wrap gap-3 items-center justify-between shadow-sm">
@@ -1108,6 +1120,89 @@
                             )}
                         </div>
                     </div>
+
+                    {/* NEW: SESSION DETAIL MODAL */}
+                    {sessionDetail && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                            <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col">
+                                <div className="p-6 border-b flex justify-between items-center bg-gray-50 rounded-t-xl no-print">
+                                    <h3 className="text-xl font-bold">Session Detail: {sessionDetail.session}</h3>
+                                    <div className="flex gap-2">
+                                        <button onClick={() => window.print()} className="bg-gray-700 text-white px-4 py-2 rounded hover:bg-gray-800"><Printer className="h-4 w-4 inline mr-2"/> Print Report</button>
+                                        <button onClick={() => setSessionDetail(null)} className="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+                                    </div>
+                                </div>
+                                
+                                <div className="flex-1 overflow-auto p-6" id="printableArea">
+                                    <div className="mb-4 hidden print-only">
+                                        <h2 className="text-2xl font-bold text-center">Session Financial Report: {sessionDetail.session}</h2>
+                                        <p className="text-center text-sm text-gray-500">Generated on: {new Date().toLocaleDateString()}</p>
+                                    </div>
+
+                                    {/* Summary Cards for Detail View */}
+                                    <div className="grid grid-cols-5 gap-4 mb-6 text-sm">
+                                        <div className="bg-blue-50 p-3 rounded border border-blue-100">
+                                            <div className="text-gray-500">Total Enrolled</div>
+                                            <div className="font-bold text-lg">{sessionDetail.enrolled}</div>
+                                        </div>
+                                        <div className="bg-gray-50 p-3 rounded border border-gray-200">
+                                            <div className="text-gray-500">Total Charged</div>
+                                            <div className="font-bold text-lg">{num(sessionDetail.charged)}</div>
+                                        </div>
+                                        <div className="bg-orange-50 p-3 rounded border border-orange-100">
+                                            <div className="text-gray-500">Total Discount</div>
+                                            <div className="font-bold text-lg">{num(sessionDetail.discount)}</div>
+                                        </div>
+                                        <div className="bg-green-50 p-3 rounded border border-green-100">
+                                            <div className="text-gray-500">Total Paid</div>
+                                            <div className="font-bold text-lg text-green-700">{num(sessionDetail.paid)}</div>
+                                        </div>
+                                        <div className="bg-red-50 p-3 rounded border border-red-100">
+                                            <div className="text-gray-500">Pending Balance</div>
+                                            <div className="font-bold text-lg text-red-600">{num(sessionDetail.balance)}</div>
+                                        </div>
+                                    </div>
+
+                                    <table className="w-full text-xs text-left border-collapse">
+                                        <thead className="bg-gray-100 uppercase font-bold text-gray-700">
+                                            <tr>
+                                                <th className="p-2 border">#</th>
+                                                <th className="p-2 border">Reg No</th>
+                                                <th className="p-2 border">Name</th>
+                                                <th className="p-2 border text-center">Courses</th>
+                                                <th className="p-2 border text-center">Cr</th>
+                                                <th className="p-2 border text-right">Tuition</th>
+                                                <th className="p-2 border text-right">Exam Fee</th> {/* Renamed from Other */}
+                                                <th className="p-2 border text-right">Discount</th>
+                                                <th className="p-2 border text-right bg-gray-50">Total</th>
+                                                <th className="p-2 border text-right text-green-700">Paid</th>
+                                                <th className="p-2 border text-right">Balance</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {sessionDetail.details.map((s, idx) => (
+                                                <tr key={idx} className="border-b hover:bg-gray-50">
+                                                    <td className="p-2 border">{idx + 1}</td>
+                                                    <td className="p-2 border font-mono">{s.reg_no}</td>
+                                                    <td className="p-2 border">{s.name}</td>
+                                                    <td className="p-2 border text-center">{s.courses}</td>
+                                                    <td className="p-2 border text-center">{s.cr}</td>
+                                                    <td className="p-2 border text-right">{num(s.tuition)}</td>
+                                                    <td className="p-2 border text-right">{num(s.exam)}</td> {/* Changed to exam fee */}
+                                                    <td className="p-2 border text-right text-red-500">{num(s.discount)}</td>
+                                                    <td className="p-2 border text-right font-bold bg-gray-50">{num(s.tuition + s.exam + s.other - s.discount)}</td> {/* Total updated */}
+                                                    <td className="p-2 border text-right font-bold text-green-700">{num(s.paid)}</td>
+                                                    <td className={`p-2 border text-right font-bold ${s.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>{num(s.balance)}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {/* ... (Other Modals: showModal, showPasswordModal, importPreview - Keep SAME as previous) ... */}
                     {showModal && (
                         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
                             <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
@@ -1222,71 +1317,6 @@
                             </div>
                         </div>
                     )}
-                    {/* NEW: SESSION DETAIL MODAL WITH PRINT FIX */}
-                    {sessionDetail && (
-                        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-                            <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col">
-                                <div className="p-6 border-b flex justify-between items-center bg-gray-50 rounded-t-xl no-print">
-                                    <h3 className="text-xl font-bold">Session: {sessionDetail.session}</h3>
-                                    <div className="flex gap-2">
-                                        <button onClick={() => window.print()} className="bg-gray-700 text-white px-4 py-2 rounded">Print</button>
-                                        <button onClick={() => setSessionDetail(null)} className="text-2xl">&times;</button>
-                                    </div>
-                                </div>
-                                
-                                <div className="flex-1 overflow-auto p-6" id="printableArea">
-                                    <div className="mb-4 hidden print-only">
-                                        <h2 className="text-2xl font-bold text-center">Session Financial Report: {sessionDetail.session}</h2>
-                                    </div>
-                                    
-                                    {/* Stats Cards */}
-                                    <div className="grid grid-cols-5 gap-4 mb-6 text-sm">
-                                        <div className="border p-2 rounded"><b>Enrolled:</b> {sessionDetail.enrolled}</div>
-                                        <div className="border p-2 rounded"><b>Charged:</b> {num(sessionDetail.charged)}</div>
-                                        <div className="border p-2 rounded"><b>Discount:</b> {num(sessionDetail.discount)}</div>
-                                        <div className="border p-2 rounded"><b>Paid:</b> {num(sessionDetail.paid)}</div>
-                                        <div className="border p-2 rounded bg-gray-100"><b>Balance:</b> {num(sessionDetail.balance)}</div>
-                                    </div>
-
-                                    <table className="w-full text-xs text-left border-collapse clearance-table">
-                                        <thead className="bg-gray-100 uppercase font-bold text-gray-700">
-                                            <tr>
-                                                <th className="p-2 border">#</th>
-                                                <th className="p-2 border">Reg No</th>
-                                                <th className="p-2 border">Name</th>
-                                                <th className="p-2 border text-center">Courses</th>
-                                                <th className="p-2 border text-center">Cr</th>
-                                                <th className="p-2 border text-right">Tuition</th>
-                                                <th className="p-2 border text-right">Exam Fee</th>
-                                                <th className="p-2 border text-right">Discount</th>
-                                                <th className="p-2 border text-right">Total</th>
-                                                <th className="p-2 border text-right">Paid</th>
-                                                <th className="p-2 border text-right">Balance</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {sessionDetail.details.map((s, idx) => (
-                                                <tr key={idx} className="border-b">
-                                                    <td className="p-2 border">{idx + 1}</td>
-                                                    <td className="p-2 border font-mono">{s.reg_no}</td>
-                                                    <td className="p-2 border">{s.name}</td>
-                                                    <td className="p-2 border text-center">{s.courses}</td>
-                                                    <td className="p-2 border text-center">{s.cr}</td>
-                                                    <td className="p-2 border text-right">{num(s.tuition)}</td>
-                                                    <td className="p-2 border text-right">{num(s.exam)}</td>
-                                                    <td className="p-2 border text-right text-red-500">{num(s.discount)}</td>
-                                                    <td className="p-2 border text-right font-bold">{num(s.tuition + s.exam + s.other - s.discount)}</td>
-                                                    <td className="p-2 border text-right text-green-700">{num(s.paid)}</td>
-                                                    <td className={`p-2 border text-right font-bold ${s.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>{num(s.balance)}</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
                 </div>
             );
         }
