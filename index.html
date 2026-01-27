@@ -25,8 +25,8 @@
         
         @media print {
             @page {
-                size: A4 portrait;
-                margin: 5mm; /* Reduced margin */
+                size: A4 portrait; /* Default to Portrait, JS handles Landscape switch for Summary */
+                margin: 5mm; 
             }
             body * {
                 visibility: hidden;
@@ -35,33 +35,55 @@
                 visibility: visible;
             }
             #printableArea {
-                position: absolute; /* Changed from fixed to absolute for better flow */
+                position: absolute;
                 left: 0;
                 top: 0;
                 width: 100%;
-                height: auto; /* Allow height to grow */
+                /* REMOVED fixed height/overflow hidden to allow multi-page printing */
+                height: auto !important; 
+                overflow: visible !important;
                 margin: 0;
-                padding: 5px;
+                padding: 0;
                 background: white;
                 font-family: 'Arial', sans-serif;
-                font-size: 9px; /* Reduced font for better fit */
+                font-size: 10px; /* Slightly larger base font for readability */
                 color: black;
             }
             .no-print { display: none !important; }
             
-            /* Table optimization for print */
+            /* General Table optimization for print */
             table { 
                 width: 100% !important; 
                 border-collapse: collapse; 
-                table-layout: fixed; /* Fixes column widths */
+                /* Removed table-layout: fixed to allow auto-sizing based on content where needed, 
+                   but we'll apply it specifically for reports that need strict columns */
             }
             th, td { 
                 border: 1px solid #000 !important; 
-                padding: 2px 3px !important; /* Tight padding */
+                padding: 4px !important; 
                 overflow: hidden;
-                white-space: nowrap;
+                white-space: normal; /* Allow wrapping */
+                vertical-align: middle;
             }
             
+            /* --- CLEARANCE REPORT SPECIFIC --- */
+            /* Target tables inside clearance report specifically if possible, or rely on structure */
+            .clearance-table {
+                table-layout: fixed;
+            }
+            .clearance-table th:nth-child(1), .clearance-table td:nth-child(1) { width: 14%; } /* Sem */
+            .clearance-table th:nth-child(2), .clearance-table td:nth-child(2) { width: 4%; text-align: center; } /* Sub */
+            .clearance-table th:nth-child(3), .clearance-table td:nth-child(3) { width: 4%; text-align: center; } /* Cr */
+            .clearance-table th:nth-child(4), .clearance-table td:nth-child(4) { width: 8%; text-align: right; } /* Tuition */
+            /* ... adjust others as needed ... */
+
+            /* --- SUMMARY & DETAIL REPORT SPECIFIC --- */
+            /* Ensure these tables use full width and reasonable spacing */
+            .summary-table th, .summary-table td {
+                padding: 6px !important;
+                font-size: 11px; /* Slightly larger for summary */
+            }
+
             /* Force background for Modern Total Highlight */
             .print-modern-total {
                 background-color: #000 !important;
@@ -71,34 +93,28 @@
                 -webkit-print-color-adjust: exact; 
                 print-color-adjust: exact;
             }
-
-            /* Specific Column Widths for Print (Total ~100%) */
-            th:nth-child(1), td:nth-child(1) { width: 14%; white-space: normal; } /* Sem */
-            th:nth-child(2), td:nth-child(2) { width: 3%; text-align: center; }  /* Sub */
-            th:nth-child(3), td:nth-child(3) { width: 3%; text-align: center; }  /* Cr */
-            th:nth-child(4), td:nth-child(4) { width: 8%; text-align: right; }  /* Tuition */
-            th:nth-child(5), td:nth-child(5) { width: 6%; text-align: right; }  /* Exam */
-            th:nth-child(6), td:nth-child(6) { width: 6%; text-align: right; }  /* Reg */
-            th:nth-child(7), td:nth-child(7) { width: 6%; text-align: right; }  /* Other */
-            th:nth-child(8), td:nth-child(8) { width: 9%; text-align: right; }   /* Total */
-            th:nth-child(9), td:nth-child(9) { width: 5%; text-align: center; }  /* Disc % */
-            th:nth-child(10), td:nth-child(10) { width: 8%; text-align: right; } /* Disc Amt */
-            th:nth-child(11), td:nth-child(11) { width: 10%; text-align: right; font-weight: bold; } /* Net Fee */
-            th:nth-child(12), td:nth-child(12) { width: 10%; text-align: right; } /* Paid */
-            th:nth-child(13), td:nth-child(13) { width: 12%; text-align: right; font-weight: bold; } /* Balance */
             
-            /* Headers */
+            /* Header Styling */
             thead th {
                 background-color: #e5e7eb !important;
                 font-weight: 800;
                 text-transform: uppercase;
-                font-size: 8px;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
             }
             
-            /* Force Landscape for Summary Detail if needed */
-            .landscape-mode-print {
-                 /* @page { size: A4 landscape; } */
+            /* Landscape class to apply via JS */
+            .landscape-mode {
+                width: 100vw; /* Ensure full width in landscape */
             }
+        }
+        
+        /* Force Landscape via CSS class for specific print area container */
+        .landscape-print-mode {
+             @media print {
+                 @page { size: A4 landscape; margin: 5mm; }
+                 #printableArea { width: 100%; }
+             }
         }
     </style>
 </head>
@@ -317,13 +333,13 @@
                              const otherBase = parseFloat(fee.other_fee || 0);
                              
                              feeDetails.tuition = tuition;
-                             feeDetails.exam = exam; // Store exam fee
+                             feeDetails.exam = exam; 
                              feeDetails.total = tuition + exam + reg + otherBase;
                              feeDetails.other = otherBase;
                          }
                     }
                     const specificOther = otherChargesMap.get(`${norm(en.reg_no)}_${semKey}`) || 0;
-                    feeDetails.other += specificOther; // Total Other (Base + Fines)
+                    feeDetails.other += specificOther; 
                     feeDetails.total += specificOther;
 
                     const discPct = discountMap.get(`${norm(en.reg_no)}_${semKey}`) || 0;
@@ -352,7 +368,7 @@
                         courses: en.courses,
                         cr: en.cr,
                         tuition: feeDetails.tuition,
-                        exam: feeDetails.exam, // NEW: Exam Fee separated
+                        exam: feeDetails.exam, 
                         other: feeDetails.other,
                         discount: discAmt,
                         paid: studentPaid,
@@ -560,7 +576,7 @@
                     newData.total_fee = newData.tuition_fee + newData.exam_fee + parseFloat(newData.reg_fee||0) + parseFloat(newData.other_fee||0);
                 }
                 
-                if ((modalType === 'payments' || modalType === 'others' || modalType === 'discounts') && !newData.name) {
+                if ((modalType === 'payments' || modalType === 'others') && !newData.name) {
                     const s = data.students.find(st => norm(st.reg_no) === norm(newData.reg_no));
                     if(s) newData.name = s.name;
                 }
