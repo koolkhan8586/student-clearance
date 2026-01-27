@@ -449,7 +449,8 @@
                             
                             // Map CSV headers to internal keys
                             if (h.includes('reg') && h.includes('no')) obj['reg_no'] = val;
-                            else if (h.includes('name') && !h.includes('user')) obj['name'] = val;
+                            else if ((h.includes('fee') || h.includes('charge') || h.includes('head')) && (h.includes('name') || h.includes('head'))) obj['fee_name'] = val; // Prioritize fee name
+                            else if (h.includes('name') && !h.includes('user') && !h.includes('fee') && !h.includes('head')) obj['name'] = val; // Strict name check
                             else if (h.includes('semester')) obj['semester'] = val;
                             else if (h.includes('amount')) obj['amount'] = val;
                             else if (h === 'cr') obj['cr'] = val;
@@ -457,7 +458,6 @@
                             else if (h.includes('degree')) obj['degree'] = val;
                             else if (h.includes('batch')) obj['batch'] = val;
                             else if (h.includes('term')) obj['term'] = val;
-                            else if ((h.includes('fee') || h.includes('charge')) && h.includes('name')) obj['fee_name'] = val; // FIXED: More specific check for Fee Name
                             else if (h.includes('bank')) obj['bank'] = val;
                             else if (h.includes('mobile')) obj['mobile'] = val;
                             else if (h.includes('email')) obj['email'] = val;
@@ -552,7 +552,7 @@
                     case 'enrollments': return ['reg_no', 'name', 'semester', 'cr', 'courses'];
                     case 'payments': return ['reg_no', 'name', 'semester', 'amount', 'date', 'bank'];
                     case 'discounts': return ['reg_no', 'name', 'term', 'discount'];
-                    case 'others': return ['reg_no', 'name', 'semester', 'fee_name', 'amount'];
+                    case 'others': return ['reg_no', 'name', 'semester', 'fee_name', 'amount']; // CHANGED TO FEE HEAD
                     case 'users': return ['username', 'password', 'role', 'permissions']; 
                     case 'banks': return ['name', 'account_no'];
                     default: return [];
@@ -561,7 +561,9 @@
             
             const downloadSample = (type) => {
                 const headers = getHeaders(type);
-                const csvContent = "data:text/csv;charset=utf-8," + headers.join(",");
+                // Adjust header for Other Charges export/sample
+                const displayHeaders = headers.map(h => h === 'fee_name' ? 'fee_head' : h);
+                const csvContent = "data:text/csv;charset=utf-8," + displayHeaders.join(",");
                 const encodedUri = encodeURI(csvContent);
                 const link = document.createElement("a");
                 link.setAttribute("href", encodedUri);
@@ -574,10 +576,12 @@
             const handleExport = (type) => {
                 const records = (type === activeTab) ? filteredData : data[type];
                 if (!records || records.length === 0) return alert("No data to export");
-                const headers = getHeaders(type);
+                let headers = getHeaders(type);
+                // Swap fee_name to fee_head for export visibility
+                let displayHeaders = headers.map(h => h === 'fee_name' ? 'fee_head' : h);
                 
                 const csvRows = [
-                    headers.join(','),
+                    displayHeaders.join(','),
                     ...records.map(row => headers.map(fieldName => {
                         let val = row[fieldName];
                         if (Array.isArray(val)) val = val.join('|'); 
