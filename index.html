@@ -457,7 +457,7 @@
                             else if (h.includes('degree')) obj['degree'] = val;
                             else if (h.includes('batch')) obj['batch'] = val;
                             else if (h.includes('term')) obj['term'] = val;
-                            else if (h.includes('fee') && h.includes('name')) obj['fee_name'] = val;
+                            else if ((h.includes('fee') || h.includes('charge')) && h.includes('name')) obj['fee_name'] = val; // FIXED: More specific check for Fee Name
                             else if (h.includes('bank')) obj['bank'] = val;
                             else if (h.includes('mobile')) obj['mobile'] = val;
                             else if (h.includes('email')) obj['email'] = val;
@@ -582,7 +582,9 @@
                         let val = row[fieldName];
                         if (Array.isArray(val)) val = val.join('|'); 
                         val = String(val || '');
-                        if (val.search(/("|,|\n)/g) >= 0) val = `"${val.replace(/"/g, '""')}"`;
+                        if (val.search(/("|,|\n)/g) >= 0) {
+                            val = `"${val.replace(/"/g, '""')}"`;
+                        }
                         return val;
                     }).join(','))
                 ];
