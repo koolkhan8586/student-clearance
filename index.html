@@ -36,6 +36,8 @@
                 margin: 0 !important;
                 padding: 0 !important;
                 width: 100% !important;
+                background: white !important;
+                color: black !important;
             }
 
             /* Disable Fixed Positioning on Modals for Multi-page Print */
@@ -110,7 +112,6 @@
             .clearance-table th:nth-child(13), .clearance-table td:nth-child(13) { width: 13%; text-align: right; font-weight: bold; } /* Balance */
             
             /* --- SESSION DETAIL REPORT SPECIFIC (11 Columns) --- */
-            /* New class to handle the session breakdown print specifically */
             .session-detail-table { table-layout: fixed; }
             .session-detail-table th:nth-child(1), .session-detail-table td:nth-child(1) { width: 4%; text-align: center; } /* # */
             .session-detail-table th:nth-child(2), .session-detail-table td:nth-child(2) { width: 15%; font-family: monospace; } /* Reg No */
@@ -140,6 +141,11 @@
                 text-transform: uppercase;
                 font-size: 8px;
                 -webkit-print-color-adjust: exact;
+            }
+            
+            /* Force Landscape for Summary Detail if needed */
+            .landscape-mode-print {
+                 /* @page { size: A4 landscape; } */
             }
         }
     </style>
@@ -204,7 +210,6 @@
             const [uploadStatus, setUploadStatus] = useState({ active: false, current: 0, total: 0 });
             const [importTerm, setImportTerm] = useState('');
             const [sidebarOpen, setSidebarOpen] = useState(false);
-            // NEW: State for Session Detail Modal
             const [sessionDetail, setSessionDetail] = useState(null);
 
             const TABS = [
@@ -292,150 +297,8 @@
             };
 
             const filteredData = getProcessedData();
+            const uniqueSessions = [...new Set(data.enrollments.map(e => e.semester))].sort();
             
-            // --- Custom Sort for Semesters ---
-            const termOrder = { 'fall': 1, 'spring': 2, 'summer': 3 };
-            const getTermRank = (sem) => {
-                const s = sem.toLowerCase();
-                if(s.includes('fall')) return 1;
-                if(s.includes('spring')) return 2;
-                if(s.includes('summer')) return 3;
-                return 4;
-            };
-            const uniqueSessions = [...new Set(data.enrollments.map(e => e.semester))].sort((a, b) => {
-                const yearA = parseInt(a.replace(/\D/g, '')) || 0;
-                const yearB = parseInt(b.replace(/\D/g, '')) || 0;
-                if (yearA !== yearB) return yearA - yearB;
-                return getTermRank(a) - getTermRank(b);
-            });
-            
-            // --- SUMMARY LOGIC ---
-            const getSummaryData = useMemo(() => {
-                if(activeTab !== 'summary') return [];
-                const studentMap = new Map(data.students.map(s => [norm(s.reg_no), s]));
-                const otherChargesMap = new Map();
-                data.others.forEach(o => {
-                     const k = `${norm(o.reg_no)}_${norm(o.semester)}`;
-                     otherChargesMap.set(k, (otherChargesMap.get(k) || 0) + (parseFloat(o.amount) || 0));
-                });
-                const discountMap = new Map();
-                data.discounts.forEach(d => {
-                     const k = `${norm(d.reg_no)}_${norm(d.term)}`;
-                     discountMap.set(k, parseFloat(d.discount) || 0);
-                });
-                const summary = new Map();
-                const sessionDetailsMap = new Map(); // Store details for modal
-
-                data.enrollments.forEach(en => {
-                    const sem = en.semester; 
-                    const semKey = norm(sem);
-                    if (summaryFilterSession && !semKey.includes(norm(summaryFilterSession))) return;
-                    if(!summary.has(semKey)) {
-                         summary.set(semKey, { session: sem, enrolled: new Set(), charged: 0, discount: 0, other: 0, paid: 0 });
-                         sessionDetailsMap.set(semKey, []);
-                    }
-                    const entry = summary.get(semKey);
-                    const detailList = sessionDetailsMap.get(semKey);
-
-                    entry.enrolled.add(norm(en.reg_no));
-                    
-                    const student = studentMap.get(norm(en.reg_no));
-                    let feeDetails = { total: 0, other: 0, tuition: 0, exam: 0 };
-                    
-                    // Fee Calculation
-                    if (student) {
-                         let fee = data.fees.find(f => norm(f.degree) === norm(student.degree) && norm(f.batch) === norm(student.batch));
-                         if(!fee) {
-                            fee = data.fees.find(f => norm(f.degree) === norm(student.degree) && (
-                                norm(student.batch).includes(norm(f.batch)) || norm(f.batch).includes(norm(student.batch))
-                            ));
-                         }
-                         if (fee) {
-                             const cr = parseFloat(en.cr || 0);
-                             const courses = parseFloat(en.courses || 0);
-                             const tuition = cr * parseFloat(fee.per_cr_fee || 0);
-                             const exam = courses * parseFloat(fee.per_course_fee || 0);
-                             const reg = parseFloat(fee.reg_fee || 0);
-                             const otherBase = parseFloat(fee.other_fee || 0);
-                             
-                             feeDetails.tuition = tuition;
-                             feeDetails.exam = exam; 
-                             feeDetails.total = tuition + exam + reg + otherBase;
-                             feeDetails.other = otherBase;
-                         }
-                    }
-                    const specificOther = otherChargesMap.get(`${norm(en.reg_no)}_${semKey}`) || 0;
-                    feeDetails.other += specificOther; 
-                    feeDetails.total += specificOther;
-
-                    const discPct = discountMap.get(`${norm(en.reg_no)}_${semKey}`) || 0;
-                    const discAmt = (feeDetails.tuition * discPct) / 100;
-                    
-                    // Add Payment Calculation Per Student for Detail View
-                    let studentPaid = 0;
-                     data.payments.forEach(p => {
-                         // Check reg no and loose semester match
-                        if(norm(p.reg_no) === norm(en.reg_no)) {
-                             const pSem = norm(p.semester);
-                             if (pSem === semKey || (semKey.includes(pSem) && pSem.length > 3) || (pSem.includes(semKey) && semKey.length > 3)) {
-                                studentPaid += parseFloat(p.amount || 0);
-                             }
-                        }
-                    });
-
-                    entry.charged += feeDetails.total;
-                    entry.discount += discAmt;
-                    entry.other += feeDetails.other;
-                    
-                    // Add to detailed list for modal
-                    detailList.push({
-                        reg_no: en.reg_no,
-                        name: en.name,
-                        courses: en.courses,
-                        cr: en.cr,
-                        tuition: feeDetails.tuition,
-                        exam: feeDetails.exam, 
-                        other: feeDetails.other,
-                        discount: discAmt,
-                        paid: studentPaid,
-                        balance: (feeDetails.total - discAmt) - studentPaid
-                    });
-                });
-                
-                // Aggregate payments for summary total
-                data.payments.forEach(p => {
-                    const pSem = norm(p.semester);
-                    if (summaryFilterSession && !pSem.includes(norm(summaryFilterSession))) return;
-                    let targetKey = null;
-                    for (let key of summary.keys()) {
-                        if (pSem === key || (key.includes(pSem) && pSem.length > 3) || (pSem.includes(key) && key.length > 3)) {
-                            targetKey = key;
-                            break;
-                        }
-                    }
-                    if(targetKey) {
-                        summary.get(targetKey).paid += parseFloat(p.amount || 0);
-                    }
-                });
-
-                return Array.from(summary.values()).sort((a,b) => {
-                     const yearA = parseInt(a.session.replace(/\D/g, '')) || 0;
-                     const yearB = parseInt(b.session.replace(/\D/g, '')) || 0;
-                     if (yearA !== yearB) return yearA - yearB;
-                     return getTermRank(a.session) - getTermRank(b.session);
-                }).map(s => ({
-                    ...s,
-                    enrolled: s.enrolled.size,
-                    balance: (s.charged - s.discount) - s.paid,
-                    details: sessionDetailsMap.get(norm(s.session)) || []
-                }));
-            }, [activeTab, data, summaryFilterSession]);
-
-            // --- OPEN SESSION DETAIL ---
-            const openSessionDetail = (sessionData) => {
-                setSessionDetail(sessionData);
-            };
-
             const paymentStats = activeTab === 'payments' ? filteredData.reduce((acc, item) => {
                  const amt = parseFloat(item.amount) || 0;
                  acc.total += amt;
@@ -602,7 +465,7 @@
                     newData.total_fee = newData.tuition_fee + newData.exam_fee + parseFloat(newData.reg_fee||0) + parseFloat(newData.other_fee||0);
                 }
                 
-                if ((modalType === 'payments' || modalType === 'others') && !newData.name) {
+                if ((modalType === 'payments' || modalType === 'others' || modalType === 'discounts') && !newData.name) {
                     const s = data.students.find(st => norm(st.reg_no) === norm(newData.reg_no));
                     if(s) newData.name = s.name;
                 }
@@ -1265,21 +1128,33 @@
                     {sessionDetail && (
                         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 print:p-0 print:block print:relative">
                             <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col print:h-auto print:shadow-none print:w-full print:max-w-none">
+                                {/* HEADER (No Print) */}
                                 <div className="p-6 border-b flex justify-between items-center bg-gray-50 rounded-t-xl no-print">
-                                    <h3 className="text-xl font-bold">Session: {sessionDetail.session}</h3>
+                                    <h3 className="text-xl font-bold">Session Detail: {sessionDetail.session}</h3>
                                     <div className="flex gap-2">
                                         <button onClick={() => window.print()} className="bg-gray-700 text-white px-4 py-2 rounded">Print</button>
                                         <button onClick={() => setSessionDetail(null)} className="text-2xl">&times;</button>
                                     </div>
                                 </div>
                                 
+                                {/* PRINTABLE CONTENT */}
                                 <div className="flex-1 overflow-auto p-6 print:overflow-visible print:p-0" id="printableArea">
-                                    <div className="mb-4 hidden print-only">
-                                        <h2 className="text-2xl font-bold text-center">Session Financial Report: {sessionDetail.session}</h2>
+                                    
+                                    {/* UOL HEADER (Visible ONLY in Print) */}
+                                    <div className="hidden print-only mb-4 border-b-2 border-gray-800 pb-4">
+                                         <div className="flex justify-between items-start">
+                                            <div className="w-32 h-32 rounded-lg flex items-center justify-center font-bold text-gray-400 overflow-hidden"><img src="src/UOL-Green-V1.png" alt="UOL Logo" className="w-full h-full object-contain" /></div>
+                                            <div className="text-center flex-1 px-4">
+                                                <h2 className="text-2xl font-bold text-gray-900 uppercase">The University of Lahore</h2>
+                                                <p className="text-gray-600 font-medium">School of Accountancy & Finance</p>
+                                                <div className="inline-block bg-gray-100 px-3 py-1 rounded mt-2 text-xs font-bold uppercase tracking-wider">Session Financial Report</div>
+                                                <div className="mt-2 text-sm font-bold">{sessionDetail.session}</div>
+                                            </div>
+                                        </div>
                                     </div>
                                     
-                                    {/* Stats Cards */}
-                                    <div className="grid grid-cols-5 gap-4 mb-6 text-sm">
+                                    {/* Summary Cards (HIDDEN IN PRINT per request) */}
+                                    <div className="grid grid-cols-5 gap-4 mb-6 text-sm no-print">
                                         <div className="border p-2 rounded"><b>Enrolled:</b> {sessionDetail.enrolled}</div>
                                         <div className="border p-2 rounded"><b>Charged:</b> {num(sessionDetail.charged)}</div>
                                         <div className="border p-2 rounded"><b>Discount:</b> {num(sessionDetail.discount)}</div>
