@@ -249,13 +249,27 @@
                 : TABS.filter(t => user.permissions.includes(t.id))
             ) : [];
 
-            // FETCH DATA
+            // FETCH DATA - UPDATED TO AUTO-CORRECT DEGREE
             const refreshData = async () => {
                 try {
                     const res = await fetch(API_URL);
                     const json = await res.json();
+                    
+                    // AUTO-CORRECT LOGIC: FIX DEGREES ON LOAD
+                    const correctedStudents = (Array.isArray(json.students) ? json.students : []).map(s => {
+                        if (s.reg_no) {
+                            const upper = s.reg_no.toUpperCase();
+                            if (upper.includes('05')) {
+                                const newDegree = upper.split('05')[0];
+                                // Update only if different (in memory for now)
+                                if (s.degree !== newDegree) return { ...s, degree: newDegree };
+                            }
+                        }
+                        return s;
+                    });
+
                     const safeData = {
-                        students: Array.isArray(json.students) ? json.students : [],
+                        students: correctedStudents,
                         fees: Array.isArray(json.fees) ? json.fees : [],
                         enrollments: Array.isArray(json.enrollments) ? json.enrollments : [],
                         payments: Array.isArray(json.payments) ? json.payments : [],
@@ -611,7 +625,7 @@
                     newData.total_fee = newData.tuition_fee + newData.exam_fee + parseFloat(newData.reg_fee||0) + parseFloat(newData.other_fee||0);
                 }
                 
-                if ((modalType === 'payments' || modalType === 'others') && !newData.name) {
+                if ((modalType === 'payments' || modalType === 'others' || modalType === 'discounts') && !newData.name) {
                     const s = data.students.find(st => norm(st.reg_no) === norm(newData.reg_no));
                     if(s) newData.name = s.name;
                 }
@@ -703,8 +717,8 @@
                         }
                         if (obj.amount) obj.amount = obj.amount.replace(/[^0-9.-]/g, '');
 
-                        // AUTO-FILL DEGREE FROM REG NO (NEW)
-                        if (type === 'students' && !obj.degree && obj.reg_no) {
+                        // AUTO-FILL DEGREE FROM REG NO (NEW: FORCE OVERWRITE IF PATTERN FOUND)
+                        if (type === 'students' && obj.reg_no) {
                              const upper = obj.reg_no.toUpperCase();
                              if (upper.includes('05')) {
                                  obj.degree = upper.split('05')[0];
