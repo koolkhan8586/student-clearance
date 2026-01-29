@@ -611,7 +611,7 @@
                     newData.total_fee = newData.tuition_fee + newData.exam_fee + parseFloat(newData.reg_fee||0) + parseFloat(newData.other_fee||0);
                 }
                 
-                if ((modalType === 'payments' || modalType === 'others' || modalType === 'discounts') && !newData.name) {
+                if ((modalType === 'payments' || modalType === 'others') && !newData.name) {
                     const s = data.students.find(st => norm(st.reg_no) === norm(newData.reg_no));
                     if(s) newData.name = s.name;
                 }
@@ -637,6 +637,7 @@
             // NEW: Auto-populate name on Reg No Change - FIX: Don't clear name if adding new student
             const handleRegChange = (e) => {
                 const reg = e.target.value;
+                // LOGIC UPDATE: Auto-extract Degree for New Students
                 if (modalType === 'students') {
                      let updates = { reg_no: reg };
                      const upper = reg.toUpperCase();
@@ -680,8 +681,8 @@
                             
                             // Map CSV headers to internal keys
                             if (h.includes('reg') && h.includes('no')) obj['reg_no'] = val;
-                            else if ((h.includes('fee') || h.includes('charge') || h.includes('head')) && (h.includes('name') || h.includes('head'))) obj['fee_name'] = val; 
-                            else if (h.includes('name') && !h.includes('user') && !h.includes('fee') && !h.includes('head')) obj['name'] = val; 
+                            else if ((h.includes('fee') || h.includes('charge') || h.includes('head')) && (h.includes('name') || h.includes('head'))) obj['fee_name'] = val; // Prioritize fee name
+                            else if (h.includes('name') && !h.includes('user') && !h.includes('fee') && !h.includes('head')) obj['name'] = val; // Strict name check
                             else if (h.includes('semester')) obj['semester'] = val;
                             else if (h.includes('amount')) obj['amount'] = val;
                             else if (h === 'cr') obj['cr'] = val;
@@ -701,6 +702,14 @@
                             else if(type === 'discounts') obj.term = importTerm;
                         }
                         if (obj.amount) obj.amount = obj.amount.replace(/[^0-9.-]/g, '');
+
+                        // AUTO-FILL DEGREE FROM REG NO (NEW)
+                        if (type === 'students' && !obj.degree && obj.reg_no) {
+                             const upper = obj.reg_no.toUpperCase();
+                             if (upper.includes('05')) {
+                                 obj.degree = upper.split('05')[0];
+                             }
+                        }
 
                         // AUTO-FILL NAME FROM DIRECTORY (UPDATED)
                         if (!obj.name && obj.reg_no) {
@@ -1180,8 +1189,8 @@
                                 <div className="p-6 border-b flex justify-between items-center bg-gray-50 rounded-t-xl no-print">
                                     <h3 className="text-xl font-bold">Session Detail: {sessionDetail.session}</h3>
                                     <div className="flex gap-2">
-                                        <button onClick={() => window.print()} className="bg-gray-700 text-white px-4 py-2 rounded hover:bg-gray-800"><Printer className="h-4 w-4 inline mr-2"/> Print Report</button>
-                                        <button onClick={() => setSessionDetail(null)} className="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+                                        <button onClick={() => window.print()} className="bg-gray-700 text-white px-4 py-2 rounded">Print</button>
+                                        <button onClick={() => setSessionDetail(null)} className="text-2xl">&times;</button>
                                     </div>
                                 </div>
                                 
