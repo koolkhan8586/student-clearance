@@ -624,8 +624,13 @@
             
             const openModal = (type, item = null) => {
                 setModalType(type);
-                if (item) { setFormData(item); setEditingId(item.id || item.reg_no); } 
-                else { setFormData(type==='users' ? {role:'user',permissions:[]} : {}); setEditingId(null); }
+                if (item) { 
+                    setFormData({...item}); 
+                    setEditingId(item.id || item.reg_no); 
+                } else { 
+                    setFormData(type === 'users' ? {role: 'user', permissions: []} : {}); 
+                    setEditingId(null); 
+                }
                 setShowModal(true);
             };
 
@@ -670,8 +675,8 @@
                             
                             // Map CSV headers to internal keys
                             if (h.includes('reg') && h.includes('no')) obj['reg_no'] = val;
-                            else if ((h.includes('fee') || h.includes('charge') || h.includes('head')) && (h.includes('name') || h.includes('head'))) obj['fee_name'] = val; // Prioritize fee name
-                            else if (h.includes('name') && !h.includes('user') && !h.includes('fee') && !h.includes('head')) obj['name'] = val; // Strict name check
+                            else if ((h.includes('fee') || h.includes('charge') || h.includes('head')) && (h.includes('name') || h.includes('head'))) obj['fee_name'] = val; 
+                            else if (h.includes('name') && !h.includes('user') && !h.includes('fee') && !h.includes('head')) obj['name'] = val; 
                             else if (h.includes('semester')) obj['semester'] = val;
                             else if (h.includes('amount')) obj['amount'] = val;
                             else if (h === 'cr') obj['cr'] = val;
@@ -1164,14 +1169,14 @@
 
                     {/* NEW: SESSION DETAIL MODAL WITH PRINT FIX */}
                     {sessionDetail && (
-                        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 print:p-0 print:block print:relative">
+                        <div className="fixed inset-0 bg-black bg-opacity-50 z-100 flex items-center justify-center p-4 print:p-0 print:block print:relative">
                             <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col print:h-auto print:shadow-none print:w-full print:max-w-none">
                                 {/* HEADER (No Print) */}
                                 <div className="p-6 border-b flex justify-between items-center bg-gray-50 rounded-t-xl no-print">
                                     <h3 className="text-xl font-bold">Session Detail: {sessionDetail.session}</h3>
                                     <div className="flex gap-2">
-                                        <button onClick={() => window.print()} className="bg-gray-700 text-white px-4 py-2 rounded">Print</button>
-                                        <button onClick={() => setSessionDetail(null)} className="text-2xl">&times;</button>
+                                        <button onClick={() => window.print()} className="bg-gray-700 text-white px-4 py-2 rounded hover:bg-gray-800"><Printer className="h-4 w-4 inline mr-2"/> Print Report</button>
+                                        <button onClick={() => setSessionDetail(null)} className="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
                                     </div>
                                 </div>
                                 
@@ -1209,7 +1214,7 @@
                                                 <th className="p-2 border text-center">Courses</th>
                                                 <th className="p-2 border text-center">Cr</th>
                                                 <th className="p-2 border text-right">Tuition</th>
-                                                <th className="p-2 border text-right">Exam Fee</th>
+                                                <th className="p-2 border text-right">Exam Fee</th> {/* FIXED */}
                                                 <th className="p-2 border text-right">Discount</th>
                                                 <th className="p-2 border text-right">Total</th>
                                                 <th className="p-2 border text-right">Paid</th>
@@ -1225,7 +1230,7 @@
                                                     <td className="p-2 border text-center">{s.courses}</td>
                                                     <td className="p-2 border text-center">{s.cr}</td>
                                                     <td className="p-2 border text-right">{num(s.tuition)}</td>
-                                                    <td className="p-2 border text-right">{num(s.exam)}</td>
+                                                    <td className="p-2 border text-right">{num(s.exam)}</td> {/* FIXED */}
                                                     <td className="p-2 border text-right text-red-500">{num(s.discount)}</td>
                                                     <td className="p-2 border text-right font-bold">{num(s.tuition + s.exam + s.other - s.discount)}</td>
                                                     <td className="p-2 border text-right text-green-700">{num(s.paid)}</td>
@@ -1238,7 +1243,122 @@
                             </div>
                         </div>
                     )}
+                    
+                    {/* ... (Other Modals: showModal, showPasswordModal, importPreview - Keep SAME as previous) ... */}
+                    {showModal && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 z-100 flex items-center justify-center p-4">
+                            <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
+                                <h3 className="text-xl font-bold mb-4 capitalize">Add/Edit {modalType.slice(0, -1)}</h3>
+                                <form onSubmit={handleSave} className="space-y-4">
+                                    {modalType === 'students' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={handleRegChange} /><input required placeholder="Full Name" className="w-full border p-2 rounded" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} /><div className="grid grid-cols-2 gap-4"><input placeholder="Degree (e.g. BSCAF)" className="w-full border p-2 rounded" value={formData.degree || ''} onChange={e => setFormData({...formData, degree: e.target.value})} /><input placeholder="Batch (e.g. Fall 2023)" className="w-full border p-2 rounded" value={formData.batch || ''} onChange={e => setFormData({...formData, batch: e.target.value})} /></div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <input placeholder="Mobile #" className="w-full border p-2 rounded" value={formData.mobile || ''} onChange={e => setFormData({...formData, mobile: e.target.value})} />
+                                            <input placeholder="Email (Optional)" className="w-full border p-2 rounded" value={formData.email || ''} onChange={e => setFormData({...formData, email: e.target.value})} />
+                                        </div>
+                                    </>}
+                                    {modalType === 'fees' && <><div className="bg-blue-50 p-3 rounded text-xs text-blue-800 mb-2"><strong>Note:</strong> Fee Structure applies to ALL semesters for this Degree & Batch.</div><div className="grid grid-cols-2 gap-4"><input required placeholder="Degree" className="w-full border p-2 rounded" value={formData.degree || ''} onChange={e => setFormData({...formData, degree: e.target.value})} /><input required placeholder="Batch" className="w-full border p-2 rounded" value={formData.batch || ''} onChange={e => setFormData({...formData, batch: e.target.value})} /></div><div className="grid grid-cols-2 gap-4"><input type="number" placeholder="Fee Per Credit Hour" className="w-full border p-2 rounded" value={formData.per_cr_fee || ''} onChange={e => setFormData({...formData, per_cr_fee: e.target.value})} /><input type="number" placeholder="Fee Per Subject/Course" className="w-full border p-2 rounded" value={formData.per_course_fee || ''} onChange={e => setFormData({...formData, per_course_fee: e.target.value})} /></div><div className="grid grid-cols-2 gap-4"><input type="number" placeholder="Registration Fee (Semester)" className="w-full border p-2 rounded" value={formData.reg_fee || ''} onChange={e => setFormData({...formData, reg_fee: e.target.value})} /><input type="number" placeholder="Other Charges (Semester)" className="w-full border p-2 rounded" value={formData.other_fee || ''} onChange={e => setFormData({...formData, other_fee: e.target.value})} /></div></>}
+                                    {modalType === 'enrollments' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={e => setFormData({...formData, reg_no: e.target.value})} /><input placeholder="Student Name" className="w-full border p-2 rounded" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} /><input required placeholder="Semester (e.g. Spring 2024)" className="w-full border p-2 rounded" value={formData.semester || ''} onChange={e => setFormData({...formData, semester: e.target.value})} /><div className="grid grid-cols-2 gap-4"><input type="number" placeholder="Credit Hours" className="w-full border p-2 rounded" value={formData.cr || ''} onChange={e => setFormData({...formData, cr: e.target.value})} /><input type="number" placeholder="No. of Courses" className="w-full border p-2 rounded" value={formData.courses || ''} onChange={e => setFormData({...formData, courses: e.target.value})} /></div></>}
+                                    {modalType === 'payments' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={handleRegChange} /><input placeholder="Student Name" className="w-full border p-2 rounded bg-gray-50 font-bold text-gray-700" value={formData.name || ''} readOnly /><input required placeholder="Semester (e.g. Spring 2024)" className="w-full border p-2 rounded" value={formData.semester || ''} onChange={e => setFormData({...formData, semester: e.target.value})} /><input required type="number" placeholder="Amount Paid" className="w-full border p-2 rounded font-bold text-lg" value={formData.amount || ''} onChange={e => setFormData({...formData, amount: e.target.value})} /><input type="date" className="w-full border p-2 rounded" value={formData.date || ''} onChange={e => setFormData({...formData, date: e.target.value})} />
+                                    <label className="block text-sm font-bold text-gray-700 mt-2 mb-1">Payment Through (Bank)</label>
+                                    <select className="w-full border p-2 rounded bg-white" value={formData.bank || ''} onChange={e => setFormData({...formData, bank: e.target.value})}>
+                                        <option value="">Select Bank</option>
+                                        <option value="Cash">Cash</option>
+                                        {data.banks.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
+                                    </select>
+                                    </>}
+                                    {modalType === 'others' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={handleRegChange} /><input placeholder="Student Name" className="w-full border p-2 rounded bg-gray-50 font-bold text-gray-700" value={formData.name || ''} readOnly /><div className="grid grid-cols-2 gap-4"><input required placeholder="Semester" className="w-full border p-2 rounded" value={formData.semester || ''} onChange={e => setFormData({...formData, semester: e.target.value})} /><input required placeholder="Fee Head (e.g. Fine)" className="w-full border p-2 rounded" value={formData.fee_name || ''} onChange={e => setFormData({...formData, fee_name: e.target.value})} /></div><input required type="number" placeholder="Amount" className="w-full border p-2 rounded font-bold text-lg" value={formData.amount || ''} onChange={e => setFormData({...formData, amount: e.target.value})} /></>}
+                                    {modalType === 'discounts' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={handleRegChange} /><input placeholder="Student Name" className="w-full border p-2 rounded bg-gray-50 font-bold text-gray-700" value={formData.name || ''} readOnly /><input required placeholder="Term" className="w-full border p-2 rounded" value={formData.term || ''} onChange={e => setFormData({...formData, term: e.target.value})} /><input required type="number" placeholder="Discount %" className="w-full border p-2 rounded" value={formData.discount || ''} onChange={e => setFormData({...formData, discount: e.target.value})} /></>}
+                                    {modalType === 'banks' && <><input required placeholder="Bank Name" className="w-full border p-2 rounded" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} /><input placeholder="Account Number (Optional)" className="w-full border p-2 rounded" value={formData.account_no || ''} onChange={e => setFormData({...formData, account_no: e.target.value})} /></>}
+                                    {modalType === 'users' && (
+                                        <div className="space-y-4">
+                                            <input required placeholder="Username" className="w-full border p-2 rounded" value={formData.username || ''} onChange={e => setFormData({...formData, username: e.target.value})} />
+                                            <input required type="password" placeholder="Password" className="w-full border p-2 rounded" value={formData.password || ''} onChange={e => setFormData({...formData, password: e.target.value})} />
+                                            <select className="w-full border p-2 rounded bg-white" value={formData.role || 'user'} onChange={e => setFormData({...formData, role: e.target.value})}>
+                                                <option value="user">Regular User</option>
+                                                <option value="admin">Administrator</option>
+                                            </select>
+                                            {formData.role !== 'admin' && (
+                                                <div className="bg-gray-50 p-3 rounded border">
+                                                    <label className="block text-xs font-bold text-gray-500 mb-2 uppercase">Tab Access Permissions</label>
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        {TABS.map(t => (
+                                                            <label key={t.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                                                                <input type="checkbox" checked={(formData.permissions || []).includes(t.id)} onChange={() => togglePermission(t.id)} />
+                                                                {t.label}
+                                                            </label>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
 
+                                    <div className="flex justify-end gap-3 mt-6">
+                                        <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 bg-gray-100 rounded hover:bg-gray-200 font-bold">Cancel</button>
+                                        <button type="submit" className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-bold">Save Record</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+                    {/* ... (Password Modal, Import Preview Modal kept same) */}
+                    {showPasswordModal && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                            <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6">
+                                <h3 className="text-xl font-bold mb-4">Change Password</h3>
+                                <form onSubmit={handleChangePassword} className="space-y-4">
+                                    <div><label className="block text-sm font-medium text-gray-700 mb-1">Current Password</label><input required type="password" value={passwordData.current} onChange={e => setPasswordData({...passwordData, current: e.target.value})} className="w-full border p-2 rounded" /></div>
+                                    <div><label className="block text-sm font-medium text-gray-700 mb-1">New Password</label><input required type="password" value={passwordData.new} onChange={e => setPasswordData({...passwordData, new: e.target.value})} className="w-full border p-2 rounded" /></div>
+                                    <div><label className="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label><input required type="password" value={passwordData.confirm} onChange={e => setPasswordData({...passwordData, confirm: e.target.value})} className="w-full border p-2 rounded" /></div>
+                                    <div className="flex justify-end gap-3 mt-4"><button type="button" onClick={() => {setShowPasswordModal(false); setPasswordData({current:'',new:'',confirm:''})}} className="px-4 py-2 bg-gray-100 rounded hover:bg-gray-200 font-bold">Cancel</button><button type="submit" className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-bold">Update</button></div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+                    {/* IMPORT PROGRESS BAR */}
+                    {uploadStatus.active && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+                            <div className="bg-white p-6 rounded-xl shadow-xl w-80 text-center">
+                                <h3 className="font-bold text-lg mb-2">Importing Data...</h3>
+                                <div className="w-full bg-gray-200 rounded-full h-4 mb-2">
+                                    <div className="bg-blue-600 h-4 rounded-full transition-all duration-300" style={{ width: `${(uploadStatus.current / uploadStatus.total) * 100}%` }}></div>
+                                </div>
+                                <p className="text-sm text-gray-600">{uploadStatus.current} / {uploadStatus.total}</p>
+                            </div>
+                        </div>
+                    )}
+                    {/* IMPORT PREVIEW MODAL */}
+                    {importPreview.show && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                            <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl p-6 max-h-[90vh] flex flex-col">
+                                <h3 className="text-xl font-bold mb-4">Import Summary ({importPreview.type})</h3>
+                                <div className="grid grid-cols-3 gap-4 mb-4 text-center">
+                                     <div className="bg-blue-50 p-2 rounded"><div className="text-xl font-bold text-blue-600">{importPreview.total}</div><div className="text-xs text-gray-500">Total Found</div></div>
+                                     <div className="bg-green-50 p-2 rounded"><div className="text-xl font-bold text-green-600">{importPreview.newItems.length}</div><div className="text-xs text-gray-500">New Records</div></div>
+                                     <div className="bg-red-50 p-2 rounded"><div className="text-xl font-bold text-red-600">{importPreview.duplicates.length}</div><div className="text-xs text-gray-500">Duplicates (Skipped)</div></div>
+                                </div>
+                                
+                                {importPreview.duplicates.length > 0 && (
+                                    <div className="flex-1 overflow-hidden flex flex-col">
+                                        <h4 className="font-bold text-sm text-gray-700 mb-2">Duplicate Entries:</h4>
+                                        <div className="overflow-y-auto border rounded bg-gray-50 p-2 text-sm text-gray-600 space-y-1">
+                                            {importPreview.duplicates.map((d, i) => (
+                                                <div key={i} className="flex justify-between border-b border-gray-200 last:border-0 pb-1">
+                                                    <span>{d.reg_no || d.name || 'Unknown'}</span>
+                                                    <span className="text-xs bg-gray-200 px-2 rounded text-gray-500">{d.semester || d.term || 'N/A'}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
+                                    <button onClick={() => { setImportPreview({show:false, newItems:[], duplicates:[], total:0, type:''}); }} className="px-4 py-2 bg-gray-100 rounded font-bold hover:bg-gray-200">Cancel</button>
+                                    {importPreview.newItems.length > 0 && <button onClick={confirmImport} className="px-6 py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700">Import {importPreview.newItems.length} Records</button>}
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             );
         }
