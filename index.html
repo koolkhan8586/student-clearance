@@ -358,7 +358,7 @@
                     const semKey = norm(sem);
                     if (summaryFilterSession && !semKey.includes(norm(summaryFilterSession))) return;
                     if(!summary.has(semKey)) {
-                         summary.set(semKey, { session: sem, enrolled: new Set(), charged: 0, discount: 0, other: 0, paid: 0 });
+                         summary.set(semKey, { session: sem, enrolled: new Set(), charged: 0, discount: 0, other: 0, exam: 0, paid: 0 });
                          sessionDetailsMap.set(semKey, []);
                     }
                     const entry = summary.get(semKey);
@@ -411,7 +411,9 @@
                     entry.charged += feeDetails.total;
                     entry.discount += discAmt;
                     entry.other += feeDetails.other;
-                    
+                    entry.exam += feeDetails.exam; // NEW: Accumulate Exam Fee
+
+                    // Add to detailed list for modal
                     detailList.push({
                         reg_no: en.reg_no,
                         name: en.name,
@@ -426,6 +428,7 @@
                     });
                 });
                 
+                // Aggregate payments for summary total
                 (data.payments || []).forEach(p => {
                     const pSem = norm(p.semester);
                     if (summaryFilterSession && !pSem.includes(norm(summaryFilterSession))) return;
@@ -695,8 +698,8 @@
                             
                             // Map CSV headers to internal keys
                             if (h.includes('reg') && h.includes('no')) obj['reg_no'] = val;
-                            else if ((h.includes('fee') || h.includes('charge') || h.includes('head')) && (h.includes('name') || h.includes('head'))) obj['fee_name'] = val; // Prioritize fee name
-                            else if (h.includes('name') && !h.includes('user') && !h.includes('fee') && !h.includes('head')) obj['name'] = val; // Strict name check
+                            else if ((h.includes('fee') || h.includes('charge') || h.includes('head')) && (h.includes('name') || h.includes('head'))) obj['fee_name'] = val; 
+                            else if (h.includes('name') && !h.includes('user') && !h.includes('fee') && !h.includes('head')) obj['name'] = val; 
                             else if (h.includes('semester')) obj['semester'] = val;
                             else if (h.includes('amount')) obj['amount'] = val;
                             else if (h === 'cr') obj['cr'] = val;
@@ -1064,6 +1067,7 @@
                                                         <th className="p-4">Session</th>
                                                         <th className="p-4 text-center">Enrolled</th>
                                                         <th className="p-4 text-right">Total Charged</th>
+                                                        <th className="p-4 text-right">Exam Fee</th> {/* New Column */}
                                                         <th className="p-4 text-right">Discounts</th>
                                                         <th className="p-4 text-right">Other Charges</th>
                                                         <th className="p-4 text-right">Total Paid</th>
@@ -1078,18 +1082,20 @@
                                                             </td>
                                                             <td className="p-4 text-center"><span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-bold">{row.enrolled}</span></td>
                                                             <td className="p-4 text-right font-mono font-bold text-gray-800">{num(row.charged)}</td>
+                                                            <td className="p-4 text-right font-mono text-gray-600">{num(row.exam)}</td> {/* New Data */}
                                                             <td className="p-4 text-right font-mono text-orange-600">{num(row.discount)}</td>
                                                             <td className="p-4 text-right font-mono text-gray-600">{num(row.other)}</td>
                                                             <td className="p-4 text-right font-mono font-bold text-green-600">{num(row.paid)}</td>
                                                             <td className={`p-4 text-right font-mono font-bold ${row.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>{num(row.balance)}</td>
                                                         </tr>
                                                     ))}
-                                                    {getSummaryData.length === 0 && <tr><td colSpan="7" className="p-8 text-center text-gray-400">No session data available.</td></tr>}
+                                                    {getSummaryData.length === 0 && <tr><td colSpan="8" className="p-8 text-center text-gray-400">No session data available.</td></tr>}
                                                     {getSummaryData.length > 0 && (
                                                         <tr className="bg-gray-800 text-white font-bold">
                                                             <td className="p-4">TOTALS</td>
                                                             <td className="p-4 text-center">{getSummaryData.reduce((s, r) => s + r.enrolled, 0)}</td>
                                                             <td className="p-4 text-right">{num(getSummaryData.reduce((s, r) => s + r.charged, 0))}</td>
+                                                            <td className="p-4 text-right">{num(getSummaryData.reduce((s, r) => s + r.exam, 0))}</td> {/* Total Exam */}
                                                             <td className="p-4 text-right">{num(getSummaryData.reduce((s, r) => s + r.discount, 0))}</td>
                                                             <td className="p-4 text-right">{num(getSummaryData.reduce((s, r) => s + r.other, 0))}</td>
                                                             <td className="p-4 text-right text-green-400">{num(getSummaryData.reduce((s, r) => s + r.paid, 0))}</td>
@@ -1197,7 +1203,7 @@
 
                     {/* NEW: SESSION DETAIL MODAL WITH PRINT FIX */}
                     {sessionDetail && (
-                        <div className="fixed inset-0 bg-black bg-opacity-50 z-100 flex items-center justify-center p-4 print:p-0 print:block print:relative">
+                        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 print:p-0 print:block print:relative">
                             <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col print:h-auto print:shadow-none print:w-full print:max-w-none">
                                 {/* HEADER (No Print) */}
                                 <div className="p-6 border-b flex justify-between items-center bg-gray-50 rounded-t-xl no-print">
@@ -1258,7 +1264,7 @@
                                                     <td className="p-2 border text-center">{s.courses}</td>
                                                     <td className="p-2 border text-center">{s.cr}</td>
                                                     <td className="p-2 border text-right">{num(s.tuition)}</td>
-                                                    <td className="p-2 border text-right">{num(s.exam)}</td> {/* FIXED */}
+                                                    <td className="p-2 border text-right">{num(s.exam)}</td>
                                                     <td className="p-2 border text-right text-red-500">{num(s.discount)}</td>
                                                     <td className="p-2 border text-right font-bold">{num(s.tuition + s.exam + s.other - s.discount)}</td>
                                                     <td className="p-2 border text-right text-green-700">{num(s.paid)}</td>
