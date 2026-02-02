@@ -199,9 +199,9 @@
             
             const getTermRank = (sem) => {
                 const s = (sem || '').toLowerCase();
-                if(s.includes('fall')) return 1;
-                if(s.includes('spring')) return 2;
-                if(s.includes('summer')) return 3;
+                if(s.includes('spring')) return 1;
+                if(s.includes('summer')) return 2;
+                if(s.includes('fall')) return 3;
                 return 4;
             };
 
