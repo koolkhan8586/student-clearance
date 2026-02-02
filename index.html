@@ -41,12 +41,11 @@
             }
 
             /* Disable Fixed Positioning on Modals for Multi-page Print */
-            .fixed, .absolute, .relative, .inset-0, .h-\[90vh\], .overflow-y-auto, .overflow-auto {
+            .fixed, .absolute, .relative {
                 position: static !important;
                 overflow: visible !important;
                 height: auto !important;
                 width: auto !important;
-                max-height: none !important;
             }
 
             /* HIDE EVERYTHING... */
@@ -336,20 +335,32 @@
                 return getTermRank(a) - getTermRank(b);
             });
             
-            // --- SUMMARY LOGIC ---
+            // --- SUMMARY LOGIC (OPTIMIZED WITH INDEXING) ---
             const getSummaryData = useMemo(() => {
                 if(activeTab !== 'summary') return [];
                 const studentMap = new Map((data.students || []).map(s => [norm(s.reg_no), s]));
+                
+                // Pre-index collections for O(1) lookup
                 const otherChargesMap = new Map();
                 (data.others || []).forEach(o => {
                      const k = `${norm(o.reg_no)}_${norm(o.semester)}`;
                      otherChargesMap.set(k, (otherChargesMap.get(k) || 0) + (parseFloat(o.amount) || 0));
                 });
+                
                 const discountMap = new Map();
                 (data.discounts || []).forEach(d => {
                      const k = `${norm(d.reg_no)}_${norm(d.term)}`;
                      discountMap.set(k, parseFloat(d.discount) || 0);
                 });
+
+                // PAYMENT INDEXING (Crucial optimization)
+                const paymentsMap = new Map();
+                (data.payments || []).forEach(p => {
+                    const r = norm(p.reg_no);
+                    if (!paymentsMap.has(r)) paymentsMap.set(r, []);
+                    paymentsMap.get(r).push(p);
+                });
+
                 const summary = new Map();
                 const sessionDetailsMap = new Map();
 
@@ -397,21 +408,20 @@
                     const discPct = discountMap.get(`${norm(en.reg_no)}_${semKey}`) || 0;
                     const discAmt = (feeDetails.tuition * discPct) / 100;
                     
-                    // Add Payment Calculation Per Student for Detail View
+                    // Optimized Payment Calculation using Index
                     let studentPaid = 0;
-                     (data.payments || []).forEach(p => {
-                        if(norm(p.reg_no) === norm(en.reg_no)) {
-                             const pSem = norm(p.semester);
-                             if (pSem === semKey || (semKey.includes(pSem) && pSem.length > 3) || (pSem.includes(semKey) && semKey.length > 3)) {
-                                studentPaid += parseFloat(p.amount || 0);
-                             }
-                        }
+                    const studentPayments = paymentsMap.get(norm(en.reg_no)) || [];
+                    studentPayments.forEach(p => {
+                         const pSem = norm(p.semester);
+                         if (pSem === semKey || (semKey.includes(pSem) && pSem.length > 3) || (pSem.includes(semKey) && semKey.length > 3)) {
+                            studentPaid += parseFloat(p.amount || 0);
+                         }
                     });
 
                     entry.charged += feeDetails.total;
                     entry.discount += discAmt;
                     entry.other += feeDetails.other;
-                    entry.exam += feeDetails.exam; // NEW: Accumulate Exam Fee
+                    entry.exam += feeDetails.exam;
 
                     // Add to detailed list for modal
                     detailList.push({
@@ -628,7 +638,7 @@
                     newData.total_fee = newData.tuition_fee + newData.exam_fee + parseFloat(newData.reg_fee||0) + parseFloat(newData.other_fee||0);
                 }
                 
-                if ((modalType === 'payments' || modalType === 'others' || modalType === 'discounts') && !newData.name) {
+                if ((modalType === 'payments' || modalType === 'others') && !newData.name) {
                     const s = data.students.find(st => norm(st.reg_no) === norm(newData.reg_no));
                     if(s) newData.name = s.name;
                 }
@@ -651,7 +661,7 @@
                 setShowModal(true);
             };
 
-            // NEW: Auto-populate name on Reg No Change - FIX: Don't clear name if adding new student
+            // NEW: Auto-populate name on Reg No Change
             const handleRegChange = (e) => {
                 const reg = e.target.value;
                 // LOGIC UPDATE: Auto-extract Degree for New Students
@@ -830,7 +840,7 @@
                     case 'enrollments': return ['reg_no', 'name', 'semester', 'cr', 'courses'];
                     case 'payments': return ['reg_no', 'name', 'semester', 'amount', 'date', 'bank'];
                     case 'discounts': return ['reg_no', 'name', 'term', 'discount'];
-                    case 'others': return ['reg_no', 'name', 'semester', 'fee_name', 'amount']; // CHANGED TO FEE HEAD
+                    case 'others': return ['reg_no', 'name', 'semester', 'fee_name', 'amount']; 
                     case 'users': return ['username', 'password', 'role', 'permissions']; 
                     case 'banks': return ['name', 'account_no'];
                     default: return [];
@@ -1264,7 +1274,7 @@
                                                     <td className="p-2 border text-center">{s.courses}</td>
                                                     <td className="p-2 border text-center">{s.cr}</td>
                                                     <td className="p-2 border text-right">{num(s.tuition)}</td>
-                                                    <td className="p-2 border text-right">{num(s.exam)}</td>
+                                                    <td className="p-2 border text-right">{num(s.exam)}</td> {/* FIXED */}
                                                     <td className="p-2 border text-right text-red-500">{num(s.discount)}</td>
                                                     <td className="p-2 border text-right font-bold">{num(s.tuition + s.exam + s.other - s.discount)}</td>
                                                     <td className="p-2 border text-right text-green-700">{num(s.paid)}</td>
@@ -1291,7 +1301,7 @@
                                         </div>
                                     </>}
                                     {modalType === 'fees' && <><div className="bg-blue-50 p-3 rounded text-xs text-blue-800 mb-2"><strong>Note:</strong> Fee Structure applies to ALL semesters for this Degree & Batch.</div><div className="grid grid-cols-2 gap-4"><input required placeholder="Degree" className="w-full border p-2 rounded" value={formData.degree || ''} onChange={e => setFormData({...formData, degree: e.target.value})} /><input required placeholder="Batch" className="w-full border p-2 rounded" value={formData.batch || ''} onChange={e => setFormData({...formData, batch: e.target.value})} /></div><div className="grid grid-cols-2 gap-4"><input type="number" placeholder="Fee Per Credit Hour" className="w-full border p-2 rounded" value={formData.per_cr_fee || ''} onChange={e => setFormData({...formData, per_cr_fee: e.target.value})} /><input type="number" placeholder="Fee Per Subject/Course" className="w-full border p-2 rounded" value={formData.per_course_fee || ''} onChange={e => setFormData({...formData, per_course_fee: e.target.value})} /></div><div className="grid grid-cols-2 gap-4"><input type="number" placeholder="Registration Fee (Semester)" className="w-full border p-2 rounded" value={formData.reg_fee || ''} onChange={e => setFormData({...formData, reg_fee: e.target.value})} /><input type="number" placeholder="Other Charges (Semester)" className="w-full border p-2 rounded" value={formData.other_fee || ''} onChange={e => setFormData({...formData, other_fee: e.target.value})} /></div></>}
-                                    {modalType === 'enrollments' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={handleRegChange} /><input placeholder="Student Name" className="w-full border p-2 rounded" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} /><input required placeholder="Semester (e.g. Spring 2024)" className="w-full border p-2 rounded" value={formData.semester || ''} onChange={e => setFormData({...formData, semester: e.target.value})} /><div className="grid grid-cols-2 gap-4"><input type="number" placeholder="Credit Hours" className="w-full border p-2 rounded" value={formData.cr || ''} onChange={e => setFormData({...formData, cr: e.target.value})} /><input type="number" placeholder="No. of Courses" className="w-full border p-2 rounded" value={formData.courses || ''} onChange={e => setFormData({...formData, courses: e.target.value})} /></div></>}
+                                    {modalType === 'enrollments' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={e => setFormData({...formData, reg_no: e.target.value})} /><input placeholder="Student Name" className="w-full border p-2 rounded" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} /><input required placeholder="Semester (e.g. Spring 2024)" className="w-full border p-2 rounded" value={formData.semester || ''} onChange={e => setFormData({...formData, semester: e.target.value})} /><div className="grid grid-cols-2 gap-4"><input type="number" placeholder="Credit Hours" className="w-full border p-2 rounded" value={formData.cr || ''} onChange={e => setFormData({...formData, cr: e.target.value})} /><input type="number" placeholder="No. of Courses" className="w-full border p-2 rounded" value={formData.courses || ''} onChange={e => setFormData({...formData, courses: e.target.value})} /></div></>}
                                     {modalType === 'payments' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={handleRegChange} /><input placeholder="Student Name" className="w-full border p-2 rounded bg-gray-50 font-bold text-gray-700" value={formData.name || ''} readOnly /><input required placeholder="Semester (e.g. Spring 2024)" className="w-full border p-2 rounded" value={formData.semester || ''} onChange={e => setFormData({...formData, semester: e.target.value})} /><input required type="number" placeholder="Amount Paid" className="w-full border p-2 rounded font-bold text-lg" value={formData.amount || ''} onChange={e => setFormData({...formData, amount: e.target.value})} /><input type="date" className="w-full border p-2 rounded" value={formData.date || ''} onChange={e => setFormData({...formData, date: e.target.value})} />
                                     <label className="block text-sm font-bold text-gray-700 mt-2 mb-1">Payment Through (Bank)</label>
                                     <select className="w-full border p-2 rounded bg-white" value={formData.bank || ''} onChange={e => setFormData({...formData, bank: e.target.value})}>
