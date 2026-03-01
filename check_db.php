@@ -6,7 +6,7 @@ error_reporting(E_ALL);
 
 $host = "localhost";
 $user = "koolkhan";      // Matches your api.php settings
-$pass = "Mangohair197";  // Matches your api.php settings
+$pass = "Mangohair@197";  // Matches your api.php settings
 $dbname = "fee_system";
 
 echo "<h2>Database Connection Test</h2>";
