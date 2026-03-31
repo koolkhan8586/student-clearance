@@ -482,6 +482,7 @@
                 }));
             }, [activeTab, data, summaryFilterSession]);
 
+            // --- OPEN SESSION DETAIL ---
             const openSessionDetail = (sessionData) => {
                 setSessionDetail(sessionData);
             };
@@ -793,7 +794,6 @@
                 reader.readAsText(file);
             };
 
-            // OPTIMIZED IMPORT
             const confirmImport = async () => {
                 setUploadStatus({ active: true, current: 0, total: importPreview.newItems.length });
                 let actionType = importPreview.type.slice(0, -1);
@@ -922,7 +922,7 @@
                         <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-8">
                             <div className="flex justify-center mb-6">
                                 <div className="w-24 h-24 rounded-lg flex items-center justify-center bg-white p-2">
-                                     <img src="src/UOL-Green-V1.png" alt="UOL Logo" className="w-full h-full object-contain" />
+                                     <img src="UOL-Green-V1.png" onError={(e) => { e.target.onerror = null; e.target.src = "src/UOL-Green-V1.png"; }} alt="UOL Logo" className="w-full h-full object-contain" />
                                 </div>
                             </div>
                             <h2 className="text-2xl font-bold text-center text-gray-800 mb-2">LSAF Student Fee Management Software</h2>
@@ -1032,7 +1032,7 @@
                                         <div className="bg-white rounded-xl shadow-lg overflow-hidden" id="printableArea">
                                             <div className="p-8">
                                                 <div className="border-b-2 border-gray-800 pb-6 mb-6 flex justify-between items-start">
-                                                    <div className="w-32 h-32 rounded-lg flex items-center justify-center font-bold text-gray-400 overflow-hidden"><img src="src/UOL-Green-V1.png" alt="UOL Logo" className="w-full h-full object-contain" /></div>
+                                                    <div className="w-32 h-32 rounded-lg flex items-center justify-center font-bold text-gray-400 overflow-hidden"><img src="UOL-Green-V1.png" onError={(e) => { e.target.onerror = null; e.target.src = "src/UOL-Green-V1.png"; }} alt="UOL Logo" className="w-full h-full object-contain" /></div>
                                                     <div className="text-center flex-1 px-4">
                                                         <h2 className="text-2xl font-bold text-gray-900 uppercase">The University of Lahore</h2>
                                                         <p className="text-gray-600 font-medium">School of Accountancy & Finance</p>
@@ -1160,7 +1160,7 @@
                                                 {selectedIds.size > 0 && <button onClick={deleteSelected} className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm font-bold hover:bg-red-100 flex items-center gap-2"><Trash2 className="h-4 w-4" /> Delete ({selectedIds.size})</button>}
                                                 {(activeTab === 'enrollments' || activeTab === 'payments' || activeTab === 'others') && <button onClick={deleteBySemester} className="bg-orange-50 border border-orange-200 text-orange-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-orange-100 flex items-center gap-2"><CalendarX className="h-4 w-4" /> Del Sem</button>}
                                                 {user.role === 'admin' && <button onClick={deleteAllInTab} className="bg-white border border-red-200 text-red-600 px-3 py-2 rounded-lg text-sm font-medium hover:bg-red-50 flex items-center gap-2"><XSquare className="h-4 w-4" /> Delete All</button>}
-                                                <div className="hidden md:block h-8 w-px bg-gray-300 mx-1"></div>
+                                                <div className="h-8 w-px bg-gray-300 mx-1"></div>
                                                 <button onClick={() => downloadSample(activeTab)} className="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2"><FileSpreadsheet className="h-4 w-4" /> Sample</button>
                                                 <label className="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 cursor-pointer flex items-center gap-2"><Download className="h-4 w-4" /><input type="file" onChange={(e) => handleImport(e, activeTab)} className="hidden" accept=".csv" /></label>
                                                 <button onClick={() => handleExport(activeTab)} className="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2"><Upload className="h-4 w-4" /> Export</button>
@@ -1278,7 +1278,7 @@
                                     {/* UOL HEADER (Visible ONLY in Print) */}
                                     <div className="hidden print-only-header mb-4 border-b-2 border-gray-800 pb-4">
                                          <div className="flex justify-between items-start">
-                                            <div className="w-32 h-32 rounded-lg flex items-center justify-center font-bold text-gray-400 overflow-hidden"><img src="src/UOL-Green-V1.png" alt="UOL Logo" className="w-full h-full object-contain" /></div>
+                                            <div className="w-32 h-32 rounded-lg flex items-center justify-center font-bold text-gray-400 overflow-hidden"><img src="UOL-Green-V1.png" onError={(e) => { e.target.onerror = null; e.target.src = "src/UOL-Green-V1.png"; }} alt="UOL Logo" className="w-full h-full object-contain" /></div>
                                             <div className="text-center flex-1 px-4">
                                                 <h2 className="text-2xl font-bold text-gray-900 uppercase">The University of Lahore</h2>
                                                 <p className="text-gray-600 font-medium">School of Accountancy & Finance</p>
@@ -1336,7 +1336,7 @@
                         </div>
                     )}
                     
-                    {/* ADD / EDIT MODAL - Z-INDEX FIXED */}
+                    {/* ADD / EDIT MODAL */}
                     {showModal && (
                         <div className="fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-center justify-center p-4">
                             <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
