@@ -18,6 +18,9 @@
     <!-- FONT & ICONS -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     
+    <!-- XLSX LIBRARY FOR MULTI-SHEET BACKUP -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
     <style>
         /* Custom Scrollbar for a cleaner look */
         .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -706,6 +709,54 @@
                 }));
             };
 
+            // --- EXCEL FULL BACKUP FEATURE ---
+            const handleFullBackup = () => {
+                if (typeof window.XLSX === 'undefined') {
+                    alert("Excel library is still loading. Please try again in a moment.");
+                    return;
+                }
+                
+                const wb = window.XLSX.utils.book_new();
+                const categories = ['students', 'fees', 'enrollments', 'payments', 'discounts', 'others', 'users', 'banks'];
+                
+                let hasData = false;
+                
+                categories.forEach(cat => {
+                    const records = data[cat] || [];
+                    const headers = getHeaders(cat);
+                    const displayHeaders = headers.map(h => h === 'fee_name' ? 'fee_head' : h);
+                    
+                    let wsData = [];
+                    if (records.length > 0) {
+                        hasData = true;
+                        wsData = records.map(row => {
+                            let newRow = {};
+                            headers.forEach((h, i) => {
+                                let val = row[h];
+                                if (Array.isArray(val)) val = val.join(', ');
+                                newRow[displayHeaders[i]] = val !== undefined ? val : '';
+                            });
+                            return newRow;
+                        });
+                    } else {
+                        let emptyRow = {};
+                        displayHeaders.forEach(h => emptyRow[h] = '');
+                        wsData = [emptyRow];
+                    }
+                    
+                    const ws = window.XLSX.utils.json_to_sheet(wsData);
+                    window.XLSX.utils.book_append_sheet(wb, ws, cat.charAt(0).toUpperCase() + cat.slice(1));
+                });
+                
+                if (!hasData) {
+                    alert("No data available to backup.");
+                    return;
+                }
+
+                const dateStr = new Date().toISOString().split('T')[0];
+                window.XLSX.writeFile(wb, `Fee_System_Full_Backup_${dateStr}.xlsx`);
+            };
+
             // --- IMPORT HANDLER (OPTIMIZED) ---
             const handleImport = (e, type) => {
                 const file = e.target.files[0];
@@ -987,6 +1038,7 @@
 
                         {/* Footer Actions */}
                         <div className="p-4 border-t border-gray-200 bg-gray-50 space-y-2">
+                            <button onClick={handleFullBackup} className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 transition shadow-sm" title="Download Full Excel Backup"><Download className="h-4 w-4" /> Full Backup (Excel)</button>
                             <button onClick={syncBrowserDataToDb} className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition shadow-sm" title="Sync Data"><CloudUpload className="h-4 w-4" /> Sync Data</button>
                             <div className="grid grid-cols-2 gap-2">
                                 <button onClick={() => setShowPasswordModal(true)} className="flex items-center justify-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-100 transition shadow-sm"><Key className="h-3 w-3" /> Password</button>
