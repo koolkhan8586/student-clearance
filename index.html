@@ -41,11 +41,12 @@
             }
 
             /* Disable Fixed Positioning on Modals for Multi-page Print */
-            .fixed, .absolute, .relative {
+            .fixed, .absolute, .relative, .inset-0, .h-\[90vh\], .overflow-y-auto, .overflow-auto {
                 position: static !important;
                 overflow: visible !important;
                 height: auto !important;
                 width: auto !important;
+                max-height: none !important;
             }
 
             /* HIDE EVERYTHING... */
@@ -216,7 +217,7 @@
             const [selectedIds, setSelectedIds] = useState(new Set());
             const [clearanceResult, setClearanceResult] = useState(null);
             
-            // --- NEW: Pagination State ---
+            // PAGINATION
             const [currentPage, setCurrentPage] = useState(1);
             const ITEMS_PER_PAGE = 100;
 
@@ -253,7 +254,7 @@
                 : TABS.filter(t => user.permissions.includes(t.id))
             ) : [];
 
-            // FETCH DATA - UPDATED TO AUTO-CORRECT DEGREE
+            // FETCH DATA
             const refreshData = async () => {
                 try {
                     const res = await fetch(API_URL);
@@ -265,7 +266,6 @@
                             const upper = s.reg_no.toUpperCase();
                             if (upper.includes('05')) {
                                 const newDegree = upper.split('05')[0];
-                                // Update only if different (in memory for now)
                                 if (s.degree !== newDegree) return { ...s, degree: newDegree };
                             }
                         }
@@ -301,10 +301,9 @@
                 setSortConfig({ key: null, direction: 'asc' }); 
                 setImportTerm(''); 
                 setSidebarOpen(false); 
-                setCurrentPage(1); // Reset page on tab change
+                setCurrentPage(1);
             }, [activeTab]);
 
-            // Reset page when search or sort changes
             useEffect(() => {
                 setCurrentPage(1);
             }, [tabSearch, sortConfig]);
@@ -320,11 +319,8 @@
                 if (tabSearch) {
                     const searchLower = tabSearch.toLowerCase();
                     result = result.filter(item => {
-                        // OPTIMIZED SEARCH: Faster than creating arrays, breaks early
                         for (let key in item) {
-                            if (item[key] && String(item[key]).toLowerCase().includes(searchLower)) {
-                                return true;
-                            }
+                            if (item[key] && String(item[key]).toLowerCase().includes(searchLower)) return true;
                         }
                         return false;
                     });
@@ -346,13 +342,8 @@
             };
 
             const filteredData = getProcessedData();
-            
-            // --- NEW: Pagination Logic ---
             const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
-            const paginatedData = filteredData.slice(
-                (currentPage - 1) * ITEMS_PER_PAGE, 
-                currentPage * ITEMS_PER_PAGE
-            );
+            const paginatedData = filteredData.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
             
             // Unique Sessions
             const uniqueSessions = [...new Set((data.enrollments || []).map(e => e.semester))].sort((a, b) => {
@@ -367,7 +358,6 @@
                 if(activeTab !== 'summary') return [];
                 const studentMap = new Map((data.students || []).map(s => [norm(s.reg_no), s]));
                 
-                // Pre-index collections for O(1) lookup
                 const otherChargesMap = new Map();
                 (data.others || []).forEach(o => {
                      const k = `${norm(o.reg_no)}_${norm(o.semester)}`;
@@ -380,7 +370,7 @@
                      discountMap.set(k, parseFloat(d.discount) || 0);
                 });
 
-                // PAYMENT INDEXING (Crucial optimization)
+                // INDEX PAYMENTS
                 const paymentsMap = new Map();
                 (data.payments || []).forEach(p => {
                     const r = norm(p.reg_no);
@@ -435,7 +425,7 @@
                     const discPct = discountMap.get(`${norm(en.reg_no)}_${semKey}`) || 0;
                     const discAmt = (feeDetails.tuition * discPct) / 100;
                     
-                    // Optimized Payment Calculation using Index
+                    // Retrieve pre-indexed payments
                     let studentPaid = 0;
                     const studentPayments = paymentsMap.get(norm(en.reg_no)) || [];
                     studentPayments.forEach(p => {
@@ -450,7 +440,6 @@
                     entry.other += feeDetails.other;
                     entry.exam += feeDetails.exam;
 
-                    // Add to detailed list for modal
                     detailList.push({
                         reg_no: en.reg_no,
                         name: en.name,
@@ -465,7 +454,6 @@
                     });
                 });
                 
-                // Aggregate payments for summary total
                 (data.payments || []).forEach(p => {
                     const pSem = norm(p.semester);
                     if (summaryFilterSession && !pSem.includes(norm(summaryFilterSession))) return;
@@ -494,7 +482,6 @@
                 }));
             }, [activeTab, data, summaryFilterSession]);
 
-            // --- OPEN SESSION DETAIL ---
             const openSessionDetail = (sessionData) => {
                 setSessionDetail(sessionData);
             };
@@ -528,14 +515,25 @@
                 const localData = JSON.parse(local);
                 const categories = ['students', 'fees', 'enrollments', 'payments', 'discounts', 'others', 'banks'];
                 let count = 0;
-                setUploadStatus({ active: true, current: 0, total: 100 }); 
+                
+                let totalToSync = 0;
+                for(const cat of categories) { totalToSync += (localData[cat] || []).length; }
+                if(totalToSync === 0) return alert("No data to sync.");
+                
+                setUploadStatus({ active: true, current: 0, total: totalToSync }); 
+                
+                // BULK IMPORT FIX (Concurrent Chunks)
+                const chunkSize = 25;
                 for (const cat of categories) {
                      const items = localData[cat] || [];
-                     for (const item of items) {
-                         let actionType = cat.endsWith('s') ? cat.slice(0, -1) : cat;
-                         if(cat === 'others') actionType = 'other';
-                         await postToApi(`save_${actionType}`, { data: item });
-                         count++;
+                     let actionType = cat.endsWith('s') ? cat.slice(0, -1) : cat;
+                     if(cat === 'others') actionType = 'other';
+                     
+                     for(let i = 0; i < items.length; i += chunkSize) {
+                         const chunk = items.slice(i, i + chunkSize);
+                         await Promise.all(chunk.map(item => postToApi(`save_${actionType}`, { data: item })));
+                         count += chunk.length;
+                         setUploadStatus(prev => ({...prev, current: count}));
                      }
                 }
                 setUploadStatus({ active: false, current: 0, total: 0 });
@@ -665,7 +663,7 @@
                     newData.total_fee = newData.tuition_fee + newData.exam_fee + parseFloat(newData.reg_fee||0) + parseFloat(newData.other_fee||0);
                 }
                 
-                if ((modalType === 'payments' || modalType === 'others') && !newData.name) {
+                if ((modalType === 'payments' || modalType === 'others' || modalType === 'discounts') && !newData.name) {
                     const s = data.students.find(st => norm(st.reg_no) === norm(newData.reg_no));
                     if(s) newData.name = s.name;
                 }
@@ -688,10 +686,8 @@
                 setShowModal(true);
             };
 
-            // NEW: Auto-populate name on Reg No Change
             const handleRegChange = (e) => {
                 const reg = e.target.value;
-                // LOGIC UPDATE: Auto-extract Degree for New Students
                 if (modalType === 'students') {
                      let updates = { reg_no: reg };
                      const upper = reg.toUpperCase();
@@ -709,7 +705,7 @@
                 }));
             };
 
-            // --- IMPORT HANDLER ---
+            // --- IMPORT HANDLER (OPTIMIZED) ---
             const handleImport = (e, type) => {
                 const file = e.target.files[0];
                 if (!file) return;
@@ -728,12 +724,10 @@
                         const values = rows[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
                         const obj = {};
                         
-                        // Smart Header Mapping
                         headers.forEach((h, index) => {
                             let val = values[index] ? values[index].trim() : '';
                             if (val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1);
                             
-                            // Map CSV headers to internal keys
                             if (h.includes('reg') && h.includes('no')) obj['reg_no'] = val;
                             else if ((h.includes('fee') || h.includes('charge') || h.includes('head')) && (h.includes('name') || h.includes('head'))) obj['fee_name'] = val; 
                             else if (h.includes('name') && !h.includes('user') && !h.includes('fee') && !h.includes('head')) obj['name'] = val; 
@@ -757,7 +751,6 @@
                         }
                         if (obj.amount) obj.amount = obj.amount.replace(/[^0-9.-]/g, '');
 
-                        // AUTO-FILL DEGREE FROM REG NO (NEW: FORCE OVERWRITE IF PATTERN FOUND)
                         if (type === 'students' && obj.reg_no) {
                              const upper = obj.reg_no.toUpperCase();
                              if (upper.includes('05')) {
@@ -765,16 +758,13 @@
                              }
                         }
 
-                        // AUTO-FILL NAME FROM DIRECTORY (UPDATED)
                         if (!obj.name && obj.reg_no) {
                             const student = data.students.find(s => norm(s.reg_no) === norm(obj.reg_no));
                             if (student) obj.name = student.name;
                         }
 
-                        // FIXED DUPLICATE CHECK FOR PAYMENTS
                         let isDuplicate = false;
                         if (type === 'payments') {
-                             // STRICT CHECK: Matches Reg, Amount, Date, and Bank (ignores Semester)
                              isDuplicate = existingData.some(existing => 
                                 norm(existing.reg_no) === norm(obj.reg_no) &&
                                 Math.abs(parseFloat(existing.amount || 0) - parseFloat(obj.amount || 0)) < 0.01 && 
@@ -786,13 +776,10 @@
                         } else if (type === 'fees') {
                              isDuplicate = existingData.some(existing => norm(existing.degree) === norm(obj.degree) && norm(existing.batch) === norm(obj.batch));
                         } else {
-                             // Default check for Enrollments, Discounts, Others (Reg No + Semester/Term)
                              isDuplicate = existingData.some(existing => 
                                 norm(existing.reg_no) === norm(obj.reg_no) &&
-                                (
-                                    (existing.semester && norm(existing.semester) === norm(obj.semester)) ||
-                                    (existing.term && norm(existing.term) === norm(obj.term))
-                                )
+                                ((existing.semester && norm(existing.semester) === norm(obj.semester)) ||
+                                (existing.term && norm(existing.term) === norm(obj.term)))
                              );
                         }
                         
@@ -806,23 +793,30 @@
                 reader.readAsText(file);
             };
 
+            // OPTIMIZED IMPORT
             const confirmImport = async () => {
                 setUploadStatus({ active: true, current: 0, total: importPreview.newItems.length });
                 let actionType = importPreview.type.slice(0, -1);
                 if(importPreview.type === 'others') actionType = 'other';
                 let uploadedCount = 0;
-                for (const item of importPreview.newItems) {
-                    await postToApi(`save_${actionType}`, { data: item });
-                    uploadedCount++;
+                
+                const chunkSize = 25; // Send 25 requests concurrently
+                for (let i = 0; i < importPreview.newItems.length; i += chunkSize) {
+                    const chunk = importPreview.newItems.slice(i, i + chunkSize);
+                    await Promise.all(chunk.map(async (item) => {
+                        await postToApi(`save_${actionType}`, { data: item });
+                    }));
+                    uploadedCount += chunk.length;
+                    if (uploadedCount > importPreview.newItems.length) uploadedCount = importPreview.newItems.length;
                     setUploadStatus(prev => ({ ...prev, current: uploadedCount }));
                 }
+                
                 setImportPreview({ show: false, total: 0, newItems: [], duplicates: [], type: '' });
                 setUploadStatus({ active: false, current: 0, total: 0 });
                 alert(`Successfully imported ${uploadedCount} records!`);
                 refreshData();
             };
 
-            // --- FILTER & BULK ---
             const handleSelectAll = (e) => {
                 if (e.target.checked) setSelectedIds(new Set(filteredData.map(i => i.id || i.reg_no)));
                 else setSelectedIds(new Set());
@@ -928,7 +922,7 @@
                         <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-8">
                             <div className="flex justify-center mb-6">
                                 <div className="w-24 h-24 rounded-lg flex items-center justify-center bg-white p-2">
-                                     <img src="UOL-Green-V1.png" alt="UOL Logo" className="w-full h-full object-contain" />
+                                     <img src="src/UOL-Green-V1.png" alt="UOL Logo" className="w-full h-full object-contain" />
                                 </div>
                             </div>
                             <h2 className="text-2xl font-bold text-center text-gray-800 mb-2">LSAF Student Fee Management Software</h2>
@@ -979,7 +973,7 @@
                                                 {tab.label}
                                             </div>
                                             
-                                            {/* Total Count Badge: Dynamic update based on filter */}
+                                            {/* Total Count Badge */}
                                             <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
                                                 activeTab === tab.id ? 'bg-blue-200 text-blue-800' : 'bg-gray-200 text-gray-600'
                                             }`}>
@@ -1013,31 +1007,32 @@
                         </div>
 
                         <div className="flex-1 overflow-y-auto p-4 md:p-8" id="main-content">
-                            {/* ... Clearance Tab (unchanged) ... */}
+                            
+                            {/* CLEARANCE TAB */}
                             {activeTab === 'clearance' && (
                                 <div className="space-y-6">
                                     <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 no-print">
                                         <label className="block text-sm font-bold text-gray-700 mb-2">Generate Student Clearance</label>
-                                        <div className="flex gap-3">
+                                        <div className="flex flex-col md:flex-row gap-3">
                                             <input type="text" value={searchReg} onChange={(e) => setSearchReg(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && generateReport()} placeholder="Enter Registration No (e.g. BSCAF052530040)" className="flex-1 block w-full rounded-lg border-gray-300 border p-3 focus:ring-2 focus:ring-blue-500 outline-none" />
                                             {/* SESSION FILTER */}
                                             <select 
                                                 value={filterSession} 
                                                 onChange={(e) => setFilterSession(e.target.value)} 
-                                                className="w-48 rounded-lg border-gray-300 border p-3 focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                                                className="w-full md:w-48 rounded-lg border-gray-300 border p-3 focus:ring-2 focus:ring-blue-500 outline-none bg-white"
                                             >
                                                 <option value="">All Sessions</option>
                                                 {uniqueSessions.map(s => <option key={s} value={s}>{s}</option>)}
                                             </select>
-                                            <button onClick={generateReport} className="bg-blue-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-blue-700 transition flex items-center gap-2"><Search className="h-5 w-5" /> Generate</button>
+                                            <button onClick={generateReport} className="w-full md:w-auto bg-blue-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-blue-700 transition flex items-center justify-center gap-2"><Search className="h-5 w-5" /> Generate</button>
                                         </div>
                                     </div>
-                                    {/* ... Clearance Result (unchanged) ... */}
+                                    {/* Clearance Result */}
                                     {clearanceResult && (
                                         <div className="bg-white rounded-xl shadow-lg overflow-hidden" id="printableArea">
                                             <div className="p-8">
                                                 <div className="border-b-2 border-gray-800 pb-6 mb-6 flex justify-between items-start">
-                                                    <div className="w-32 h-32 rounded-lg flex items-center justify-center font-bold text-gray-400 overflow-hidden"><img src="UOL-Green-V1.png" alt="UOL Logo" className="w-full h-full object-contain" /></div>
+                                                    <div className="w-32 h-32 rounded-lg flex items-center justify-center font-bold text-gray-400 overflow-hidden"><img src="src/UOL-Green-V1.png" alt="UOL Logo" className="w-full h-full object-contain" /></div>
                                                     <div className="text-center flex-1 px-4">
                                                         <h2 className="text-2xl font-bold text-gray-900 uppercase">The University of Lahore</h2>
                                                         <p className="text-gray-600 font-medium">School of Accountancy & Finance</p>
@@ -1091,7 +1086,6 @@
                                         </select>
                                         <button onClick={() => window.print()} className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg" title="Print Summary"><Printer className="h-5 w-5" /></button>
                                     </div>
-                                    {/* Use conditional ID to prevent double printing */}
                                     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden" id={!sessionDetail ? "printableArea" : ""}>
                                         <div className="p-4 hidden print-only">
                                             <h2 className="text-xl font-bold text-center uppercase mb-4">Financial Summary Report</h2>
@@ -1104,7 +1098,7 @@
                                                         <th className="p-4">Session</th>
                                                         <th className="p-4 text-center">Enrolled</th>
                                                         <th className="p-4 text-right">Total Charged</th>
-                                                        <th className="p-4 text-right">Exam Fee</th> {/* New Column */}
+                                                        <th className="p-4 text-right">Exam Fee</th>
                                                         <th className="p-4 text-right">Discounts</th>
                                                         <th className="p-4 text-right">Other Charges</th>
                                                         <th className="p-4 text-right">Total Paid</th>
@@ -1119,7 +1113,7 @@
                                                             </td>
                                                             <td className="p-4 text-center"><span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-bold">{row.enrolled}</span></td>
                                                             <td className="p-4 text-right font-mono font-bold text-gray-800">{num(row.charged)}</td>
-                                                            <td className="p-4 text-right font-mono text-gray-600">{num(row.exam)}</td> {/* New Data */}
+                                                            <td className="p-4 text-right font-mono text-gray-600">{num(row.exam)}</td>
                                                             <td className="p-4 text-right font-mono text-orange-600">{num(row.discount)}</td>
                                                             <td className="p-4 text-right font-mono text-gray-600">{num(row.other)}</td>
                                                             <td className="p-4 text-right font-mono font-bold text-green-600">{num(row.paid)}</td>
@@ -1132,7 +1126,7 @@
                                                             <td className="p-4">TOTALS</td>
                                                             <td className="p-4 text-center">{getSummaryData.reduce((s, r) => s + r.enrolled, 0)}</td>
                                                             <td className="p-4 text-right">{num(getSummaryData.reduce((s, r) => s + r.charged, 0))}</td>
-                                                            <td className="p-4 text-right">{num(getSummaryData.reduce((s, r) => s + r.exam, 0))}</td> {/* Total Exam */}
+                                                            <td className="p-4 text-right">{num(getSummaryData.reduce((s, r) => s + r.exam, 0))}</td>
                                                             <td className="p-4 text-right">{num(getSummaryData.reduce((s, r) => s + r.discount, 0))}</td>
                                                             <td className="p-4 text-right">{num(getSummaryData.reduce((s, r) => s + r.other, 0))}</td>
                                                             <td className="p-4 text-right text-green-400">{num(getSummaryData.reduce((s, r) => s + r.paid, 0))}</td>
@@ -1148,7 +1142,6 @@
 
                             {activeTab !== 'clearance' && activeTab !== 'summary' && (
                                 <div>
-                                    {/* (Existing List View UI same as before) */}
                                     <div className="flex flex-col gap-4 mb-6 no-print">
                                         <div className="flex justify-between items-center"><h2 className="text-2xl font-bold text-gray-800 capitalize">{activeTab} Directory</h2><div className="flex gap-2">{(user.role === 'admin' || user.permissions.includes(activeTab)) && <button onClick={() => openModal(activeTab)} className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700 transition flex items-center gap-2 shadow-sm"><Plus className="h-5 w-5" /> Add New</button>}</div></div>
                                         <div className="bg-white p-3 rounded-xl border border-gray-200 flex flex-wrap gap-3 items-center justify-between shadow-sm">
@@ -1163,11 +1156,11 @@
                                                 <span className="bg-blue-100 text-blue-800 text-xs font-bold px-3 py-1 rounded-full whitespace-nowrap">Showing {filteredData.length} Records</span>
                                             </div>
 
-                                            <div className="flex gap-2">
+                                            <div className="flex gap-2 flex-wrap md:flex-nowrap">
                                                 {selectedIds.size > 0 && <button onClick={deleteSelected} className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm font-bold hover:bg-red-100 flex items-center gap-2"><Trash2 className="h-4 w-4" /> Delete ({selectedIds.size})</button>}
                                                 {(activeTab === 'enrollments' || activeTab === 'payments' || activeTab === 'others') && <button onClick={deleteBySemester} className="bg-orange-50 border border-orange-200 text-orange-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-orange-100 flex items-center gap-2"><CalendarX className="h-4 w-4" /> Del Sem</button>}
                                                 {user.role === 'admin' && <button onClick={deleteAllInTab} className="bg-white border border-red-200 text-red-600 px-3 py-2 rounded-lg text-sm font-medium hover:bg-red-50 flex items-center gap-2"><XSquare className="h-4 w-4" /> Delete All</button>}
-                                                <div className="h-8 w-px bg-gray-300 mx-1"></div>
+                                                <div className="hidden md:block h-8 w-px bg-gray-300 mx-1"></div>
                                                 <button onClick={() => downloadSample(activeTab)} className="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2"><FileSpreadsheet className="h-4 w-4" /> Sample</button>
                                                 <label className="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 cursor-pointer flex items-center gap-2"><Download className="h-4 w-4" /><input type="file" onChange={(e) => handleImport(e, activeTab)} className="hidden" accept=".csv" /></label>
                                                 <button onClick={() => handleExport(activeTab)} className="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2"><Upload className="h-4 w-4" /> Export</button>
@@ -1178,8 +1171,8 @@
                                         {(activeTab === 'enrollments' || activeTab === 'payments' || activeTab === 'others' || activeTab === 'discounts') && (
                                             <div className="bg-blue-50 border-l-4 border-blue-400 p-2 mb-4 text-sm flex items-center gap-2 no-print">
                                                 <span className="font-bold">Import Setting:</span>
-                                                <input type="text" placeholder="Default Semester/Term (e.g. Fall 2024)" value={importTerm} onChange={(e) => setImportTerm(e.target.value)} className="border p-1 rounded px-2 w-64" />
-                                                <span className="text-gray-500 text-xs">(If provided, this will be applied to all imported records)</span>
+                                                <input type="text" placeholder="Default Semester/Term (e.g. Fall 2024)" value={importTerm} onChange={(e) => setImportTerm(e.target.value)} className="border p-1 rounded px-2 w-full md:w-64" />
+                                                <span className="text-gray-500 text-xs hidden md:inline">(If provided, this will be applied to all imported records)</span>
                                             </div>
                                         )}
                                     </div>
@@ -1233,7 +1226,7 @@
                                             </table>
                                         </div>
                                         
-                                        {/* NEW: Pagination Controls UI */}
+                                        {/* Pagination UI */}
                                         {totalPages > 1 && (
                                             <div className="bg-gray-50 p-4 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-4 no-print">
                                                 <span className="text-sm text-gray-600 font-medium">
@@ -1268,7 +1261,7 @@
 
                     {/* NEW: SESSION DETAIL MODAL WITH PRINT FIX */}
                     {sessionDetail && (
-                        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 print:p-0 print:block print:relative">
+                        <div className="fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-center justify-center p-4 print:p-0 print:block print:relative">
                             <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col print:h-auto print:shadow-none print:w-full print:max-w-none">
                                 {/* HEADER (No Print) */}
                                 <div className="p-6 border-b flex justify-between items-center bg-gray-50 rounded-t-xl no-print">
@@ -1285,7 +1278,7 @@
                                     {/* UOL HEADER (Visible ONLY in Print) */}
                                     <div className="hidden print-only-header mb-4 border-b-2 border-gray-800 pb-4">
                                          <div className="flex justify-between items-start">
-                                            <div className="w-32 h-32 rounded-lg flex items-center justify-center font-bold text-gray-400 overflow-hidden"><img src="UOL-Green-V1.png" alt="UOL Logo" className="w-full h-full object-contain" /></div>
+                                            <div className="w-32 h-32 rounded-lg flex items-center justify-center font-bold text-gray-400 overflow-hidden"><img src="src/UOL-Green-V1.png" alt="UOL Logo" className="w-full h-full object-contain" /></div>
                                             <div className="text-center flex-1 px-4">
                                                 <h2 className="text-2xl font-bold text-gray-900 uppercase">The University of Lahore</h2>
                                                 <p className="text-gray-600 font-medium">School of Accountancy & Finance</p>
@@ -1313,7 +1306,7 @@
                                                 <th className="p-2 border text-center">Courses</th>
                                                 <th className="p-2 border text-center">Cr</th>
                                                 <th className="p-2 border text-right">Tuition</th>
-                                                <th className="p-2 border text-right">Exam Fee</th> {/* FIXED */}
+                                                <th className="p-2 border text-right">Exam Fee</th> 
                                                 <th className="p-2 border text-right">Discount</th>
                                                 <th className="p-2 border text-right">Total</th>
                                                 <th className="p-2 border text-right">Paid</th>
@@ -1329,7 +1322,7 @@
                                                     <td className="p-2 border text-center">{s.courses}</td>
                                                     <td className="p-2 border text-center">{s.cr}</td>
                                                     <td className="p-2 border text-right">{num(s.tuition)}</td>
-                                                    <td className="p-2 border text-right">{num(s.exam)}</td> {/* FIXED */}
+                                                    <td className="p-2 border text-right">{num(s.exam)}</td>
                                                     <td className="p-2 border text-right text-red-500">{num(s.discount)}</td>
                                                     <td className="p-2 border text-right font-bold">{num(s.tuition + s.exam + s.other - s.discount)}</td>
                                                     <td className="p-2 border text-right text-green-700">{num(s.paid)}</td>
@@ -1343,9 +1336,9 @@
                         </div>
                     )}
                     
-                    {/* ... (Other Modals: showModal, showPasswordModal, importPreview - Keep SAME as previous) ... */}
+                    {/* ADD / EDIT MODAL - Z-INDEX FIXED */}
                     {showModal && (
-                        <div className="fixed inset-0 bg-black bg-opacity-50 z-100 flex items-center justify-center p-4">
+                        <div className="fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-center justify-center p-4">
                             <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
                                 <h3 className="text-xl font-bold mb-4 capitalize">Add/Edit {modalType.slice(0, -1)}</h3>
                                 <form onSubmit={handleSave} className="space-y-4">
@@ -1356,7 +1349,7 @@
                                         </div>
                                     </>}
                                     {modalType === 'fees' && <><div className="bg-blue-50 p-3 rounded text-xs text-blue-800 mb-2"><strong>Note:</strong> Fee Structure applies to ALL semesters for this Degree & Batch.</div><div className="grid grid-cols-2 gap-4"><input required placeholder="Degree" className="w-full border p-2 rounded" value={formData.degree || ''} onChange={e => setFormData({...formData, degree: e.target.value})} /><input required placeholder="Batch" className="w-full border p-2 rounded" value={formData.batch || ''} onChange={e => setFormData({...formData, batch: e.target.value})} /></div><div className="grid grid-cols-2 gap-4"><input type="number" placeholder="Fee Per Credit Hour" className="w-full border p-2 rounded" value={formData.per_cr_fee || ''} onChange={e => setFormData({...formData, per_cr_fee: e.target.value})} /><input type="number" placeholder="Fee Per Subject/Course" className="w-full border p-2 rounded" value={formData.per_course_fee || ''} onChange={e => setFormData({...formData, per_course_fee: e.target.value})} /></div><div className="grid grid-cols-2 gap-4"><input type="number" placeholder="Registration Fee (Semester)" className="w-full border p-2 rounded" value={formData.reg_fee || ''} onChange={e => setFormData({...formData, reg_fee: e.target.value})} /><input type="number" placeholder="Other Charges (Semester)" className="w-full border p-2 rounded" value={formData.other_fee || ''} onChange={e => setFormData({...formData, other_fee: e.target.value})} /></div></>}
-                                    {modalType === 'enrollments' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={e => setFormData({...formData, reg_no: e.target.value})} /><input placeholder="Student Name" className="w-full border p-2 rounded" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} /><input required placeholder="Semester (e.g. Spring 2024)" className="w-full border p-2 rounded" value={formData.semester || ''} onChange={e => setFormData({...formData, semester: e.target.value})} /><div className="grid grid-cols-2 gap-4"><input type="number" placeholder="Credit Hours" className="w-full border p-2 rounded" value={formData.cr || ''} onChange={e => setFormData({...formData, cr: e.target.value})} /><input type="number" placeholder="No. of Courses" className="w-full border p-2 rounded" value={formData.courses || ''} onChange={e => setFormData({...formData, courses: e.target.value})} /></div></>}
+                                    {modalType === 'enrollments' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={handleRegChange} /><input placeholder="Student Name" className="w-full border p-2 rounded bg-gray-50 font-bold text-gray-700" value={formData.name || ''} readOnly /><input required placeholder="Semester (e.g. Spring 2024)" className="w-full border p-2 rounded" value={formData.semester || ''} onChange={e => setFormData({...formData, semester: e.target.value})} /><div className="grid grid-cols-2 gap-4"><input type="number" placeholder="Credit Hours" className="w-full border p-2 rounded" value={formData.cr || ''} onChange={e => setFormData({...formData, cr: e.target.value})} /><input type="number" placeholder="No. of Courses" className="w-full border p-2 rounded" value={formData.courses || ''} onChange={e => setFormData({...formData, courses: e.target.value})} /></div></>}
                                     {modalType === 'payments' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={handleRegChange} /><input placeholder="Student Name" className="w-full border p-2 rounded bg-gray-50 font-bold text-gray-700" value={formData.name || ''} readOnly /><input required placeholder="Semester (e.g. Spring 2024)" className="w-full border p-2 rounded" value={formData.semester || ''} onChange={e => setFormData({...formData, semester: e.target.value})} /><input required type="number" placeholder="Amount Paid" className="w-full border p-2 rounded font-bold text-lg" value={formData.amount || ''} onChange={e => setFormData({...formData, amount: e.target.value})} /><input type="date" className="w-full border p-2 rounded" value={formData.date || ''} onChange={e => setFormData({...formData, date: e.target.value})} />
                                     <label className="block text-sm font-bold text-gray-700 mt-2 mb-1">Payment Through (Bank)</label>
                                     <select className="w-full border p-2 rounded bg-white" value={formData.bank || ''} onChange={e => setFormData({...formData, bank: e.target.value})}>
@@ -1402,7 +1395,7 @@
                     )}
                     {/* ... (Password Modal, Import Preview Modal kept same) */}
                     {showPasswordModal && (
-                        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                        <div className="fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-center justify-center p-4">
                             <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6">
                                 <h3 className="text-xl font-bold mb-4">Change Password</h3>
                                 <form onSubmit={handleChangePassword} className="space-y-4">
@@ -1416,7 +1409,7 @@
                     )}
                     {/* IMPORT PROGRESS BAR */}
                     {uploadStatus.active && (
-                        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+                        <div className="fixed inset-0 bg-black bg-opacity-50 z-[110] flex items-center justify-center">
                             <div className="bg-white p-6 rounded-xl shadow-xl w-80 text-center">
                                 <h3 className="font-bold text-lg mb-2">Importing Data...</h3>
                                 <div className="w-full bg-gray-200 rounded-full h-4 mb-2">
@@ -1428,7 +1421,7 @@
                     )}
                     {/* IMPORT PREVIEW MODAL */}
                     {importPreview.show && (
-                        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                        <div className="fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-center justify-center p-4">
                             <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl p-6 max-h-[90vh] flex flex-col">
                                 <h3 className="text-xl font-bold mb-4">Import Summary ({importPreview.type})</h3>
                                 <div className="grid grid-cols-3 gap-4 mb-4 text-center">
