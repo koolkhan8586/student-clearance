@@ -194,6 +194,7 @@
         const Menu = (p) => <Icon d="M3 12h18M3 6h18M3 18h18" {...p} />;
         const BarChart = (p) => <Icon d="M12 20V10M18 20V4M6 20v-4" {...p} />;
         const Eye = (p) => <Icon d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z M12 5c-3.866 0-7 3.134-7 7s3.134 7 7 7 7-3.134 7-7-3.134-7-7-7z M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z" {...p} />;
+        const RefreshCw = (p) => <Icon d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" {...p} />;
 
         function App() {
             // --- STATE & HELPER FUNCTIONS ---
@@ -210,6 +211,7 @@
 
             const [user, setUser] = useState(null);
             const [activeTab, setActiveTab] = useState('clearance');
+            const [isFetching, setIsFetching] = useState(false); // NEW: Loading State for fetching
             const [data, setData] = useState({
                 students: [], fees: [], enrollments: [], payments: [], discounts: [], others: [], users: [], banks: []
             });
@@ -257,8 +259,9 @@
                 : TABS.filter(t => user.permissions.includes(t.id))
             ) : [];
 
-            // FETCH DATA
-            const refreshData = async () => {
+            // OPTIMIZED FETCH DATA
+            const refreshData = async (isBackground = false) => {
+                if (!isBackground) setIsFetching(true);
                 try {
                     const res = await fetch(API_URL);
                     const json = await res.json();
@@ -288,7 +291,9 @@
                     setData(safeData);
                 } catch(e) { 
                     console.error("Connection Error:", e);
-                    setData({ students: [], fees: [], enrollments: [], payments: [], discounts: [], others: [], users: [], banks: [] });
+                    if (!isBackground) setData({ students: [], fees: [], enrollments: [], payments: [], discounts: [], others: [], users: [], banks: [] });
+                } finally {
+                    if (!isBackground) setIsFetching(false);
                 }
             };
 
@@ -317,7 +322,8 @@
                 }
             }, [filterSession]);
 
-            const getProcessedData = () => {
+            // OPTIMIZED: Wrap filtering in useMemo to prevent freezing UI on every keystroke/render
+            const filteredData = useMemo(() => {
                 let result = (data[activeTab] || []); 
                 if (tabSearch) {
                     const searchLower = tabSearch.toLowerCase();
@@ -342,11 +348,12 @@
                     });
                 }
                 return result;
-            };
+            }, [data, activeTab, tabSearch, sortConfig]);
 
-            const filteredData = getProcessedData();
             const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
-            const paginatedData = filteredData.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+            const paginatedData = useMemo(() => {
+                return filteredData.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+            }, [filteredData, currentPage]);
             
             // Unique Sessions
             const uniqueSessions = [...new Set((data.enrollments || []).map(e => e.semester))].sort((a, b) => {
@@ -499,7 +506,8 @@
                  return acc;
             }, { total: 0, bank: 0, cash: 0 }) : { total: 0, bank: 0, cash: 0 };
 
-            const postToApi = async (action, payload = {}) => {
+            // OPTIMIZED API POST (skipRefresh controls blocking fetch)
+            const postToApi = async (action, payload = {}, skipRefresh = false) => {
                 try {
                     const res = await fetch(API_URL, {
                         method: 'POST',
@@ -507,7 +515,10 @@
                         body: JSON.stringify({ action, ...payload })
                     });
                     const json = await res.json();
-                    if(json.status === 'success') { refreshData(); return true; } 
+                    if(json.status === 'success') { 
+                        if (!skipRefresh) refreshData(true); // Default to background refresh
+                        return true; 
+                    } 
                     else { alert("Error: " + json.message); return false; }
                 } catch(e) { alert("Network Error"); return false; }
             };
@@ -526,7 +537,7 @@
                 
                 setUploadStatus({ active: true, current: 0, total: totalToSync }); 
                 
-                // BULK IMPORT FIX (Concurrent Chunks)
+                // BULK IMPORT FIX (Concurrent Chunks, Skipping blocking refresh)
                 const chunkSize = 25;
                 for (const cat of categories) {
                      const items = localData[cat] || [];
@@ -535,14 +546,14 @@
                      
                      for(let i = 0; i < items.length; i += chunkSize) {
                          const chunk = items.slice(i, i + chunkSize);
-                         await Promise.all(chunk.map(item => postToApi(`save_${actionType}`, { data: item })));
+                         await Promise.all(chunk.map(item => postToApi(`save_${actionType}`, { data: item }, true))); // pass true to skip refresh
                          count += chunk.length;
                          setUploadStatus(prev => ({...prev, current: count}));
                      }
                 }
                 setUploadStatus({ active: false, current: 0, total: 0 });
                 alert(`Sync Complete! Uploaded/Checked ${count} records.`);
-                refreshData();
+                refreshData(true); // Refresh in background once done
             };
 
             const handleLogin = (e) => {
@@ -577,7 +588,7 @@
                     const updatedUser = { ...user, password: passwordData.new };
                     setUser(updatedUser);
                     sessionStorage.setItem('feeUser', JSON.stringify(updatedUser));
-                    refreshData();
+                    refreshData(true);
                 }
             };
 
@@ -651,12 +662,26 @@
                 setClearanceResult({ student, rows: studentEnrollments, summary, masterFeeFound: !!masterFee, masterFee });
             };
 
+            // OPTIMIZED DELETE: Update UI Instantly, Delete in Background
             const handleDelete = async (type, id) => {
                 if(!confirm("Are you sure?")) return;
-                await postToApi(`delete_${type}`, { id });
-                refreshData();
+                
+                // Optimistic Update: Remove from UI immediately
+                setData(prev => {
+                    const updated = { ...prev };
+                    if (type === 'students') {
+                        updated[type] = updated[type].filter(item => item.reg_no !== id);
+                    } else {
+                        updated[type] = updated[type].filter(item => item.id !== id);
+                    }
+                    return updated;
+                });
+                
+                // Perform the backend delete silently
+                await postToApi(`delete_${type}`, { id }, true); // true = skip refresh
             };
 
+            // OPTIMIZED SAVE: Update UI Instantly, Save in Background
             const handleSave = async (e) => {
                 e.preventDefault();
                 const newData = { ...formData };
@@ -672,10 +697,35 @@
                     if(s) newData.name = s.name;
                 }
                 
+                const isEdit = !!editingId;
+                const tempId = editingId || Date.now();
+                newData.id = tempId; // Assure it has an ID for React maps immediately
+                
+                // Optimistic UI Update: Add/Edit instantly
+                setData(prev => {
+                    const updated = { ...prev };
+                    const list = updated[modalType];
+                    if (isEdit) {
+                        const idx = list.findIndex(x => (modalType === 'students' ? x.reg_no === editingId : x.id === editingId));
+                        if (idx > -1) list[idx] = newData;
+                    } else {
+                        updated[modalType] = [newData, ...list];
+                    }
+                    return updated;
+                });
+                
+                setShowModal(false); setFormData({}); setEditingId(null);
+                
                 let actionType = modalType.slice(0, -1);
                 if(modalType === 'others') actionType = 'other';
-                const success = await postToApi(`save_${actionType}`, { data: newData, id: editingId });
-                if(success) { setShowModal(false); setFormData({}); setEditingId(null); refreshData(); }
+                
+                // Perform Save
+                const success = await postToApi(`save_${actionType}`, { data: newData, id: isEdit ? editingId : null }, true);
+                
+                // Background refresh only for new items to get true Database ID
+                if(success && !isEdit) { 
+                    refreshData(true); 
+                }
             };
             
             const openModal = (type, item = null) => {
@@ -855,7 +905,7 @@
                 for (let i = 0; i < importPreview.newItems.length; i += chunkSize) {
                     const chunk = importPreview.newItems.slice(i, i + chunkSize);
                     await Promise.all(chunk.map(async (item) => {
-                        await postToApi(`save_${actionType}`, { data: item });
+                        await postToApi(`save_${actionType}`, { data: item }, true); // Skip refresh for speed
                     }));
                     uploadedCount += chunk.length;
                     if (uploadedCount > importPreview.newItems.length) uploadedCount = importPreview.newItems.length;
@@ -865,7 +915,7 @@
                 setImportPreview({ show: false, total: 0, newItems: [], duplicates: [], type: '' });
                 setUploadStatus({ active: false, current: 0, total: 0 });
                 alert(`Successfully imported ${uploadedCount} records!`);
-                refreshData();
+                refreshData(true); // Single background refresh
             };
 
             const handleSelectAll = (e) => {
@@ -879,24 +929,36 @@
             };
             const deleteSelected = async () => {
                 if (!confirm(`Delete ${selectedIds.size} records?`)) return;
+                
+                // Optimistic UI Update
+                setData(prev => {
+                    const updated = { ...prev };
+                    updated[activeTab] = updated[activeTab].filter(item => !selectedIds.has(item.id || item.reg_no));
+                    return updated;
+                });
+                
                 for (let id of selectedIds) {
                     let type = activeTab;
                     if(type === 'others') type = 'other'; 
-                    await postToApi(`delete_${type.slice(0,-1)}`, { id });
+                    await postToApi(`delete_${type.slice(0,-1)}`, { id }, true);
                 }
                 setSelectedIds(new Set());
-                refreshData();
             };
             const deleteAllInTab = async () => {
                 if (!confirm(`Permanently delete ALL ${activeTab} records?`)) return;
-                await postToApi('delete_all', { table: activeTab });
-                refreshData();
+                setData(prev => ({...prev, [activeTab]: []}));
+                await postToApi('delete_all', { table: activeTab }, true);
             };
             const deleteBySemester = async () => {
                 const term = prompt("Enter Semester Name to delete:");
                 if (!term) return;
-                await postToApi('delete_semester', { table: activeTab, term });
-                refreshData();
+                const lowerTerm = term.toLowerCase();
+                setData(prev => {
+                    const updated = {...prev};
+                    updated[activeTab] = updated[activeTab].filter(x => !(x.semester && x.semester.toLowerCase() === lowerTerm));
+                    return updated;
+                });
+                await postToApi('delete_semester', { table: activeTab, term }, true);
             };
 
             const togglePermission = (tabId) => {
@@ -996,7 +1058,13 @@
                         <div className="p-6 border-b border-gray-200 bg-gray-50">
                             <div className="flex items-center gap-3 mb-4">
                                 <div className="bg-blue-600 text-white p-2 rounded-lg shadow-sm"><BookOpen className="h-6 w-6" /></div>
-                                <div><h1 className="text-lg font-bold text-gray-900 leading-tight">Fee Manager</h1><p className="text-xs text-gray-500 font-medium">SCS & Finance</p></div>
+                                <div>
+                                    <h1 className="text-lg font-bold text-gray-900 leading-tight">
+                                        Fee Manager
+                                        {isFetching && <i className="fas fa-circle-notch fa-spin text-blue-500 ml-2 text-sm"></i>}
+                                    </h1>
+                                    <p className="text-xs text-gray-500 font-medium">SCS & Finance</p>
+                                </div>
                             </div>
                             <div className="flex flex-col gap-2">
                                 <div className="text-sm font-bold text-gray-800">{user.username}</div>
@@ -1255,7 +1323,11 @@
                                                     <tr><th className="p-4 w-10"><input type="checkbox" onChange={handleSelectAll} checked={filteredData.length > 0 && selectedIds.size === filteredData.length} className="rounded" /></th>{getHeaders(activeTab).map(h => <th key={h} className="p-4">{h.replace(/_/g, ' ')}</th>)}<th className="p-4 text-center">Actions</th></tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-gray-100">
-                                                    {paginatedData.map((item, idx) => (
+                                                    {isFetching && filteredData.length === 0 ? (
+                                                        <tr><td colSpan="10" className="p-8 text-center text-blue-500 font-bold"><i className="fas fa-circle-notch fa-spin mr-2"></i> Loading data from server...</td></tr>
+                                                    ) : filteredData.length === 0 ? (
+                                                        <tr><td colSpan="10" className="p-8 text-center text-gray-400">No records found.</td></tr>
+                                                    ) : paginatedData.map((item, idx) => (
                                                         <tr key={item.id || idx} className={`hover:bg-gray-50 transition ${selectedIds.has(item.id || item.reg_no) ? 'bg-blue-50' : ''}`}>
                                                             <td className="p-4"><input type="checkbox" checked={selectedIds.has(item.id || item.reg_no)} onChange={() => handleSelectRow(item.id || item.reg_no)} className="rounded" /></td>
                                                             {/* TABLE ROWS - Keep same structure as before */}
@@ -1269,11 +1341,10 @@
                                                             {activeTab === 'banks' && <><td className="p-4 font-bold">{item.name}</td><td className="p-4 font-mono text-gray-600">{item.account_no}</td></>}
                                                             <td className="p-4 text-center flex justify-center gap-2">
                                                                 <button onClick={() => openModal(activeTab, item)} className="p-2 text-blue-600 hover:bg-blue-50 rounded"><i className="fas fa-edit"></i> Edit</button>
-                                                                <button onClick={() => handleDelete(activeTab, item.id)} className="p-2 text-red-600 hover:bg-red-50 rounded"><Trash2 className="h-4 w-4" /></button>
+                                                                <button onClick={() => handleDelete(activeTab, item.id || item.reg_no)} className="p-2 text-red-600 hover:bg-red-50 rounded"><Trash2 className="h-4 w-4" /></button>
                                                             </td>
                                                         </tr>
                                                     ))}
-                                                    {filteredData.length === 0 && <tr><td colSpan="10" className="p-8 text-center text-gray-400">No records found.</td></tr>}
                                                 </tbody>
                                             </table>
                                         </div>
@@ -1319,8 +1390,8 @@
                                 <div className="p-6 border-b flex justify-between items-center bg-gray-50 rounded-t-xl no-print">
                                     <h3 className="text-xl font-bold">Session Detail: {sessionDetail.session}</h3>
                                     <div className="flex gap-2">
-                                        <button onClick={() => window.print()} className="bg-gray-700 text-white px-4 py-2 rounded">Print</button>
-                                        <button onClick={() => setSessionDetail(null)} className="text-2xl">&times;</button>
+                                        <button onClick={() => window.print()} className="bg-gray-700 text-white px-4 py-2 rounded hover:bg-gray-800"><Printer className="h-4 w-4 inline mr-2"/> Print Report</button>
+                                        <button onClick={() => setSessionDetail(null)} className="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
                                     </div>
                                 </div>
                                 
