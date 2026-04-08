@@ -211,10 +211,29 @@
 
             const [user, setUser] = useState(null);
             const [activeTab, setActiveTab] = useState('clearance');
-            const [isFetching, setIsFetching] = useState(false); // NEW: Loading State for fetching
-            const [data, setData] = useState({
-                students: [], fees: [], enrollments: [], payments: [], discounts: [], others: [], users: [], banks: []
+            const [isFetching, setIsFetching] = useState(false);
+            
+            // FIXED: Load data instantly from browser cache to prevent showing 0 records
+            const [data, setData] = useState(() => {
+                const cached = localStorage.getItem('feeSystemData_v2') || localStorage.getItem('fee_system_local');
+                if (cached) {
+                    try {
+                        const parsed = JSON.parse(cached);
+                        if (parsed && parsed.students) return parsed;
+                    } catch(e) { console.error("Cache read error", e); }
+                }
+                return {
+                    students: [], fees: [], enrollments: [], payments: [], discounts: [], others: [], users: [], banks: []
+                };
             });
+
+            // FIXED: Keep cache continuously updated to ensure instant loads
+            useEffect(() => {
+                if (data.students.length > 0 || data.payments.length > 0) {
+                    localStorage.setItem('feeSystemData_v2', JSON.stringify(data));
+                }
+            }, [data]);
+
             const [searchReg, setSearchReg] = useState('');
             const [filterSession, setFilterSession] = useState(''); 
             const [summaryFilterSession, setSummaryFilterSession] = useState(''); 
@@ -261,7 +280,8 @@
 
             // OPTIMIZED FETCH DATA
             const refreshData = async (isBackground = false) => {
-                if (!isBackground) setIsFetching(true);
+                // Only show the loading spinner block if we don't have cached data yet
+                if (!isBackground && data.students.length === 0) setIsFetching(true); 
                 try {
                     const res = await fetch(API_URL);
                     const json = await res.json();
@@ -291,7 +311,7 @@
                     setData(safeData);
                 } catch(e) { 
                     console.error("Connection Error:", e);
-                    if (!isBackground) setData({ students: [], fees: [], enrollments: [], payments: [], discounts: [], others: [], users: [], banks: [] });
+                    // Purposely do not clear `data` on failure so the cache remains available
                 } finally {
                     if (!isBackground) setIsFetching(false);
                 }
