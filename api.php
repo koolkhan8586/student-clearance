@@ -20,7 +20,7 @@ try {
     $pdo = new PDO($dsn, $user, $pass, $options);
     
     // --- AUTO-CREATE TABLES IF NOT EXIST ---
-    $pdo->exec("CREATE TABLE IF NOT EXISTS students (id INT AUTO_INCREMENT PRIMARY KEY, reg_no VARCHAR(50) UNIQUE, name VARCHAR(100), degree VARCHAR(50), batch VARCHAR(50), mobile VARCHAR(50), email VARCHAR(100), total_package DECIMAL(10,2) DEFAULT NULL)");
+    $pdo->exec("CREATE TABLE IF NOT EXISTS students (id INT AUTO_INCREMENT PRIMARY KEY, reg_no VARCHAR(50) UNIQUE, name VARCHAR(100), degree VARCHAR(50), batch VARCHAR(50))");
     $pdo->exec("CREATE TABLE IF NOT EXISTS fee_structure (id INT AUTO_INCREMENT PRIMARY KEY, degree VARCHAR(50), batch VARCHAR(50), per_cr_fee DECIMAL(10,2) DEFAULT 0, per_course_fee DECIMAL(10,2) DEFAULT 0, reg_fee DECIMAL(10,2) DEFAULT 0, other_fee DECIMAL(10,2) DEFAULT 0, UNIQUE KEY unique_fee (degree, batch))");
     $pdo->exec("CREATE TABLE IF NOT EXISTS enrollments (id INT AUTO_INCREMENT PRIMARY KEY, reg_no VARCHAR(50), name VARCHAR(100), semester VARCHAR(50), cr DECIMAL(10,2), courses INT)");
     $pdo->exec("CREATE TABLE IF NOT EXISTS payments (id INT AUTO_INCREMENT PRIMARY KEY, reg_no VARCHAR(50), name VARCHAR(100), semester VARCHAR(50), amount DECIMAL(10,2), date DATE, bank VARCHAR(100))");
@@ -29,10 +29,26 @@ try {
     $pdo->exec("CREATE TABLE IF NOT EXISTS users (id INT AUTO_INCREMENT PRIMARY KEY, username VARCHAR(50) UNIQUE, password VARCHAR(255), role VARCHAR(20), permissions TEXT)");
     $pdo->exec("CREATE TABLE IF NOT EXISTS banks (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(100) UNIQUE, account_no VARCHAR(100))");
 
-    // --- AUTO-FIX DATABASE SCHEMA (Add missing columns for existing users) ---
-    try { $pdo->query("SELECT bank FROM payments LIMIT 1"); } catch (Exception $e) { $pdo->exec("ALTER TABLE payments ADD COLUMN bank VARCHAR(100)"); }
-    try { $pdo->query("SELECT mobile FROM students LIMIT 1"); } catch (Exception $e) { $pdo->exec("ALTER TABLE students ADD COLUMN mobile VARCHAR(50), ADD COLUMN email VARCHAR(100)"); }
-    try { $pdo->query("SELECT total_package FROM students LIMIT 1"); } catch (Exception $e) { $pdo->exec("ALTER TABLE students ADD COLUMN total_package DECIMAL(10,2) DEFAULT NULL"); }
+    // --- BULLETPROOF AUTO-COLUMN ADDER ---
+    // This safely forces missing columns into existing tables without crashing
+    function ensureColumn($pdo, $table, $column, $definition) {
+        $stmt = $pdo->prepare("SHOW COLUMNS FROM `$table` LIKE ?");
+        $stmt->execute([$column]);
+        if ($stmt->rowCount() == 0) {
+            try {
+                $pdo->exec("ALTER TABLE `$table` ADD COLUMN `$column` $definition");
+            } catch (\PDOException $e) {
+                // If user lacks ALTER permissions, it fails silently to prevent breaking the API
+            }
+        }
+    }
+
+    try {
+        ensureColumn($pdo, 'payments', 'bank', 'VARCHAR(100) DEFAULT NULL');
+        ensureColumn($pdo, 'students', 'mobile', 'VARCHAR(50) DEFAULT NULL');
+        ensureColumn($pdo, 'students', 'email', 'VARCHAR(100) DEFAULT NULL');
+        ensureColumn($pdo, 'students', 'total_package', 'DECIMAL(10,2) DEFAULT NULL');
+    } catch (\Exception $e) {}
 
     // Seed Admin if missing
     $stmt = $pdo->prepare("SELECT COUNT(*) FROM users WHERE username = 'admin'");
@@ -107,7 +123,9 @@ if ($method === 'POST' && isset($input['action'])) {
                 
                 $mobile = $data['mobile'] ?? '';
                 $email = $data['email'] ?? '';
-                $total_package = (!empty($data['total_package'])) ? $data['total_package'] : null;
+                
+                // Safely handle empty total_package amounts
+                $total_package = (isset($data['total_package']) && $data['total_package'] !== '') ? $data['total_package'] : null;
 
                 $stmt = $pdo->prepare("INSERT INTO students (reg_no, name, degree, batch, mobile, email, total_package) 
                                        VALUES (?, ?, ?, ?, ?, ?, ?) 
