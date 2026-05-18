@@ -76,8 +76,8 @@ if ($method === 'GET') {
             $u['permissions'] = json_decode($u['permissions'] ?? '[]');
         }
 
-        // Return the clean data structure your frontend expects
-        echo json_encode(['status' => 'success', 'data' => $data]);
+        // Return the clean data structure directly
+        echo json_encode($data);
     } catch (Exception $e) {
         echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
     }
