@@ -5,15 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LSAF Student Fee Management</title>
     
+    <!-- TAILWIND CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
+    <!-- REACT & REACT DOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     
+    <!-- BABEL (To compile JSX in browser) -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
+    <!-- FONT & ICONS -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     
+    <!-- XLSX LIBRARY FOR MULTI-SHEET BACKUP -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     
     <style>
@@ -713,13 +718,15 @@
                 // Optimistic UI Update: Add/Edit instantly
                 setData(prev => {
                     const updated = { ...prev };
-                    const list = updated[modalType];
+                    // Clone the array properly to trigger React render
+                    const list = [...(updated[modalType] || [])];
                     if (isEdit) {
                         const idx = list.findIndex(x => (modalType === 'students' ? x.reg_no === editingId : x.id === editingId));
                         if (idx > -1) list[idx] = newData;
                     } else {
-                        updated[modalType] = [newData, ...list];
+                        list.unshift(newData); // Add new items to top
                     }
+                    updated[modalType] = list;
                     return updated;
                 });
                 
@@ -728,8 +735,15 @@
                 let actionType = modalType.slice(0, -1);
                 if(modalType === 'others') actionType = 'other';
                 
+                // FIX: Strip the fake Date.now() ID so backend doesn't try to UPDATE instead of INSERT
+                const apiData = { ...newData };
+                if (!isEdit) {
+                    delete apiData.id; 
+                    apiData.id = -1; // Standardize new record ID for PHP backend
+                }
+
                 // Perform Save
-                const success = await postToApi(`save_${actionType}`, { data: newData, id: isEdit ? editingId : null }, true);
+                const success = await postToApi(`save_${actionType}`, { data: apiData, id: isEdit ? editingId : null }, true);
                 
                 // Background refresh only for new items to get true Database ID
                 if(success && !isEdit) { 
