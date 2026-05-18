@@ -7,7 +7,7 @@ header("Content-Type: application/json");
 $host = 'localhost';
 $db   = 'fee_system';
 $user = 'koolkhan';
-$pass = 'Mangohair@197'; // <--- ENTER YOUR DATABASE PASSWORD HERE IF SET
+$pass = 'Mangohair@197'; // Ensure this is correct
 
 $dsn = "mysql:host=$host;dbname=$db;charset=utf8mb4";
 $options = [
@@ -20,7 +20,7 @@ try {
     $pdo = new PDO($dsn, $user, $pass, $options);
     
     // --- AUTO-CREATE TABLES IF NOT EXIST ---
-    $pdo->exec("CREATE TABLE IF NOT EXISTS students (id INT AUTO_INCREMENT PRIMARY KEY, reg_no VARCHAR(50) UNIQUE, name VARCHAR(100), degree VARCHAR(50), batch VARCHAR(50))");
+    $pdo->exec("CREATE TABLE IF NOT EXISTS students (id INT AUTO_INCREMENT PRIMARY KEY, reg_no VARCHAR(50) UNIQUE, name VARCHAR(100), degree VARCHAR(50), batch VARCHAR(50), mobile VARCHAR(50), email VARCHAR(100), total_package DECIMAL(10,2) DEFAULT NULL)");
     $pdo->exec("CREATE TABLE IF NOT EXISTS fee_structure (id INT AUTO_INCREMENT PRIMARY KEY, degree VARCHAR(50), batch VARCHAR(50), per_cr_fee DECIMAL(10,2) DEFAULT 0, per_course_fee DECIMAL(10,2) DEFAULT 0, reg_fee DECIMAL(10,2) DEFAULT 0, other_fee DECIMAL(10,2) DEFAULT 0, UNIQUE KEY unique_fee (degree, batch))");
     $pdo->exec("CREATE TABLE IF NOT EXISTS enrollments (id INT AUTO_INCREMENT PRIMARY KEY, reg_no VARCHAR(50), name VARCHAR(100), semester VARCHAR(50), cr DECIMAL(10,2), courses INT)");
     $pdo->exec("CREATE TABLE IF NOT EXISTS payments (id INT AUTO_INCREMENT PRIMARY KEY, reg_no VARCHAR(50), name VARCHAR(100), semester VARCHAR(50), amount DECIMAL(10,2), date DATE, bank VARCHAR(100))");
@@ -30,11 +30,9 @@ try {
     $pdo->exec("CREATE TABLE IF NOT EXISTS banks (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(100) UNIQUE, account_no VARCHAR(100))");
 
     // --- AUTO-FIX DATABASE SCHEMA (Add missing columns for existing users) ---
-    try {
-        $pdo->query("SELECT bank FROM payments LIMIT 1");
-    } catch (Exception $e) {
-        $pdo->exec("ALTER TABLE payments ADD COLUMN bank VARCHAR(100)");
-    }
+    try { $pdo->query("SELECT bank FROM payments LIMIT 1"); } catch (Exception $e) { $pdo->exec("ALTER TABLE payments ADD COLUMN bank VARCHAR(100)"); }
+    try { $pdo->query("SELECT mobile FROM students LIMIT 1"); } catch (Exception $e) { $pdo->exec("ALTER TABLE students ADD COLUMN mobile VARCHAR(50), ADD COLUMN email VARCHAR(100)"); }
+    try { $pdo->query("SELECT total_package FROM students LIMIT 1"); } catch (Exception $e) { $pdo->exec("ALTER TABLE students ADD COLUMN total_package DECIMAL(10,2) DEFAULT NULL"); }
 
     // Seed Admin if missing
     $stmt = $pdo->prepare("SELECT COUNT(*) FROM users WHERE username = 'admin'");
@@ -57,7 +55,6 @@ function formatDateForDB($dateString) {
 }
 
 // --- HANDLE REQUESTS ---
-
 $method = $_SERVER['REQUEST_METHOD'];
 $input = json_decode(file_get_contents('php://input'), true);
 
@@ -65,21 +62,22 @@ $input = json_decode(file_get_contents('php://input'), true);
 if ($method === 'GET') {
     try {
         $data = [
-            'students'    => $pdo->query("SELECT * FROM students")->fetchAll(),
-            'fees'        => $pdo->query("SELECT * FROM fee_structure")->fetchAll(),
-            'enrollments' => $pdo->query("SELECT * FROM enrollments")->fetchAll(),
-            'payments'    => $pdo->query("SELECT * FROM payments")->fetchAll(),
-            'discounts'   => $pdo->query("SELECT * FROM discounts")->fetchAll(),
-            'others'      => $pdo->query("SELECT * FROM other_charges")->fetchAll(),
-            'users'       => $pdo->query("SELECT * FROM users")->fetchAll(),
-            'banks'       => $pdo->query("SELECT * FROM banks")->fetchAll()
+            'students'    => $pdo->query("SELECT * FROM students ORDER BY id DESC")->fetchAll(),
+            'fees'        => $pdo->query("SELECT * FROM fee_structure ORDER BY id DESC")->fetchAll(),
+            'enrollments' => $pdo->query("SELECT * FROM enrollments ORDER BY id DESC")->fetchAll(),
+            'payments'    => $pdo->query("SELECT * FROM payments ORDER BY id DESC")->fetchAll(),
+            'discounts'   => $pdo->query("SELECT * FROM discounts ORDER BY id DESC")->fetchAll(),
+            'others'      => $pdo->query("SELECT * FROM other_charges ORDER BY id DESC")->fetchAll(),
+            'users'       => $pdo->query("SELECT * FROM users ORDER BY id DESC")->fetchAll(),
+            'banks'       => $pdo->query("SELECT * FROM banks ORDER BY id DESC")->fetchAll()
         ];
         
         foreach ($data['users'] as &$u) {
             $u['permissions'] = json_decode($u['permissions'] ?? '[]');
         }
 
-        echo json_encode($data);
+        // Return the clean data structure your frontend expects
+        echo json_encode(['status' => 'success', 'data' => $data]);
     } catch (Exception $e) {
         echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
     }
@@ -100,23 +98,33 @@ if ($method === 'POST' && isset($input['action'])) {
                 $reg_no = strtoupper($data['reg_no']);
                 
                 // Auto-Detect Degree if empty
-                $degree = $data['degree'];
+                $degree = $data['degree'] ?? '';
                 if (empty($degree)) {
                     if (preg_match('/^([A-Z0-9]+)05/', $reg_no, $matches)) {
                         $degree = $matches[1];
                     }
                 }
+                
+                $mobile = $data['mobile'] ?? '';
+                $email = $data['email'] ?? '';
+                $total_package = (!empty($data['total_package'])) ? $data['total_package'] : null;
 
-                $stmt = $pdo->prepare("INSERT INTO students (reg_no, name, degree, batch) VALUES (?, ?, ?, ?) 
-                                       ON DUPLICATE KEY UPDATE name=?, degree=?, batch=?");
-                $stmt->execute([$reg_no, $data['name'], $degree, $data['batch'], 
-                                $data['name'], $degree, $data['batch']]);
+                $stmt = $pdo->prepare("INSERT INTO students (reg_no, name, degree, batch, mobile, email, total_package) 
+                                       VALUES (?, ?, ?, ?, ?, ?, ?) 
+                                       ON DUPLICATE KEY UPDATE 
+                                       name=?, degree=?, batch=?, mobile=?, email=?, total_package=?");
+                $stmt->execute([
+                    $reg_no, $data['name'], $degree, $data['batch'], $mobile, $email, $total_package,
+                    $data['name'], $degree, $data['batch'], $mobile, $email, $total_package
+                ]);
                 break;
             
             case 'delete_student':
             case 'delete_students':
-                $stmt = $pdo->prepare("DELETE FROM students WHERE id = ?");
-                $stmt->execute([$id]);
+                // The frontend sometimes sends reg_no instead of id
+                $delId = $data['reg_no'] ?? $id; 
+                $stmt = $pdo->prepare("DELETE FROM students WHERE reg_no = ? OR id = ?");
+                $stmt->execute([$delId, $delId]);
                 break;
 
             // --- FEE STRUCTURE ---
@@ -180,12 +188,6 @@ if ($method === 'POST' && isset($input['action'])) {
                 $stmt = $pdo->prepare("DELETE FROM payments WHERE id = ?");
                 $stmt->execute([$id]);
                 break;
-
-            // Inside api.php for save_student
-$stmt = $pdo->prepare("INSERT INTO students (reg_no, name, degree, batch, mobile, email, total_package) 
-                       VALUES (?, ?, ?, ?, ?, ?, ?) 
-                       ON DUPLICATE KEY UPDATE 
-                       name=?, degree=?, batch=?, mobile=?, email=?, total_package=?");
 
             // --- DISCOUNTS ---
             case 'save_discount':
