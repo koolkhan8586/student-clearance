@@ -5,20 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LSAF Student Fee Management</title>
     
-    <!-- TAILWIND CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- REACT & REACT DOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     
-    <!-- BABEL (To compile JSX in browser) -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- FONT & ICONS -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     
-    <!-- XLSX LIBRARY FOR MULTI-SHEET BACKUP -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     
     <style>
@@ -213,7 +208,6 @@
             const [activeTab, setActiveTab] = useState('clearance');
             const [isFetching, setIsFetching] = useState(false);
             
-            // FIXED: Load data instantly from browser cache to prevent showing 0 records
             const [data, setData] = useState(() => {
                 const cached = localStorage.getItem('feeSystemData_v2') || localStorage.getItem('fee_system_local');
                 if (cached) {
@@ -227,7 +221,6 @@
                 };
             });
 
-            // FIXED: Keep cache continuously updated to ensure instant loads
             useEffect(() => {
                 if (data.students.length > 0 || data.payments.length > 0) {
                     localStorage.setItem('feeSystemData_v2', JSON.stringify(data));
@@ -280,13 +273,11 @@
 
             // OPTIMIZED FETCH DATA
             const refreshData = async (isBackground = false) => {
-                // Only show the loading spinner block if we don't have cached data yet
                 if (!isBackground && data.students.length === 0) setIsFetching(true); 
                 try {
                     const res = await fetch(API_URL);
                     const json = await res.json();
                     
-                    // AUTO-CORRECT LOGIC: FIX DEGREES ON LOAD
                     const correctedStudents = (Array.isArray(json.students) ? json.students : []).map(s => {
                         if (s.reg_no) {
                             const upper = s.reg_no.toUpperCase();
@@ -311,7 +302,6 @@
                     setData(safeData);
                 } catch(e) { 
                     console.error("Connection Error:", e);
-                    // Purposely do not clear `data` on failure so the cache remains available
                 } finally {
                     if (!isBackground) setIsFetching(false);
                 }
@@ -342,7 +332,6 @@
                 }
             }, [filterSession]);
 
-            // OPTIMIZED: Wrap filtering in useMemo to prevent freezing UI on every keystroke/render
             const filteredData = useMemo(() => {
                 let result = (data[activeTab] || []); 
                 if (tabSearch) {
@@ -864,6 +853,7 @@
                             else if (h.includes('bank')) obj['bank'] = val;
                             else if (h.includes('mobile')) obj['mobile'] = val;
                             else if (h.includes('email')) obj['email'] = val;
+                            else if (h.includes('package') || h.includes('total_package')) obj['total_package'] = val; 
                             else obj[h] = val; 
                         });
 
@@ -989,7 +979,7 @@
             
             const getHeaders = (type) => {
                 switch(type) {
-                    case 'students': return ['reg_no', 'name', 'degree', 'batch', 'mobile', 'email'];
+                    case 'students': return ['reg_no', 'name', 'degree', 'batch', 'mobile', 'email', 'total_package'];
                     case 'fees': return ['degree', 'batch', 'per_cr_fee', 'per_course_fee', 'reg_fee', 'other_fee'];
                     case 'enrollments': return ['reg_no', 'name', 'semester', 'cr', 'courses'];
                     case 'payments': return ['reg_no', 'name', 'semester', 'amount', 'date', 'bank'];
@@ -1185,6 +1175,9 @@
                                                     <div className="flex justify-between border-b border-gray-200 py-1"><span className="font-bold text-gray-600">Degree Program:</span><span className="text-gray-900">{clearanceResult.student.degree}</span></div>
                                                     <div className="flex justify-between border-b border-gray-200 py-1"><span className="font-bold text-gray-600">Batch / Session:</span><span className="text-gray-900">{clearanceResult.student.batch}</span></div>
                                                     <div className="flex justify-between border-b border-gray-200 py-1"><span className="font-bold text-gray-600">Rate (Per Cr. Hr):</span><span className="text-gray-900">{clearanceResult.masterFee ? num(clearanceResult.masterFee.per_cr_fee) : '-'}</span></div>
+                                                    {clearanceResult.student.total_package && (
+                                                        <div className="flex justify-between border-b border-gray-200 py-1"><span className="font-bold text-gray-600">Total Package:</span><span className="text-gray-900 font-bold">{num(clearanceResult.student.total_package)}</span></div>
+                                                    )}
                                                 </div>
                                                 <div className="overflow-x-auto">
                                                     <table className="w-full text-xs clearance-table">
@@ -1351,7 +1344,7 @@
                                                         <tr key={item.id || idx} className={`hover:bg-gray-50 transition ${selectedIds.has(item.id || item.reg_no) ? 'bg-blue-50' : ''}`}>
                                                             <td className="p-4"><input type="checkbox" checked={selectedIds.has(item.id || item.reg_no)} onChange={() => handleSelectRow(item.id || item.reg_no)} className="rounded" /></td>
                                                             {/* TABLE ROWS - Keep same structure as before */}
-                                                            {activeTab === 'students' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4 font-bold">{item.name}</td><td className="p-4"><span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-bold">{item.degree}</span></td><td className="p-4 text-gray-500">{item.batch}</td><td className="p-4 text-gray-500">{item.mobile || '-'}</td><td className="p-4 text-gray-500">{item.email || '-'}</td></>}
+                                                            {activeTab === 'students' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4 font-bold">{item.name}</td><td className="p-4"><span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-bold">{item.degree}</span></td><td className="p-4 text-gray-500">{item.batch}</td><td className="p-4 text-gray-500">{item.mobile || '-'}</td><td className="p-4 text-gray-500">{item.email || '-'}</td><td className="p-4 font-bold text-green-700">{item.total_package ? num(item.total_package) : '-'}</td></>}
                                                             {activeTab === 'fees' && <><td className="p-4 font-bold">{item.degree}</td><td className="p-4 text-gray-600">{item.batch}</td><td className="p-4 text-right text-gray-500">{num(item.per_cr_fee)}</td><td className="p-4 text-right font-bold text-green-700">{num(item.per_course_fee)}</td><td className="p-4 text-right text-gray-500">{num(item.reg_fee)}</td><td className="p-4 text-right text-gray-500">{num(item.other_fee)}</td></>}
                                                             {activeTab === 'enrollments' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4"><span className="bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-xs font-bold">{item.semester}</span></td><td className="p-4">{item.cr}</td><td className="p-4">{item.courses}</td></>}
                                                             {activeTab === 'payments' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4"><span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-bold">{item.semester}</span></td><td className="p-4 text-right font-bold">{num(item.amount)}</td><td className="p-4 text-gray-500">{item.date}</td><td className="p-4 text-gray-500">{item.bank}</td></>}
@@ -1421,7 +1414,7 @@
                                     {/* UOL HEADER (Visible ONLY in Print) */}
                                     <div className="hidden print-only-header mb-4 border-b-2 border-gray-800 pb-4">
                                          <div className="flex justify-between items-start">
-                                            <div className="w-32 h-32 rounded-lg flex items-center justify-center font-bold text-gray-400 overflow-hidden"><img src="UOL-Green-V1.png" onError={(e) => { e.target.onerror = null; e.target.src = "src/UOL-Green-V1.png"; }} alt="UOL Logo" className="w-full h-full object-contain" /></div>
+                                            <div className="w-32 h-32 rounded-lg flex items-center justify-center font-bold text-gray-400 overflow-hidden"><img src="src/UOL-Green-V1.png" alt="UOL Logo" className="w-full h-full object-contain" /></div>
                                             <div className="text-center flex-1 px-4">
                                                 <h2 className="text-2xl font-bold text-gray-900 uppercase">The University of Lahore</h2>
                                                 <p className="text-gray-600 font-medium">School of Accountancy & Finance</p>
@@ -1490,6 +1483,7 @@
                                             <input placeholder="Mobile #" className="w-full border p-2 rounded" value={formData.mobile || ''} onChange={e => setFormData({...formData, mobile: e.target.value})} />
                                             <input placeholder="Email (Optional)" className="w-full border p-2 rounded" value={formData.email || ''} onChange={e => setFormData({...formData, email: e.target.value})} />
                                         </div>
+                                        <input type="number" placeholder="Total Package Amount (Optional)" className="w-full border p-2 rounded" value={formData.total_package || ''} onChange={e => setFormData({...formData, total_package: e.target.value})} />
                                     </>}
                                     {modalType === 'fees' && <><div className="bg-blue-50 p-3 rounded text-xs text-blue-800 mb-2"><strong>Note:</strong> Fee Structure applies to ALL semesters for this Degree & Batch.</div><div className="grid grid-cols-2 gap-4"><input required placeholder="Degree" className="w-full border p-2 rounded" value={formData.degree || ''} onChange={e => setFormData({...formData, degree: e.target.value})} /><input required placeholder="Batch" className="w-full border p-2 rounded" value={formData.batch || ''} onChange={e => setFormData({...formData, batch: e.target.value})} /></div><div className="grid grid-cols-2 gap-4"><input type="number" placeholder="Fee Per Credit Hour" className="w-full border p-2 rounded" value={formData.per_cr_fee || ''} onChange={e => setFormData({...formData, per_cr_fee: e.target.value})} /><input type="number" placeholder="Fee Per Subject/Course" className="w-full border p-2 rounded" value={formData.per_course_fee || ''} onChange={e => setFormData({...formData, per_course_fee: e.target.value})} /></div><div className="grid grid-cols-2 gap-4"><input type="number" placeholder="Registration Fee (Semester)" className="w-full border p-2 rounded" value={formData.reg_fee || ''} onChange={e => setFormData({...formData, reg_fee: e.target.value})} /><input type="number" placeholder="Other Charges (Semester)" className="w-full border p-2 rounded" value={formData.other_fee || ''} onChange={e => setFormData({...formData, other_fee: e.target.value})} /></div></>}
                                     {modalType === 'enrollments' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={handleRegChange} /><input placeholder="Student Name" className="w-full border p-2 rounded bg-gray-50 font-bold text-gray-700" value={formData.name || ''} readOnly /><input required placeholder="Semester (e.g. Spring 2024)" className="w-full border p-2 rounded" value={formData.semester || ''} onChange={e => setFormData({...formData, semester: e.target.value})} /><div className="grid grid-cols-2 gap-4"><input type="number" placeholder="Credit Hours" className="w-full border p-2 rounded" value={formData.cr || ''} onChange={e => setFormData({...formData, cr: e.target.value})} /><input type="number" placeholder="No. of Courses" className="w-full border p-2 rounded" value={formData.courses || ''} onChange={e => setFormData({...formData, courses: e.target.value})} /></div></>}
