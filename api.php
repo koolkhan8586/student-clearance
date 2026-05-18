@@ -181,6 +181,12 @@ if ($method === 'POST' && isset($input['action'])) {
                 $stmt->execute([$id]);
                 break;
 
+            // Inside api.php for save_student
+$stmt = $pdo->prepare("INSERT INTO students (reg_no, name, degree, batch, mobile, email, total_package) 
+                       VALUES (?, ?, ?, ?, ?, ?, ?) 
+                       ON DUPLICATE KEY UPDATE 
+                       name=?, degree=?, batch=?, mobile=?, email=?, total_package=?");
+
             // --- DISCOUNTS ---
             case 'save_discount':
                 $dbId = (is_numeric($id) && $id > 0) ? $id : null;
