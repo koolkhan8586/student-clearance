@@ -14,6 +14,16 @@
     
     <!-- BABEL (To compile JSX in browser) -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script>
+        /* FIX: Force the CLASSIC JSX runtime.
+           Newer @babel/standalone defaults to the "automatic" runtime, which
+           emits `import { jsx } from "react/jsx-runtime"`. That import is illegal
+           inside a non-module text/babel script (React is a UMD global here),
+           which caused the white screen. Classic runtime uses React.createElement. */
+        Babel.registerPreset('react-classic', {
+            presets: [[Babel.availablePresets['react'], { runtime: 'classic' }]]
+        });
+    </script>
 
     <!-- FONT & ICONS -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -164,7 +174,7 @@
 <body class="bg-gray-100 font-sans text-gray-800 overflow-hidden">
     <div id="root"></div>
 
-    <script type="text/babel">
+    <script type="text/babel" data-presets="react-classic">
         const { useState, useEffect, useMemo } = React;
         const API_URL = 'api.php'; 
 
