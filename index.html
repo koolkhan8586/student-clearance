@@ -8,7 +8,7 @@
     <!-- TAILWIND CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- REACT PRODUCTION CDNS (Fixes React DevTools Warning) -->
+    <!-- REACT PRODUCTION CDNS -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     
@@ -67,11 +67,11 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        // Ensure no imports are used here. We pull from global React object.
+        // NO IMPORTS ALLOWED HERE. Extracting directly from global React.
         const { useState, useEffect, useMemo } = React;
         const API_URL = 'api.php'; 
 
-        // --- INLINE ICONS (Prevents Import Errors) ---
+        // --- INLINE ICONS ---
         const Icon = ({ d, ...props }) => <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>;
         const Search = (p) => <Icon d="M21 21l-4.35-4.35M19 11a8 8 0 1 1-16 0 8 8 0 0 1 16 0z" {...p} />;
         const Plus = (p) => <Icon d="M12 5v14M5 12h14" {...p} />;
@@ -83,7 +83,7 @@
         const CreditCard = (p) => <Icon d="M1 4h22v16H1zM1 10h22" {...p} />;
         const Percent = (p) => <Icon d="M19 5L5 19M6.5 6.5h0M17.5 17.5h0" {...p} />;
         const Printer = (p) => <Icon d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z" {...p} />;
-        const Download = (p) => <Icon d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" {...p} />;
+        const Download = (p) => <Icon d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M5 10l7-7 7 7M12 3v12" {...p} />;
         const Upload = (p) => <Icon d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" {...p} />;
         const FileSpreadsheet = (p) => <Icon d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" {...p} />;
         const XSquare = (p) => <Icon d="M3 3h18v18H3zM9 9l6 6M15 9l-6 6" {...p} />;
