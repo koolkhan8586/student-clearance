@@ -23,7 +23,7 @@ The update script only guarantees the PHP/MySQL packages are present. MySQL data
 # 1. Start MySQL (no systemd in this container; start the daemon directly)
 sudo mkdir -p /var/run/mysqld && sudo chown mysql:mysql /var/run/mysqld
 sudo mysqld_safe >/tmp/mysql.log 2>&1 &
-sleep 8 && sudo mysqladmin ping
+sleep 10 && sudo mysqladmin ping
 
 # 2. IMPORTANT: make the socket dir traversable by the non-root PHP process.
 #    mysqld_safe resets /var/run/mysqld to 0700 on every start, which causes
@@ -48,6 +48,7 @@ Then open `http://localhost:8000/index.html`.
   - `payments`: `bank VARCHAR(100)`
   If you ever recreate `fee_system` from scratch, re-add these columns or saving students/payments with those fields will fail.
 - **Relaxed `sql_mode` is required.** Several queries rely on legacy loose typing (e.g. `delete_student` compares string `reg_no` against the integer `id` column), which errors under MySQL 8's default strict mode. `/etc/mysql/conf.d/zz-fee-system.cnf` sets `sql_mode=` (empty). Note the leftover `/etc/mysql/my.cnf` alternatives symlink points at `mariadb.cnf`, which only includes `conf.d/` (not `mysql.conf.d/`), so app DB config must live in `/etc/mysql/conf.d/`.
+- **InnoDB IO must be tamed for this container's overlay filesystem.** Native async IO / `O_DIRECT` cause MySQL to fail on startup (`InnoDB OS error 122 on file 'close'`). `/etc/mysql/conf.d/zz-fee-system.cnf` also sets `innodb_use_native_aio=0`, `innodb_flush_method=fsync`, and `innodb_doublewrite=0`. A *fresh* `--initialize` works with these settings, but an InnoDB data dir created on a previous VM/snapshot may be unreadable after a restart and fail with the same error. If that happens, reinitialize a fresh data dir (`sudo mv /var/lib/mysql /var/lib/mysql.broken && sudo mkdir /var/lib/mysql && sudo chown mysql:mysql /var/lib/mysql && sudo mysqld --initialize-insecure --user=mysql`), start MySQL, then recreate the `fee_system` DB, the `koolkhan` user, and the extra columns listed above. (Dev data is disposable; re-seed via the API.)
 
 ### Lint / test / build
 
