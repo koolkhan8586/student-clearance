@@ -521,6 +521,56 @@
                 setSessionDetail(sessionData);
             };
 
+            // --- EXPORT SESSION DETAIL (CSV / EXCEL) ---
+            const buildSessionDetailRows = (detail) => {
+                const headers = ['#', 'Reg No', 'Name', 'Courses', 'Cr', 'Tuition', 'Exam Fee', 'Discount', 'Total', 'Paid', 'Balance'];
+                const rows = (detail.details || []).map((s, idx) => ({
+                    '#': idx + 1,
+                    'Reg No': s.reg_no || '',
+                    'Name': s.name || '',
+                    'Courses': s.courses || 0,
+                    'Cr': s.cr || 0,
+                    'Tuition': Math.round((s.tuition || 0) * 100) / 100,
+                    'Exam Fee': Math.round((s.exam || 0) * 100) / 100,
+                    'Discount': Math.round((s.discount || 0) * 100) / 100,
+                    'Total': Math.round(((s.tuition || 0) + (s.exam || 0) + (s.other || 0) - (s.discount || 0)) * 100) / 100,
+                    'Paid': Math.round((s.paid || 0) * 100) / 100,
+                    'Balance': Math.round((s.balance || 0) * 100) / 100
+                }));
+                return { headers, rows };
+            };
+
+            const exportSessionDetailExcel = (detail) => {
+                if (!detail || !detail.details || detail.details.length === 0) return alert("No data to export");
+                if (typeof window.XLSX === 'undefined') return alert("Excel library is still loading. Please try again in a moment.");
+                const { rows } = buildSessionDetailRows(detail);
+                const wb = window.XLSX.utils.book_new();
+                const ws = window.XLSX.utils.json_to_sheet(rows);
+                const safeName = String(detail.session || 'Session').replace(/[\\/?*\[\]:]/g, ' ').substring(0, 28).trim() || 'Session';
+                window.XLSX.utils.book_append_sheet(wb, ws, safeName);
+                const fileName = String(detail.session || 'session').replace(/[^a-z0-9]/gi, '_');
+                window.XLSX.writeFile(wb, `Session_Detail_${fileName}_${new Date().toISOString().split('T')[0]}.xlsx`);
+            };
+
+            const exportSessionDetailCsv = (detail) => {
+                if (!detail || !detail.details || detail.details.length === 0) return alert("No data to export");
+                const { headers, rows } = buildSessionDetailRows(detail);
+                const escape = (v) => {
+                    const str = (v === undefined || v === null) ? '' : String(v);
+                    return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+                };
+                const csvRows = [headers.join(',')];
+                rows.forEach(r => csvRows.push(headers.map(h => escape(r[h])).join(',')));
+                const blob = new Blob(['\uFEFF' + csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                const fileName = String(detail.session || 'session').replace(/[^a-z0-9]/gi, '_');
+                link.setAttribute('download', `Session_Detail_${fileName}_${new Date().toISOString().split('T')[0]}.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            };
+
             const paymentStats = activeTab === 'payments' ? filteredData.reduce((acc, item) => {
                  const amt = parseFloat(item.amount) || 0;
                  acc.total += amt;
@@ -1427,6 +1477,8 @@
                                 <div className="p-6 border-b flex justify-between items-center bg-gray-50 rounded-t-xl no-print">
                                     <h3 className="text-xl font-bold">Session Detail: {sessionDetail.session}</h3>
                                     <div className="flex gap-2">
+                                        <button onClick={() => exportSessionDetailExcel(sessionDetail)} className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"><FileSpreadsheet className="h-4 w-4 inline mr-2"/> Export Excel</button>
+                                        <button onClick={() => exportSessionDetailCsv(sessionDetail)} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"><Download className="h-4 w-4 inline mr-2"/> Export CSV</button>
                                         <button onClick={() => window.print()} className="bg-gray-700 text-white px-4 py-2 rounded hover:bg-gray-800"><Printer className="h-4 w-4 inline mr-2"/> Print Report</button>
                                         <button onClick={() => setSessionDetail(null)} className="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
                                     </div>
