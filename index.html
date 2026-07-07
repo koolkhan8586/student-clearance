@@ -288,11 +288,16 @@
 
             // OPTIMIZED FETCH DATA
             const refreshData = async (isBackground = false) => {
-                if (!isBackground && data.students.length === 0) setIsFetching(true); 
+                if (!isBackground && data.students.length === 0) setIsFetching(true);
                 try {
-                    const res = await fetch(API_URL);
+                    const res = await fetch(API_URL, { credentials: 'same-origin' });
+                    if (res.status === 401) {
+                        setUser(null);
+                        sessionStorage.removeItem('feeUser');
+                        return;
+                    }
                     const json = await res.json();
-                    
+
                     const correctedStudents = (Array.isArray(json.students) ? json.students : []).map(s => {
                         if (s.reg_no) {
                             const upper = s.reg_no.toUpperCase();
@@ -585,14 +590,21 @@
                 try {
                     const res = await fetch(API_URL, {
                         method: 'POST',
+                        credentials: 'same-origin',
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify({ action, ...payload })
                     });
+                    if (res.status === 401) {
+                        setUser(null);
+                        sessionStorage.removeItem('feeUser');
+                        alert("Your session has expired. Please log in again.");
+                        return false;
+                    }
                     const json = await res.json();
-                    if(json.status === 'success') { 
+                    if(json.status === 'success') {
                         if (!skipRefresh) refreshData(true); // Default to background refresh
-                        return true; 
-                    } 
+                        return true;
+                    }
                     else { alert("Error: " + json.message); return false; }
                 } catch(e) { alert("Network Error"); return false; }
             };
@@ -630,20 +642,39 @@
                 refreshData(true); // Refresh in background once done
             };
 
-            const handleLogin = (e) => {
+            const handleLogin = async (e) => {
                 e.preventDefault();
-                const userList = data.users || [];
-                const found = userList.find(u => u.username === loginData.username && u.password === loginData.password);
-                if (found) {
-                    setUser(found);
-                    sessionStorage.setItem('feeUser', JSON.stringify(found));
-                    setLoginData({ username: '', password: '' });
-                    if(found.role === 'admin' || found.permissions.includes('clearance')) setActiveTab('clearance');
-                    else if(found.permissions.length > 0) setActiveTab(found.permissions[0]);
-                } else { alert("Invalid Credentials"); }
+                try {
+                    const res = await fetch(API_URL, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ action: 'login', data: { username: loginData.username, password: loginData.password } })
+                    });
+                    const json = await res.json();
+                    if (json.status === 'success' && json.user) {
+                        const found = json.user;
+                        setUser(found);
+                        sessionStorage.setItem('feeUser', JSON.stringify(found));
+                        setLoginData({ username: '', password: '' });
+                        if(found.role === 'admin' || found.permissions.includes('clearance')) setActiveTab('clearance');
+                        else if(found.permissions.length > 0) setActiveTab(found.permissions[0]);
+                        refreshData();
+                    } else {
+                        alert(json.message || "Invalid Credentials");
+                    }
+                } catch(e) { alert("Network Error"); }
             };
 
-            const handleLogout = () => {
+            const handleLogout = async () => {
+                try {
+                    await fetch(API_URL, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ action: 'logout' })
+                    });
+                } catch(e) {}
                 setUser(null);
                 sessionStorage.removeItem('feeUser');
                 setClearanceResult(null);
@@ -652,18 +683,23 @@
 
             const handleChangePassword = async (e) => {
                 e.preventDefault();
-                if (passwordData.current !== user.password) return alert("Incorrect current password!");
                 if (passwordData.new !== passwordData.confirm) return alert("New passwords do not match!");
-                const success = await postToApi('save_user', { data: { ...user, password: passwordData.new }, id: user.id });
-                if(success) {
-                    alert("Password changed successfully!");
-                    setShowPasswordModal(false);
-                    setPasswordData({ current: '', new: '', confirm: '' });
-                    const updatedUser = { ...user, password: passwordData.new };
-                    setUser(updatedUser);
-                    sessionStorage.setItem('feeUser', JSON.stringify(updatedUser));
-                    refreshData(true);
-                }
+                try {
+                    const res = await fetch(API_URL, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ action: 'change_password', data: { current: passwordData.current, new: passwordData.new } })
+                    });
+                    const json = await res.json();
+                    if (json.status === 'success') {
+                        alert("Password changed successfully!");
+                        setShowPasswordModal(false);
+                        setPasswordData({ current: '', new: '', confirm: '' });
+                    } else {
+                        alert(json.message || "Failed to change password");
+                    }
+                } catch(e) { alert("Network Error"); }
             };
 
             const handleSort = (key) => {
@@ -1577,7 +1613,7 @@
                                     {modalType === 'users' && (
                                         <div className="space-y-4">
                                             <input required placeholder="Username" className="w-full border p-2 rounded" value={formData.username || ''} onChange={e => setFormData({...formData, username: e.target.value})} />
-                                            <input required type="password" placeholder="Password" className="w-full border p-2 rounded" value={formData.password || ''} onChange={e => setFormData({...formData, password: e.target.value})} />
+                                            <input required={!editingId} type="password" placeholder={editingId ? "New Password (leave blank to keep current)" : "Password"} className="w-full border p-2 rounded" value={formData.password || ''} onChange={e => setFormData({...formData, password: e.target.value})} />
                                             <select className="w-full border p-2 rounded bg-white" value={formData.role || 'user'} onChange={e => setFormData({...formData, role: e.target.value})}>
                                                 <option value="user">Regular User</option>
                                                 <option value="admin">Administrator</option>

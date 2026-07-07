@@ -1,7 +1,23 @@
 <?php
+session_set_cookie_params([
+    'lifetime' => 0,
+    'path'     => '/',
+    'httponly' => true,
+    'samesite' => 'Lax',
+]);
+session_start();
+
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Headers: Content-Type");
 header("Content-Type: application/json");
+
+function requireAuth() {
+    if (empty($_SESSION['user'])) {
+        http_response_code(401);
+        echo json_encode(['status' => 'error', 'message' => 'Not authenticated']);
+        exit;
+    }
+}
 
 // --- DATABASE CONFIGURATION ---
 $host = 'localhost';
@@ -54,7 +70,9 @@ try {
     $stmt = $pdo->prepare("SELECT COUNT(*) FROM users WHERE username = 'admin'");
     $stmt->execute();
     if ($stmt->fetchColumn() == 0) {
-        $pdo->exec("INSERT INTO users (username, password, role, permissions) VALUES ('admin', '123', 'admin', '[\"all\"]')");
+        $defaultHash = password_hash('123', PASSWORD_DEFAULT);
+        $stmt = $pdo->prepare("INSERT INTO users (username, password, role, permissions) VALUES ('admin', ?, 'admin', '[\"all\"]')");
+        $stmt->execute([$defaultHash]);
     }
 
 } catch (\PDOException $e) {
@@ -76,6 +94,7 @@ $input = json_decode(file_get_contents('php://input'), true);
 
 // GET Request: Fetch All Data (Load App)
 if ($method === 'GET') {
+    requireAuth();
     try {
         $data = [
             'students'    => $pdo->query("SELECT * FROM students ORDER BY id DESC")->fetchAll(),
@@ -90,6 +109,7 @@ if ($method === 'GET') {
         
         foreach ($data['users'] as &$u) {
             $u['permissions'] = json_decode($u['permissions'] ?? '[]');
+            unset($u['password']);
         }
 
         // Return the clean data structure directly
@@ -105,6 +125,71 @@ if ($method === 'POST' && isset($input['action'])) {
     $action = $input['action'];
     $data   = $input['data'] ?? [];
     $id     = $input['id'] ?? null;
+
+    // --- LOGIN / LOGOUT (do not require an existing session) ---
+    if ($action === 'login') {
+        try {
+            $username = $data['username'] ?? '';
+            $password = $data['password'] ?? '';
+            $stmt = $pdo->prepare("SELECT * FROM users WHERE username = ?");
+            $stmt->execute([$username]);
+            $u = $stmt->fetch();
+
+            $valid = $u && password_verify($password, $u['password']);
+
+            // One-time transparent upgrade path for pre-existing plaintext passwords
+            if (!$valid && $u && hash_equals((string) $u['password'], (string) $password)) {
+                $valid = true;
+                $newHash = password_hash($password, PASSWORD_DEFAULT);
+                $upd = $pdo->prepare("UPDATE users SET password = ? WHERE id = ?");
+                $upd->execute([$newHash, $u['id']]);
+            }
+
+            if ($valid) {
+                $sessionUser = [
+                    'id'          => $u['id'],
+                    'username'    => $u['username'],
+                    'role'        => $u['role'],
+                    'permissions' => json_decode($u['permissions'] ?? '[]'),
+                ];
+                $_SESSION['user'] = $sessionUser;
+                echo json_encode(['status' => 'success', 'user' => $sessionUser]);
+            } else {
+                echo json_encode(['status' => 'error', 'message' => 'Invalid username or password']);
+            }
+        } catch (Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => 'Login failed']);
+        }
+        exit;
+    }
+
+    if ($action === 'logout') {
+        $_SESSION = [];
+        session_destroy();
+        echo json_encode(['status' => 'success']);
+        exit;
+    }
+
+    requireAuth();
+
+    if ($action === 'change_password') {
+        try {
+            $stmt = $pdo->prepare("SELECT password FROM users WHERE id = ?");
+            $stmt->execute([$_SESSION['user']['id']]);
+            $row = $stmt->fetch();
+            if (!$row || !password_verify($data['current'] ?? '', $row['password'])) {
+                echo json_encode(['status' => 'error', 'message' => 'Incorrect current password']);
+                exit;
+            }
+            $newHash = password_hash($data['new'] ?? '', PASSWORD_DEFAULT);
+            $stmt = $pdo->prepare("UPDATE users SET password = ? WHERE id = ?");
+            $stmt->execute([$newHash, $_SESSION['user']['id']]);
+            echo json_encode(['status' => 'success']);
+        } catch (Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
 
     try {
         switch ($action) {
@@ -262,10 +347,21 @@ if ($method === 'POST' && isset($input['action'])) {
             case 'save_user':
                 $dbId = (is_numeric($id) && $id > 0) ? $id : null;
                 $perms = json_encode($data['permissions'] ?? []);
-                $stmt = $pdo->prepare("INSERT INTO users (id, username, password, role, permissions) VALUES (?, ?, ?, ?, ?)
-                                       ON DUPLICATE KEY UPDATE username=?, password=?, role=?, permissions=?");
-                $stmt->execute([$dbId, $data['username'], $data['password'], $data['role'], $perms,
-                                $data['username'], $data['password'], $data['role'], $perms]);
+
+                if (!empty($data['password'])) {
+                    $hashedPassword = password_hash($data['password'], PASSWORD_DEFAULT);
+                    if ($dbId) {
+                        $stmt = $pdo->prepare("UPDATE users SET username=?, password=?, role=?, permissions=? WHERE id=?");
+                        $stmt->execute([$data['username'], $hashedPassword, $data['role'], $perms, $dbId]);
+                    } else {
+                        $stmt = $pdo->prepare("INSERT INTO users (username, password, role, permissions) VALUES (?, ?, ?, ?)");
+                        $stmt->execute([$data['username'], $hashedPassword, $data['role'], $perms]);
+                    }
+                } else {
+                    if (!$dbId) throw new Exception("Password is required for new users");
+                    $stmt = $pdo->prepare("UPDATE users SET username=?, role=?, permissions=? WHERE id=?");
+                    $stmt->execute([$data['username'], $data['role'], $perms, $dbId]);
+                }
                 break;
             
             case 'delete_user':
