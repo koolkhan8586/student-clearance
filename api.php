@@ -1,4 +1,5 @@
 <?php
+session_cache_limiter('');
 session_set_cookie_params([
     'lifetime' => 0,
     'path'     => '/',
@@ -10,6 +11,8 @@ session_start();
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Headers: Content-Type");
 header("Content-Type: application/json");
+header("Cache-Control: no-store, no-cache, must-revalidate");
+header("Pragma: no-cache");
 
 function requireAuth() {
     if (empty($_SESSION['user'])) {
