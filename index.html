@@ -762,6 +762,41 @@
                     return { ...en, ...feeDetails, discPct, discAmt, netFee, totalPaid, balance };
                 }) || [];
 
+                // --- GAP FEE: blanket charges (Other Charges with no Registration No) for terms
+                // this student has no enrollment record for ---
+                const enrolledTermsNorm = new Set(
+                    (data.enrollments?.filter(e => norm(e.reg_no) === cleanReg) || []).map(e => norm(e.semester))
+                );
+                const gapFeeRows = (data.others || [])
+                    .filter(o => !norm(o.reg_no))
+                    .filter(rule => {
+                        const ruleTerm = norm(rule.semester);
+                        if (filterSession && !ruleTerm.includes(norm(filterSession))) return false;
+                        for (const t of enrolledTermsNorm) {
+                            if (t === ruleTerm || t.includes(ruleTerm) || ruleTerm.includes(t)) return false;
+                        }
+                        return true;
+                    })
+                    .map(rule => {
+                        const ruleTerm = norm(rule.semester);
+                        const amount = parseFloat(rule.amount || 0);
+                        const payments = data.payments?.filter(p => {
+                            if (norm(p.reg_no) !== cleanReg) return false;
+                            const pSem = norm(p.semester);
+                            return pSem === ruleTerm || (ruleTerm.includes(pSem) && pSem.length > 3) || (pSem.includes(ruleTerm) && ruleTerm.length > 3);
+                        }) || [];
+                        const totalPaid = payments.reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
+                        return {
+                            semester: rule.semester, cr: 0, courses: 0,
+                            tuition: 0, exam: 0, reg: 0, other: amount, total: amount,
+                            discPct: 0, discAmt: 0, netFee: amount, totalPaid,
+                            balance: amount - totalPaid,
+                            isGapFee: true, feeName: rule.fee_name
+                        };
+                    });
+
+                studentEnrollments = [...studentEnrollments, ...gapFeeRows];
+
                 const summary = studentEnrollments.reduce((acc, curr) => ({
                     total: acc.total + curr.total, fa: acc.fa + curr.discAmt,
                     paid: acc.paid + curr.totalPaid, balance: acc.balance + curr.balance,
@@ -1297,7 +1332,7 @@
                                                         <tbody className="divide-y divide-gray-200">
                                                             {clearanceResult.rows.map((row, idx) => (
                                                                 <tr key={idx} className="hover:bg-gray-50">
-                                                                    <td className="p-2 border font-medium">{row.semester}</td><td className="p-2 border text-center">{row.courses}</td><td className="p-2 border text-center">{row.cr}</td><td className="p-2 border text-right text-gray-600">{num(row.tuition)}</td><td className="p-2 border text-right text-gray-600">{num(row.exam)}</td><td className="p-2 border text-right text-gray-600">{num(row.reg)}</td><td className="p-2 border text-right text-gray-600">{num(row.other)}</td><td className="p-2 border text-right font-bold bg-gray-50">{num(row.total)}</td><td className="p-2 border text-center text-gray-500">{row.discPct > 0 ? `${row.discPct}%` : '-'}</td><td className="p-2 border text-right text-gray-500">{row.discAmt > 0 ? num(row.discAmt) : '-'}</td><td className="p-2 border text-right font-bold">{num(row.netFee)}</td><td className="p-2 border text-right font-bold text-green-600">{num(row.totalPaid)}</td><td className={`p-2 border text-right font-bold ${row.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>{num(row.balance)}</td>
+                                                                    <td className="p-2 border font-medium">{row.semester}{row.isGapFee && <span className="ml-1 text-[10px] bg-orange-100 text-orange-700 px-1 py-0.5 rounded font-bold align-middle">{row.feeName || 'Gap Fee'}</span>}</td><td className="p-2 border text-center">{row.courses}</td><td className="p-2 border text-center">{row.cr}</td><td className="p-2 border text-right text-gray-600">{num(row.tuition)}</td><td className="p-2 border text-right text-gray-600">{num(row.exam)}</td><td className="p-2 border text-right text-gray-600">{num(row.reg)}</td><td className="p-2 border text-right text-gray-600">{num(row.other)}</td><td className="p-2 border text-right font-bold bg-gray-50">{num(row.total)}</td><td className="p-2 border text-center text-gray-500">{row.discPct > 0 ? `${row.discPct}%` : '-'}</td><td className="p-2 border text-right text-gray-500">{row.discAmt > 0 ? num(row.discAmt) : '-'}</td><td className="p-2 border text-right font-bold">{num(row.netFee)}</td><td className="p-2 border text-right font-bold text-green-600">{num(row.totalPaid)}</td><td className={`p-2 border text-right font-bold ${row.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>{num(row.balance)}</td>
                                                                 </tr>
                                                             ))}
                                                             <tr className="bg-gray-800 text-white font-bold"><td className="p-3 text-right uppercase tracking-wider">Totals</td><td className="p-3 text-center">{clearanceResult.summary.courses}</td><td className="p-3 text-center">{clearanceResult.summary.cr}</td><td colSpan="4" className="p-3"></td><td className="p-3 text-right print-modern-total">{num(clearanceResult.summary.total)}</td><td className="p-3 text-center">-</td><td className="p-3 text-right">{num(clearanceResult.summary.fa)}</td><td className="p-3 text-right">{num(clearanceResult.summary.total - clearanceResult.summary.fa)}</td><td className="p-3 text-right text-green-400">{num(clearanceResult.summary.paid)}</td><td className={`p-3 text-right ${clearanceResult.summary.balance > 0 ? 'text-red-400' : 'text-green-400'}`}>{num(clearanceResult.summary.balance)}</td></tr>
@@ -1458,7 +1493,7 @@
                                                             {activeTab === 'fees' && <><td className="p-4 font-bold">{item.degree}</td><td className="p-4 text-gray-600">{item.batch}</td><td className="p-4 text-right text-gray-500">{num(item.per_cr_fee)}</td><td className="p-4 text-right font-bold text-green-700">{num(item.per_course_fee)}</td><td className="p-4 text-right text-gray-500">{num(item.reg_fee)}</td><td className="p-4 text-right text-gray-500">{num(item.other_fee)}</td></>}
                                                             {activeTab === 'enrollments' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4"><span className="bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-xs font-bold">{item.semester}</span></td><td className="p-4">{item.cr}</td><td className="p-4">{item.courses}</td></>}
                                                             {activeTab === 'payments' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4"><span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-bold">{item.semester}</span></td><td className="p-4 text-right font-bold">{num(item.amount)}</td><td className="p-4 text-gray-500">{item.date}</td><td className="p-4 text-gray-500">{item.bank}</td></>}
-                                                            {activeTab === 'others' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4 text-gray-600">{item.semester}</td><td className="p-4"><span className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs font-bold">{item.fee_name}</span></td><td className="p-4 text-right font-bold">{num(item.amount)}</td></>}
+                                                            {activeTab === 'others' && <><td className="p-4 font-mono">{item.reg_no || <span className="text-orange-600 font-sans font-bold">ALL (Gap Fee)</span>}</td><td className="p-4">{item.name}</td><td className="p-4 text-gray-600">{item.semester}</td><td className="p-4"><span className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs font-bold">{item.fee_name}</span></td><td className="p-4 text-right font-bold">{num(item.amount)}</td></>}
                                                             {activeTab === 'discounts' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4 text-gray-500">{item.term}</td><td className="p-4 text-right font-bold text-purple-600">{item.discount}%</td></>}
                                                             {activeTab === 'users' && <><td className="p-4 font-bold">{item.username}</td><td className="p-4 capitalize">{item.role}</td><td className="p-4 text-xs max-w-xs truncate">{item.role === 'admin' ? 'Full Access' : (Array.isArray(item.permissions) ? item.permissions.join(', ') : item.permissions)}</td></>}
                                                             {activeTab === 'banks' && <><td className="p-4 font-bold">{item.name}</td><td className="p-4 font-mono text-gray-600">{item.account_no}</td></>}
@@ -1607,7 +1642,7 @@
                                         {data.banks.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
                                     </select>
                                     </>}
-                                    {modalType === 'others' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={handleRegChange} /><input placeholder="Student Name" className="w-full border p-2 rounded bg-gray-50 font-bold text-gray-700" value={formData.name || ''} readOnly /><div className="grid grid-cols-2 gap-4"><input required placeholder="Semester" className="w-full border p-2 rounded" value={formData.semester || ''} onChange={e => setFormData({...formData, semester: e.target.value})} /><input required placeholder="Fee Head (e.g. Fine)" className="w-full border p-2 rounded" value={formData.fee_name || ''} onChange={e => setFormData({...formData, fee_name: e.target.value})} /></div><input required type="number" placeholder="Amount" className="w-full border p-2 rounded font-bold text-lg" value={formData.amount || ''} onChange={e => setFormData({...formData, amount: e.target.value})} /></>}
+                                    {modalType === 'others' && <><input placeholder="Registration No (leave blank for a Gap Fee applied to everyone not enrolled this term)" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={handleRegChange} /><input placeholder="Student Name" className="w-full border p-2 rounded bg-gray-50 font-bold text-gray-700" value={formData.name || ''} readOnly /><div className="grid grid-cols-2 gap-4"><input required placeholder="Semester" className="w-full border p-2 rounded" value={formData.semester || ''} onChange={e => setFormData({...formData, semester: e.target.value})} /><input required placeholder="Fee Head (e.g. Fine, Gap Fee)" className="w-full border p-2 rounded" value={formData.fee_name || ''} onChange={e => setFormData({...formData, fee_name: e.target.value})} /></div><input required type="number" placeholder="Amount" className="w-full border p-2 rounded font-bold text-lg" value={formData.amount || ''} onChange={e => setFormData({...formData, amount: e.target.value})} />{!formData.reg_no && <div className="bg-orange-50 border border-orange-200 text-orange-800 text-xs p-2 rounded">This will be saved as a blanket <strong>Gap Fee</strong>: every student with no enrollment record in "{formData.semester || '...'}" will be charged {formData.amount || 0} on their clearance for that term.</div>}</>}
                                     {modalType === 'discounts' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={handleRegChange} /><input placeholder="Student Name" className="w-full border p-2 rounded bg-gray-50 font-bold text-gray-700" value={formData.name || ''} readOnly /><input required placeholder="Term" className="w-full border p-2 rounded" value={formData.term || ''} onChange={e => setFormData({...formData, term: e.target.value})} /><input required type="number" placeholder="Discount %" className="w-full border p-2 rounded" value={formData.discount || ''} onChange={e => setFormData({...formData, discount: e.target.value})} /></>}
                                     {modalType === 'banks' && <><input required placeholder="Bank Name" className="w-full border p-2 rounded" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} /><input placeholder="Account Number (Optional)" className="w-full border p-2 rounded" value={formData.account_no || ''} onChange={e => setFormData({...formData, account_no: e.target.value})} /></>}
                                     {modalType === 'users' && (

@@ -318,7 +318,8 @@ if ($method === 'POST' && isset($input['action'])) {
             case 'save_other':
                 $dbId = (is_numeric($id) && $id > 0) ? $id : null;
                 $amount = empty($data['amount']) ? 0 : $data['amount'];
-                $reg_no = strtoupper($data['reg_no']);
+                $reg_no = strtoupper($data['reg_no'] ?? '');
+                $data['name'] = $data['name'] ?? '';
 
                 $stmt = $pdo->prepare("INSERT INTO other_charges (id, reg_no, name, semester, fee_name, amount) VALUES (?, ?, ?, ?, ?, ?)
                                        ON DUPLICATE KEY UPDATE reg_no=?, name=?, semester=?, fee_name=?, amount=?");
