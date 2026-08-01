@@ -762,13 +762,15 @@
                     return { ...en, ...feeDetails, discPct, discAmt, netFee, totalPaid, balance };
                 }) || [];
 
-                // --- GAP FEE: blanket charges (Other Charges with no Registration No) for terms
-                // this student has no enrollment record for ---
+                // --- GAP FEE: Other Charges named "Gap Fee" for a term this student has no
+                // enrollment record for. Works whether the charge was saved for this specific
+                // student's reg_no, or left blank as a blanket rule for everyone. ---
                 const enrolledTermsNorm = new Set(
                     (data.enrollments?.filter(e => norm(e.reg_no) === cleanReg) || []).map(e => norm(e.semester))
                 );
                 const gapFeeRows = (data.others || [])
-                    .filter(o => !norm(o.reg_no))
+                    .filter(o => norm(o.fee_name).includes('gap'))
+                    .filter(o => !norm(o.reg_no) || norm(o.reg_no) === cleanReg)
                     .filter(rule => {
                         const ruleTerm = norm(rule.semester);
                         if (filterSession && !ruleTerm.includes(norm(filterSession))) return false;
@@ -1642,7 +1644,7 @@
                                         {data.banks.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
                                     </select>
                                     </>}
-                                    {modalType === 'others' && <><input placeholder="Registration No (leave blank for a Gap Fee applied to everyone not enrolled this term)" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={handleRegChange} /><input placeholder="Student Name" className="w-full border p-2 rounded bg-gray-50 font-bold text-gray-700" value={formData.name || ''} readOnly /><div className="grid grid-cols-2 gap-4"><input required placeholder="Semester" className="w-full border p-2 rounded" value={formData.semester || ''} onChange={e => setFormData({...formData, semester: e.target.value})} /><input required placeholder="Fee Head (e.g. Fine, Gap Fee)" className="w-full border p-2 rounded" value={formData.fee_name || ''} onChange={e => setFormData({...formData, fee_name: e.target.value})} /></div><input required type="number" placeholder="Amount" className="w-full border p-2 rounded font-bold text-lg" value={formData.amount || ''} onChange={e => setFormData({...formData, amount: e.target.value})} />{!formData.reg_no && <div className="bg-orange-50 border border-orange-200 text-orange-800 text-xs p-2 rounded">This will be saved as a blanket <strong>Gap Fee</strong>: every student with no enrollment record in "{formData.semester || '...'}" will be charged {formData.amount || 0} on their clearance for that term.</div>}</>}
+                                    {modalType === 'others' && <><input placeholder="Registration No (leave blank for a Gap Fee applied to everyone not enrolled this term)" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={handleRegChange} /><input placeholder="Student Name" className="w-full border p-2 rounded bg-gray-50 font-bold text-gray-700" value={formData.name || ''} readOnly /><div className="grid grid-cols-2 gap-4"><input required placeholder="Semester" className="w-full border p-2 rounded" value={formData.semester || ''} onChange={e => setFormData({...formData, semester: e.target.value})} /><input required placeholder="Fee Head (e.g. Fine, Gap Fee)" className="w-full border p-2 rounded" value={formData.fee_name || ''} onChange={e => setFormData({...formData, fee_name: e.target.value})} /></div><input required type="number" placeholder="Amount" className="w-full border p-2 rounded font-bold text-lg" value={formData.amount || ''} onChange={e => setFormData({...formData, amount: e.target.value})} />{norm(formData.fee_name).includes('gap') && <div className="bg-orange-50 border border-orange-200 text-orange-800 text-xs p-2 rounded">Fee Head contains "Gap": this will show up on the Clearance report for "{formData.semester || '...'}" even though there's no enrollment record for that term — {formData.reg_no ? <>charged only to <strong>{formData.reg_no}</strong></> : <>charged to <strong>every student</strong> with no enrollment that term</>}.</div>}</>}
                                     {modalType === 'discounts' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={handleRegChange} /><input placeholder="Student Name" className="w-full border p-2 rounded bg-gray-50 font-bold text-gray-700" value={formData.name || ''} readOnly /><input required placeholder="Term" className="w-full border p-2 rounded" value={formData.term || ''} onChange={e => setFormData({...formData, term: e.target.value})} /><input required type="number" placeholder="Discount %" className="w-full border p-2 rounded" value={formData.discount || ''} onChange={e => setFormData({...formData, discount: e.target.value})} /></>}
                                     {modalType === 'banks' && <><input required placeholder="Bank Name" className="w-full border p-2 rounded" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} /><input placeholder="Account Number (Optional)" className="w-full border p-2 rounded" value={formData.account_no || ''} onChange={e => setFormData({...formData, account_no: e.target.value})} /></>}
                                     {modalType === 'users' && (
