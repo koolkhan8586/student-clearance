@@ -38,8 +38,7 @@
         
         @media print {
             @page {
-                size: A4 portrait;
-                margin: 5mm; 
+                margin: 5mm;
             }
             
             /* RESET EVERYTHING FOR PRINT */
@@ -267,6 +266,7 @@
             const [importTerm, setImportTerm] = useState('');
             const [sidebarOpen, setSidebarOpen] = useState(false);
             const [sessionDetail, setSessionDetail] = useState(null);
+            const [printOrientation, setPrintOrientation] = useState(() => localStorage.getItem('clearancePrintOrientation') || 'portrait');
 
             const TABS = [
                 { id: 'clearance', label: 'Clearance', icon: FileText },
@@ -326,6 +326,17 @@
                     if (!isBackground) setIsFetching(false);
                 }
             };
+
+            useEffect(() => {
+                let styleTag = document.getElementById('dynamic-print-orientation');
+                if (!styleTag) {
+                    styleTag = document.createElement('style');
+                    styleTag.id = 'dynamic-print-orientation';
+                    document.head.appendChild(styleTag);
+                }
+                styleTag.innerHTML = `@media print { @page { size: A4 ${printOrientation}; } }`;
+                localStorage.setItem('clearancePrintOrientation', printOrientation);
+            }, [printOrientation]);
 
             useEffect(() => {
                 refreshData();
@@ -1336,6 +1347,15 @@
                                     </div>
                                     {/* Clearance Result */}
                                     {clearanceResult && (
+                                        <>
+                                        <div className="no-print flex items-center justify-end gap-3 bg-white p-3 rounded-xl shadow-sm border border-gray-200">
+                                            <span className="text-sm font-bold text-gray-700">Print Layout:</span>
+                                            <div className="flex rounded-lg border border-gray-300 overflow-hidden">
+                                                <button onClick={() => setPrintOrientation('portrait')} className={`px-3 py-1.5 text-sm font-medium ${printOrientation === 'portrait' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>Portrait</button>
+                                                <button onClick={() => setPrintOrientation('landscape')} className={`px-3 py-1.5 text-sm font-medium border-l border-gray-300 ${printOrientation === 'landscape' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>Landscape</button>
+                                            </div>
+                                            <button onClick={() => window.print()} className="bg-gray-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-800 flex items-center gap-2"><Printer className="h-4 w-4" /> Print</button>
+                                        </div>
                                         <div className="bg-white rounded-xl shadow-lg overflow-hidden" id="printableArea">
                                             <div className="p-8">
                                                 <div className="border-b-2 border-gray-800 pb-6 mb-6 flex justify-between items-start">
@@ -1377,6 +1397,7 @@
                                                 </div>
                                             </div>
                                         </div>
+                                        </>
                                     )}
                                 </div>
                             )}
