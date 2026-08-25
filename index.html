@@ -237,7 +237,15 @@
 
             useEffect(() => {
                 if (data.students.length > 0 || data.payments.length > 0) {
-                    localStorage.setItem('feeSystemData_v2', JSON.stringify(data));
+                    try {
+                        localStorage.setItem('feeSystemData_v2', JSON.stringify(data));
+                    } catch (e) {
+                        // Caching is a best-effort speed-up (instant load on next visit) — if the
+                        // browser's storage quota is full (common on iOS/iPadOS with a lot of
+                        // records), skip it silently instead of crashing. The app still works
+                        // fine from in-memory state and a fresh fetch on next load.
+                        console.warn("Could not cache data locally (storage quota likely full):", e);
+                    }
                 }
             }, [data]);
 
@@ -335,7 +343,11 @@
                     document.head.appendChild(styleTag);
                 }
                 styleTag.innerHTML = `@media print { @page { size: A4 ${printOrientation}; } }`;
-                localStorage.setItem('clearancePrintOrientation', printOrientation);
+                try {
+                    localStorage.setItem('clearancePrintOrientation', printOrientation);
+                } catch (e) {
+                    console.warn("Could not save print orientation preference:", e);
+                }
             }, [printOrientation]);
 
             useEffect(() => {
