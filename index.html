@@ -615,15 +615,11 @@
             const paymentStats = activeTab === 'payments' ? filteredData.reduce((acc, item) => {
                  const amt = parseFloat(item.amount) || 0;
                  acc.total += amt;
-                 if (item.bank === 'Loan') {
-                     acc.loan += amt;
-                 } else {
-                     const isBank = item.bank && item.bank !== 'Cash' && item.bank.trim() !== '';
-                     if(isBank) acc.bank += amt;
-                     else acc.cash += amt;
-                 }
+                 const isBank = item.bank && item.bank !== 'Cash' && item.bank !== 'Loan' && item.bank.trim() !== '';
+                 if(isBank) acc.bank += amt;
+                 else acc.cash += amt; // includes loan-sourced rows
                  return acc;
-            }, { total: 0, bank: 0, cash: 0, loan: 0 }) : { total: 0, bank: 0, cash: 0, loan: 0 };
+            }, { total: 0, bank: 0, cash: 0 }) : { total: 0, bank: 0, cash: 0 };
 
             // Per-semester breakdown for the Other Bank (Loan) tab
             const loanSemesterStats = useMemo(() => {
@@ -1600,7 +1596,7 @@
                                     
                                     {/* DASHBOARD WIDGETS FOR PAYMENTS */}
                                     {activeTab === 'payments' && (
-                                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 no-print">
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 no-print">
                                             <div className="bg-white p-4 rounded-xl shadow-sm border-l-4 border-green-500">
                                                 <div className="text-xs font-bold text-gray-500 uppercase">Total Received</div>
                                                 <div className="text-2xl font-bold text-gray-800">{num(paymentStats.total)}</div>
@@ -1613,10 +1609,6 @@
                                             <div className="bg-white p-4 rounded-xl shadow-sm border-l-4 border-orange-500">
                                                 <div className="text-xs font-bold text-gray-500 uppercase">Other Bank</div>
                                                 <div className="text-2xl font-bold text-gray-800">{num(paymentStats.cash)}</div>
-                                            </div>
-                                            <div className="bg-white p-4 rounded-xl shadow-sm border-l-4 border-purple-500">
-                                                <div className="text-xs font-bold text-gray-500 uppercase">Loan</div>
-                                                <div className="text-2xl font-bold text-gray-800">{num(paymentStats.loan)}</div>
                                             </div>
                                         </div>
                                     )}
@@ -1652,7 +1644,7 @@
                                                             {activeTab === 'students' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4 font-bold">{item.name}</td><td className="p-4"><span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-bold">{item.degree}</span></td><td className="p-4 text-gray-500">{item.batch}</td><td className="p-4 text-gray-500">{item.mobile || '-'}</td><td className="p-4 text-gray-500">{item.email || '-'}</td><td className="p-4 font-bold text-green-700">{item.total_package ? num(item.total_package) : '-'}</td></>}
                                                             {activeTab === 'fees' && <><td className="p-4 font-bold">{item.degree}</td><td className="p-4 text-gray-600">{item.batch}</td><td className="p-4 text-right text-gray-500">{num(item.per_cr_fee)}</td><td className="p-4 text-right font-bold text-green-700">{num(item.per_course_fee)}</td><td className="p-4 text-right text-gray-500">{num(item.reg_fee)}</td><td className="p-4 text-right text-gray-500">{num(item.other_fee)}</td></>}
                                                             {activeTab === 'enrollments' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4"><span className="bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-xs font-bold">{item.semester}</span></td><td className="p-4">{item.cr}</td><td className="p-4">{item.courses}</td></>}
-                                                            {activeTab === 'payments' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4"><span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-bold">{item.semester}</span></td><td className="p-4 text-right font-bold">{num(item.amount)}</td><td className="p-4 text-gray-500">{item.date}</td><td className="p-4 text-gray-500">{item.bank}</td></>}
+                                                            {activeTab === 'payments' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4"><span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-bold">{item.semester}</span></td><td className="p-4 text-right font-bold">{num(item.amount)}</td><td className="p-4 text-gray-500">{item.date}</td><td className="p-4 text-gray-500">{item.bank === 'Loan' ? '' : item.bank}</td></>}
                                                             {activeTab === 'loans' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4"><span className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs font-bold">{item.semester}</span></td><td className="p-4 text-right font-bold">{num(item.amount)}</td><td className="p-4 text-gray-500">{item.date}</td></>}
                                                             {activeTab === 'others' && <><td className="p-4 font-mono">{item.reg_no || <span className="text-orange-600 font-sans font-bold">ALL (Gap Fee)</span>}</td><td className="p-4">{item.name}</td><td className="p-4 text-gray-600">{item.semester}</td><td className="p-4"><span className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs font-bold">{item.fee_name}</span></td><td className="p-4 text-right font-bold">{num(item.amount)}</td></>}
                                                             {activeTab === 'discounts' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4 text-gray-500">{item.term}</td><td className="p-4 text-right font-bold text-purple-600">{item.discount}%</td></>}
