@@ -615,11 +615,15 @@
             const paymentStats = activeTab === 'payments' ? filteredData.reduce((acc, item) => {
                  const amt = parseFloat(item.amount) || 0;
                  acc.total += amt;
-                 const isBank = item.bank && item.bank !== 'Cash' && item.bank !== 'Loan' && item.bank.trim() !== '';
-                 if(isBank) acc.bank += amt;
-                 else acc.cash += amt;
+                 if (item.bank === 'Loan') {
+                     acc.loan += amt;
+                 } else {
+                     const isBank = item.bank && item.bank !== 'Cash' && item.bank.trim() !== '';
+                     if(isBank) acc.bank += amt;
+                     else acc.cash += amt;
+                 }
                  return acc;
-            }, { total: 0, bank: 0, cash: 0 }) : { total: 0, bank: 0, cash: 0 };
+            }, { total: 0, bank: 0, cash: 0, loan: 0 }) : { total: 0, bank: 0, cash: 0, loan: 0 };
 
             // OPTIMIZED API POST (skipRefresh controls blocking fetch)
             const postToApi = async (action, payload = {}, skipRefresh = false) => {
@@ -878,6 +882,14 @@
 
             // OPTIMIZED DELETE: Update UI Instantly, Delete in Background
             const handleDelete = async (type, id) => {
+                if (type === 'payments') {
+                    const target = data.payments.find(p => p.id === id);
+                    if (target && norm(target.bank) === 'loan') {
+                        alert('This is a loan-sourced payment. Delete it from the "Other Bank" tab instead.');
+                        return;
+                    }
+                }
+
                 if(!confirm("Are you sure?")) return;
 
                 const dataKey = type === 'loans' ? 'payments' : type;
@@ -1161,18 +1173,27 @@
                 setSelectedIds(newSet);
             };
             const deleteSelected = async () => {
-                if (!confirm(`Delete ${selectedIds.size} records?`)) return;
+                let idsToDelete = selectedIds;
+                if (activeTab === 'payments') {
+                    const loanIds = new Set(data.payments.filter(p => selectedIds.has(p.id) && norm(p.bank) === 'loan').map(p => p.id));
+                    if (loanIds.size > 0) {
+                        alert(`${loanIds.size} selected record(s) are loan-sourced payments and were skipped. Delete them from the "Other Bank" tab instead.`);
+                        idsToDelete = new Set([...selectedIds].filter(id => !loanIds.has(id)));
+                    }
+                }
+                if (idsToDelete.size === 0) { setSelectedIds(new Set()); return; }
+                if (!confirm(`Delete ${idsToDelete.size} records?`)) return;
 
                 const dataKey = activeTab === 'loans' ? 'payments' : activeTab;
 
                 // Optimistic UI Update
                 setData(prev => {
                     const updated = { ...prev };
-                    updated[dataKey] = updated[dataKey].filter(item => !selectedIds.has(item.id || item.reg_no));
+                    updated[dataKey] = updated[dataKey].filter(item => !idsToDelete.has(item.id || item.reg_no));
                     return updated;
                 });
 
-                for (let id of selectedIds) {
+                for (let id of idsToDelete) {
                     let type = activeTab;
                     if(type === 'others') type = 'other';
                     if(type === 'loans') type = 'payments';
@@ -1560,7 +1581,7 @@
                                     
                                     {/* DASHBOARD WIDGETS FOR PAYMENTS */}
                                     {activeTab === 'payments' && (
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 no-print">
+                                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 no-print">
                                             <div className="bg-white p-4 rounded-xl shadow-sm border-l-4 border-green-500">
                                                 <div className="text-xs font-bold text-gray-500 uppercase">Total Received</div>
                                                 <div className="text-2xl font-bold text-gray-800">{num(paymentStats.total)}</div>
@@ -1573,6 +1594,10 @@
                                             <div className="bg-white p-4 rounded-xl shadow-sm border-l-4 border-orange-500">
                                                 <div className="text-xs font-bold text-gray-500 uppercase">Other Bank</div>
                                                 <div className="text-2xl font-bold text-gray-800">{num(paymentStats.cash)}</div>
+                                            </div>
+                                            <div className="bg-white p-4 rounded-xl shadow-sm border-l-4 border-purple-500">
+                                                <div className="text-xs font-bold text-gray-500 uppercase">Loan</div>
+                                                <div className="text-2xl font-bold text-gray-800">{num(paymentStats.loan)}</div>
                                             </div>
                                         </div>
                                     )}
@@ -1603,7 +1628,11 @@
                                                             {activeTab === 'banks' && <><td className="p-4 font-bold">{item.name}</td><td className="p-4 font-mono text-gray-600">{item.account_no}</td></>}
                                                             <td className="p-4 text-center flex justify-center gap-2">
                                                                 <button onClick={() => openModal(activeTab, item)} className="p-2 text-blue-600 hover:bg-blue-50 rounded"><i className="fas fa-edit"></i> Edit</button>
-                                                                <button onClick={() => handleDelete(activeTab, item.id || item.reg_no)} className="p-2 text-red-600 hover:bg-red-50 rounded"><Trash2 className="h-4 w-4" /></button>
+                                                                {activeTab === 'payments' && norm(item.bank) === 'loan' ? (
+                                                                    <span className="p-2 text-gray-300 cursor-not-allowed" title='Loan-sourced — delete from the "Other Bank" tab'><Trash2 className="h-4 w-4" /></span>
+                                                                ) : (
+                                                                    <button onClick={() => handleDelete(activeTab, item.id || item.reg_no)} className="p-2 text-red-600 hover:bg-red-50 rounded"><Trash2 className="h-4 w-4" /></button>
+                                                                )}
                                                             </td>
                                                         </tr>
                                                     ))}
