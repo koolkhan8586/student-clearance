@@ -625,6 +625,25 @@
                  return acc;
             }, { total: 0, bank: 0, cash: 0, loan: 0 }) : { total: 0, bank: 0, cash: 0, loan: 0 };
 
+            // Per-semester breakdown for the Other Bank (Loan) tab
+            const loanSemesterStats = useMemo(() => {
+                if (activeTab !== 'loans') return [];
+                const map = new Map();
+                filteredData.forEach(item => {
+                    const key = item.semester || 'Unspecified';
+                    if (!map.has(key)) map.set(key, { semester: key, total: 0, count: 0 });
+                    const entry = map.get(key);
+                    entry.total += parseFloat(item.amount || 0);
+                    entry.count += 1;
+                });
+                return Array.from(map.values()).sort((a, b) => {
+                    const yearA = parseInt(String(a.semester).replace(/\D/g, '')) || 0;
+                    const yearB = parseInt(String(b.semester).replace(/\D/g, '')) || 0;
+                    if (yearA !== yearB) return yearA - yearB;
+                    return getTermRank(a.semester) - getTermRank(b.semester);
+                });
+            }, [activeTab, filteredData]);
+
             // OPTIMIZED API POST (skipRefresh controls blocking fetch)
             const postToApi = async (action, payload = {}, skipRefresh = false) => {
                 try {
@@ -1602,11 +1621,24 @@
                                         </div>
                                     )}
 
+                                    {/* DASHBOARD WIDGETS FOR OTHER BANK — semester-wise breakdown */}
+                                    {activeTab === 'loans' && loanSemesterStats.length > 0 && (
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mb-6 no-print">
+                                            {loanSemesterStats.map(s => (
+                                                <div key={s.semester} className="bg-white p-4 rounded-xl shadow-sm border-l-4 border-purple-500">
+                                                    <div className="text-xs font-bold text-gray-500 uppercase truncate">{s.semester}</div>
+                                                    <div className="text-xl font-bold text-gray-800">{num(s.total)}</div>
+                                                    <div className="text-xs text-gray-400 mt-1">{s.count} record{s.count !== 1 ? 's' : ''}</div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
                                     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                                         <div className="overflow-x-auto">
                                             <table className="w-full text-sm text-left">
                                                 <thead className="bg-gray-50 text-gray-700 uppercase font-bold text-xs border-b border-gray-200">
-                                                    <tr><th className="p-4 w-10"><input type="checkbox" onChange={handleSelectAll} checked={filteredData.length > 0 && selectedIds.size === filteredData.length} className="rounded" /></th>{getHeaders(activeTab).map(h => <th key={h} className="p-4">{h.replace(/_/g, ' ')}</th>)}<th className="p-4 text-center">Actions</th></tr>
+                                                    <tr><th className="p-4 w-10"><input type="checkbox" onChange={handleSelectAll} checked={filteredData.length > 0 && selectedIds.size === filteredData.length} className="rounded" /></th>{getHeaders(activeTab).map(h => <th key={h} className="p-4 cursor-pointer select-none hover:bg-gray-100" onClick={() => handleSort(h)}>{h.replace(/_/g, ' ')}{sortConfig.key === h && (sortConfig.direction === 'asc' ? ' ▲' : ' ▼')}</th>)}<th className="p-4 text-center">Actions</th></tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-gray-100">
                                                     {isFetching && filteredData.length === 0 ? (
