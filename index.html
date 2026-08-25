@@ -204,6 +204,7 @@
         const BarChart = (p) => <Icon d="M12 20V10M18 20V4M6 20v-4" {...p} />;
         const Eye = (p) => <Icon d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z M12 5c-3.866 0-7 3.134-7 7s3.134 7 7 7 7-3.134 7-7-3.134-7-7-7z M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z" {...p} />;
         const RefreshCw = (p) => <Icon d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" {...p} />;
+        const Wallet = (p) => <Icon d="M21 12V7H5a2 2 0 0 1 0-4h14v4M3 5v14a2 2 0 0 0 2 2h16v-5M18 12a2 2 0 0 0 0 4h4v-4h-4z" {...p} />;
 
         function App() {
             // --- STATE & HELPER FUNCTIONS ---
@@ -284,6 +285,7 @@
                 { id: 'others', label: 'Other Charges', icon: AlertCircle },
                 { id: 'enrollments', label: 'Enrollments', icon: BookOpen },
                 { id: 'payments', label: 'Payments', icon: CreditCard },
+                { id: 'loans', label: 'Loan', icon: Wallet },
                 { id: 'discounts', label: 'Discounts', icon: Percent },
                 { id: 'banks', label: 'Banks', icon: Landmark } 
             ];
@@ -387,7 +389,7 @@
             }, [filterSession]);
 
             const filteredData = useMemo(() => {
-                let result = (data[activeTab] || []); 
+                let result = activeTab === 'loans' ? (data.payments || []).filter(p => norm(p.bank) === 'loan') : (data[activeTab] || []);
                 if (tabSearch) {
                     const searchLower = tabSearch.toLowerCase();
                     result = result.filter(item => {
@@ -877,20 +879,23 @@
             // OPTIMIZED DELETE: Update UI Instantly, Delete in Background
             const handleDelete = async (type, id) => {
                 if(!confirm("Are you sure?")) return;
-                
+
+                const dataKey = type === 'loans' ? 'payments' : type;
+                const actionName = type === 'loans' ? 'payment' : type;
+
                 // Optimistic Update: Remove from UI immediately
                 setData(prev => {
                     const updated = { ...prev };
-                    if (type === 'students') {
-                        updated[type] = updated[type].filter(item => item.reg_no !== id);
+                    if (dataKey === 'students') {
+                        updated[dataKey] = updated[dataKey].filter(item => item.reg_no !== id);
                     } else {
-                        updated[type] = updated[type].filter(item => item.id !== id);
+                        updated[dataKey] = updated[dataKey].filter(item => item.id !== id);
                     }
                     return updated;
                 });
-                
+
                 // Perform the backend delete silently
-                await postToApi(`delete_${type}`, { id }, true); // true = skip refresh
+                await postToApi(`delete_${actionName}`, { id }, true); // true = skip refresh
             };
 
             // OPTIMIZED SAVE: Update UI Instantly, Save in Background
@@ -903,36 +908,42 @@
                     newData.tuition_fee = cr * rate; newData.exam_fee = courses * examRate;
                     newData.total_fee = newData.tuition_fee + newData.exam_fee + parseFloat(newData.reg_fee||0) + parseFloat(newData.other_fee||0);
                 }
-                
-                if ((modalType === 'payments' || modalType === 'others' || modalType === 'discounts') && !newData.name) {
+                if (modalType === 'loans') newData.bank = 'Loan';
+
+                if ((modalType === 'payments' || modalType === 'others' || modalType === 'discounts' || modalType === 'loans') && !newData.name) {
                     const s = data.students.find(st => norm(st.reg_no) === norm(newData.reg_no));
                     if(s) newData.name = s.name;
                 }
-                
+
                 const isEdit = !!editingId;
                 const tempId = editingId || Date.now();
                 newData.id = tempId; // Assure it has an ID for React maps immediately
-                
+
+                // Loan entries are stored as regular payments (bank = "Loan") so they
+                // automatically show up on the Payments tab and count toward balances.
+                const dataKey = modalType === 'loans' ? 'payments' : modalType;
+
                 // Optimistic UI Update: Add/Edit instantly
                 setData(prev => {
                     const updated = { ...prev };
                     // Clone the array properly to trigger React render
-                    const list = [...(updated[modalType] || [])];
+                    const list = [...(updated[dataKey] || [])];
                     if (isEdit) {
                         const idx = list.findIndex(x => (modalType === 'students' ? x.reg_no === editingId : x.id === editingId));
                         if (idx > -1) list[idx] = newData;
                     } else {
                         list.unshift(newData); // Add new items to top
                     }
-                    updated[modalType] = list;
+                    updated[dataKey] = list;
                     return updated;
                 });
-                
+
                 setShowModal(false); setFormData({}); setEditingId(null);
-                
+
                 let actionType = modalType.slice(0, -1);
                 if(modalType === 'others') actionType = 'other';
-                
+                if(modalType === 'loans') actionType = 'payment';
+
                 // FIX: Strip the fake Date.now() ID so backend doesn't try to UPDATE instead of INSERT
                 const apiData = { ...newData };
                 if (!isEdit) {
@@ -954,9 +965,9 @@
                 if (item) { 
                     setFormData({...item}); 
                     setEditingId(item.id || item.reg_no); 
-                } else { 
-                    setFormData(type === 'users' ? {role: 'user', permissions: []} : {}); 
-                    setEditingId(null); 
+                } else {
+                    setFormData(type === 'users' ? {role: 'user', permissions: []} : type === 'loans' ? {bank: 'Loan'} : {});
+                    setEditingId(null);
                 }
                 setShowModal(true);
             };
@@ -1151,17 +1162,20 @@
             };
             const deleteSelected = async () => {
                 if (!confirm(`Delete ${selectedIds.size} records?`)) return;
-                
+
+                const dataKey = activeTab === 'loans' ? 'payments' : activeTab;
+
                 // Optimistic UI Update
                 setData(prev => {
                     const updated = { ...prev };
-                    updated[activeTab] = updated[activeTab].filter(item => !selectedIds.has(item.id || item.reg_no));
+                    updated[dataKey] = updated[dataKey].filter(item => !selectedIds.has(item.id || item.reg_no));
                     return updated;
                 });
-                
+
                 for (let id of selectedIds) {
                     let type = activeTab;
-                    if(type === 'others') type = 'other'; 
+                    if(type === 'others') type = 'other';
+                    if(type === 'loans') type = 'payments';
                     await postToApi(`delete_${type.slice(0,-1)}`, { id }, true);
                 }
                 setSelectedIds(new Set());
@@ -1195,6 +1209,7 @@
                     case 'fees': return ['degree', 'batch', 'per_cr_fee', 'per_course_fee', 'reg_fee', 'other_fee'];
                     case 'enrollments': return ['reg_no', 'name', 'semester', 'cr', 'courses'];
                     case 'payments': return ['reg_no', 'name', 'semester', 'amount', 'date', 'bank'];
+                    case 'loans': return ['reg_no', 'name', 'semester', 'amount', 'date'];
                     case 'discounts': return ['reg_no', 'name', 'term', 'discount'];
                     case 'others': return ['reg_no', 'name', 'semester', 'fee_name', 'amount']; 
                     case 'users': return ['username', 'password', 'role', 'permissions']; 
@@ -1514,11 +1529,11 @@
                                             <div className="flex gap-2 flex-wrap md:flex-nowrap">
                                                 {selectedIds.size > 0 && <button onClick={deleteSelected} className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm font-bold hover:bg-red-100 flex items-center gap-2"><Trash2 className="h-4 w-4" /> Delete ({selectedIds.size})</button>}
                                                 {(activeTab === 'enrollments' || activeTab === 'payments' || activeTab === 'others') && <button onClick={deleteBySemester} className="bg-orange-50 border border-orange-200 text-orange-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-orange-100 flex items-center gap-2"><CalendarX className="h-4 w-4" /> Del Sem</button>}
-                                                {user.role === 'admin' && <button onClick={deleteAllInTab} className="bg-white border border-red-200 text-red-600 px-3 py-2 rounded-lg text-sm font-medium hover:bg-red-50 flex items-center gap-2"><XSquare className="h-4 w-4" /> Delete All</button>}
-                                                <div className="h-8 w-px bg-gray-300 mx-1"></div>
-                                                <button onClick={() => downloadSample(activeTab)} className="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2"><FileSpreadsheet className="h-4 w-4" /> Sample</button>
-                                                <label className="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 cursor-pointer flex items-center gap-2"><Download className="h-4 w-4" /><input type="file" onChange={(e) => handleImport(e, activeTab)} className="hidden" accept=".csv" /></label>
-                                                <button onClick={() => handleExport(activeTab)} className="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2"><Upload className="h-4 w-4" /> Export</button>
+                                                {user.role === 'admin' && activeTab !== 'loans' && <button onClick={deleteAllInTab} className="bg-white border border-red-200 text-red-600 px-3 py-2 rounded-lg text-sm font-medium hover:bg-red-50 flex items-center gap-2"><XSquare className="h-4 w-4" /> Delete All</button>}
+                                                {activeTab !== 'loans' && <div className="h-8 w-px bg-gray-300 mx-1"></div>}
+                                                {activeTab !== 'loans' && <button onClick={() => downloadSample(activeTab)} className="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2"><FileSpreadsheet className="h-4 w-4" /> Sample</button>}
+                                                {activeTab !== 'loans' && <label className="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 cursor-pointer flex items-center gap-2"><Download className="h-4 w-4" /><input type="file" onChange={(e) => handleImport(e, activeTab)} className="hidden" accept=".csv" /></label>}
+                                                {activeTab !== 'loans' && <button onClick={() => handleExport(activeTab)} className="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2"><Upload className="h-4 w-4" /> Export</button>}
                                             </div>
                                         </div>
                                         
@@ -1570,6 +1585,7 @@
                                                             {activeTab === 'fees' && <><td className="p-4 font-bold">{item.degree}</td><td className="p-4 text-gray-600">{item.batch}</td><td className="p-4 text-right text-gray-500">{num(item.per_cr_fee)}</td><td className="p-4 text-right font-bold text-green-700">{num(item.per_course_fee)}</td><td className="p-4 text-right text-gray-500">{num(item.reg_fee)}</td><td className="p-4 text-right text-gray-500">{num(item.other_fee)}</td></>}
                                                             {activeTab === 'enrollments' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4"><span className="bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-xs font-bold">{item.semester}</span></td><td className="p-4">{item.cr}</td><td className="p-4">{item.courses}</td></>}
                                                             {activeTab === 'payments' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4"><span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-bold">{item.semester}</span></td><td className="p-4 text-right font-bold">{num(item.amount)}</td><td className="p-4 text-gray-500">{item.date}</td><td className="p-4 text-gray-500">{item.bank}</td></>}
+                                                            {activeTab === 'loans' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4"><span className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs font-bold">{item.semester}</span></td><td className="p-4 text-right font-bold">{num(item.amount)}</td><td className="p-4 text-gray-500">{item.date}</td></>}
                                                             {activeTab === 'others' && <><td className="p-4 font-mono">{item.reg_no || <span className="text-orange-600 font-sans font-bold">ALL (Gap Fee)</span>}</td><td className="p-4">{item.name}</td><td className="p-4 text-gray-600">{item.semester}</td><td className="p-4"><span className="bg-orange-100 text-orange-800 px-2 py-1 rounded text-xs font-bold">{item.fee_name}</span></td><td className="p-4 text-right font-bold">{num(item.amount)}</td></>}
                                                             {activeTab === 'discounts' && <><td className="p-4 font-mono">{item.reg_no}</td><td className="p-4">{item.name}</td><td className="p-4 text-gray-500">{item.term}</td><td className="p-4 text-right font-bold text-purple-600">{item.discount}%</td></>}
                                                             {activeTab === 'users' && <><td className="p-4 font-bold">{item.username}</td><td className="p-4 capitalize">{item.role}</td><td className="p-4 text-xs max-w-xs truncate">{item.role === 'admin' ? 'Full Access' : (Array.isArray(item.permissions) ? item.permissions.join(', ') : item.permissions)}</td></>}
@@ -1719,6 +1735,7 @@
                                         {data.banks.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
                                     </select>
                                     </>}
+                                    {modalType === 'loans' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={handleRegChange} /><input placeholder="Student Name" className="w-full border p-2 rounded bg-gray-50 font-bold text-gray-700" value={formData.name || ''} readOnly /><input required placeholder="Semester (e.g. Spring 2024)" className="w-full border p-2 rounded" value={formData.semester || ''} onChange={e => setFormData({...formData, semester: e.target.value})} /><input required type="number" placeholder="Loan Amount" className="w-full border p-2 rounded font-bold text-lg" value={formData.amount || ''} onChange={e => setFormData({...formData, amount: e.target.value})} /><input type="date" className="w-full border p-2 rounded" value={formData.date || ''} onChange={e => setFormData({...formData, date: e.target.value})} /><div className="bg-purple-50 border border-purple-200 text-purple-800 text-xs p-2 rounded">This is recorded as a payment (source: <strong>Loan</strong>) and will reduce the student's outstanding balance for this semester on the Clearance report and Payments tab.</div></>}
                                     {modalType === 'others' && <><input placeholder="Registration No (leave blank for a Gap Fee applied to everyone not enrolled this term)" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={handleRegChange} /><input placeholder="Student Name" className="w-full border p-2 rounded bg-gray-50 font-bold text-gray-700" value={formData.name || ''} readOnly /><div className="grid grid-cols-2 gap-4"><input required placeholder="Semester" className="w-full border p-2 rounded" value={formData.semester || ''} onChange={e => setFormData({...formData, semester: e.target.value})} /><input required placeholder="Fee Head (e.g. Fine, Gap Fee)" className="w-full border p-2 rounded" value={formData.fee_name || ''} onChange={e => setFormData({...formData, fee_name: e.target.value})} /></div><input required type="number" placeholder="Amount" className="w-full border p-2 rounded font-bold text-lg" value={formData.amount || ''} onChange={e => setFormData({...formData, amount: e.target.value})} />{norm(formData.fee_name).includes('gap') && <div className="bg-orange-50 border border-orange-200 text-orange-800 text-xs p-2 rounded">Fee Head contains "Gap": this will show up on the Clearance report for "{formData.semester || '...'}" even though there's no enrollment record for that term — {formData.reg_no ? <>charged only to <strong>{formData.reg_no}</strong></> : <>charged to <strong>every student</strong> with no enrollment that term</>}.</div>}</>}
                                     {modalType === 'discounts' && <><input required placeholder="Registration No" className="w-full border p-2 rounded" value={formData.reg_no || ''} onChange={handleRegChange} /><input placeholder="Student Name" className="w-full border p-2 rounded bg-gray-50 font-bold text-gray-700" value={formData.name || ''} readOnly /><input required placeholder="Term" className="w-full border p-2 rounded" value={formData.term || ''} onChange={e => setFormData({...formData, term: e.target.value})} /><input required type="number" placeholder="Discount %" className="w-full border p-2 rounded" value={formData.discount || ''} onChange={e => setFormData({...formData, discount: e.target.value})} /></>}
                                     {modalType === 'banks' && <><input required placeholder="Bank Name" className="w-full border p-2 rounded" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} /><input placeholder="Account Number (Optional)" className="w-full border p-2 rounded" value={formData.account_no || ''} onChange={e => setFormData({...formData, account_no: e.target.value})} /></>}
