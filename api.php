@@ -376,24 +376,39 @@ if ($method === 'POST' && isset($input['action'])) {
 
             // --- BULK OPERATIONS ---
             case 'delete_all':
-                $table = $input['table']; 
-                $allowed = ['students', 'fee_structure', 'enrollments', 'payments', 'discounts', 'other_charges', 'users', 'banks'];
+                $table = $input['table'];
                 $map = ['fees' => 'fee_structure', 'others' => 'other_charges'];
                 if(isset($map[$table])) $table = $map[$table];
-                
-                if (in_array($table, $allowed)) {
-                    $pdo->query("TRUNCATE TABLE $table");
+
+                if ($table === 'loans') {
+                    // "loans" isn't a real table — it's payments tagged bank = 'Loan'
+                    $pdo->exec("DELETE FROM payments WHERE bank = 'Loan'");
+                } elseif ($table === 'payments') {
+                    // Never let a Payments-tab bulk delete touch loan-sourced rows
+                    $pdo->exec("DELETE FROM payments WHERE bank IS NULL OR bank <> 'Loan'");
+                } else {
+                    $allowed = ['students', 'fee_structure', 'enrollments', 'discounts', 'other_charges', 'users', 'banks'];
+                    if (in_array($table, $allowed)) {
+                        $pdo->query("TRUNCATE TABLE $table");
+                    }
                 }
                 break;
-            
+
             case 'delete_semester':
                  $table = $input['table'];
                  $term = $input['term'];
-                 $allowed = ['enrollments', 'payments', 'other_charges'];
                  $map = ['others' => 'other_charges'];
                  if(isset($map[$table])) $table = $map[$table];
 
-                 if(in_array($table, $allowed) && $term) {
+                 if (!$term) break;
+
+                 if ($table === 'loans') {
+                     $stmt = $pdo->prepare("DELETE FROM payments WHERE bank = 'Loan' AND semester LIKE ?");
+                     $stmt->execute(["%$term%"]);
+                 } elseif ($table === 'payments') {
+                     $stmt = $pdo->prepare("DELETE FROM payments WHERE (bank IS NULL OR bank <> 'Loan') AND semester LIKE ?");
+                     $stmt->execute(["%$term%"]);
+                 } elseif (in_array($table, ['enrollments', 'other_charges'])) {
                      $stmt = $pdo->prepare("DELETE FROM $table WHERE semester LIKE ?");
                      $stmt->execute(["%$term%"]);
                  }
