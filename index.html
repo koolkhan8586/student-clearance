@@ -281,9 +281,9 @@
             ];
 
             const availableTabs = user ? (
-                user.role === 'admin' 
-                ? [...TABS, { id: 'users', label: 'Users & Access', icon: Shield }] 
-                : TABS.filter(t => user.permissions.includes(t.id))
+                user.role === 'admin'
+                ? [...TABS, { id: 'users', label: 'Users & Access', icon: Shield }]
+                : TABS.filter(t => (user.permissions || []).includes(t.id))
             ) : [];
 
             // OPTIMIZED FETCH DATA
@@ -341,7 +341,18 @@
             useEffect(() => {
                 refreshData();
                 const storedUser = sessionStorage.getItem('feeUser');
-                if(storedUser) setUser(JSON.parse(storedUser));
+                if (storedUser) {
+                    try {
+                        const parsedUser = JSON.parse(storedUser);
+                        if (parsedUser && typeof parsedUser === 'object' && parsedUser.role && Array.isArray(parsedUser.permissions)) {
+                            setUser(parsedUser);
+                        } else {
+                            sessionStorage.removeItem('feeUser');
+                        }
+                    } catch (e) {
+                        sessionStorage.removeItem('feeUser');
+                    }
+                }
             }, []);
 
             useEffect(() => {
@@ -668,8 +679,9 @@
                         setUser(found);
                         sessionStorage.setItem('feeUser', JSON.stringify(found));
                         setLoginData({ username: '', password: '' });
-                        if(found.role === 'admin' || found.permissions.includes('clearance')) setActiveTab('clearance');
-                        else if(found.permissions.length > 0) setActiveTab(found.permissions[0]);
+                        const foundPerms = found.permissions || [];
+                        if(found.role === 'admin' || foundPerms.includes('clearance')) setActiveTab('clearance');
+                        else if(foundPerms.length > 0) setActiveTab(foundPerms[0]);
                         refreshData();
                     } else {
                         alert(json.message || "Invalid Credentials");
@@ -1791,8 +1803,39 @@
                 </div>
             );
         }
+        class ErrorBoundary extends React.Component {
+            constructor(props) {
+                super(props);
+                this.state = { hasError: false };
+            }
+            static getDerivedStateFromError(error) {
+                return { hasError: true };
+            }
+            componentDidCatch(error, info) {
+                console.error("App crashed:", error, info);
+            }
+            handleReset = () => {
+                sessionStorage.clear();
+                window.location.reload();
+            };
+            render() {
+                if (this.state.hasError) {
+                    return (
+                        <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
+                            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-8 text-center">
+                                <h2 className="text-xl font-bold text-gray-800 mb-2">Something went wrong</h2>
+                                <p className="text-gray-500 mb-6 text-sm">The app hit an unexpected error while loading. Resetting your local session usually fixes this.</p>
+                                <button onClick={this.handleReset} className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-bold transition">Reset & Reload</button>
+                            </div>
+                        </div>
+                    );
+                }
+                return this.props.children;
+            }
+        }
+
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+        root.render(<ErrorBoundary><App /></ErrorBoundary>);
     </script>
 </body>
 </html>
