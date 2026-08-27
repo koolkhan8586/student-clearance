@@ -1077,7 +1077,7 @@
                     if (rows.length < 2) return; 
                     const headers = rows[0].split(',').map(h => h.trim().replace(/ /g, '_').toLowerCase());
                     
-                    const existingData = data[type] || [];
+                    const existingData = type === 'loans' ? (data.payments || []).filter(p => norm(p.bank) === 'loan') : (data[type] || []);
                     const newItems = [];
                     const duplicates = [];
                     
@@ -1108,7 +1108,7 @@
                         });
 
                         if(importTerm) {
-                            if(type === 'enrollments' || type === 'payments' || type === 'others') obj.semester = importTerm;
+                            if(type === 'enrollments' || type === 'payments' || type === 'others' || type === 'loans') obj.semester = importTerm;
                             else if(type === 'discounts') obj.term = importTerm;
                         }
                         if (obj.amount) obj.amount = obj.amount.replace(/[^0-9.-]/g, '');
@@ -1127,11 +1127,17 @@
 
                         let isDuplicate = false;
                         if (type === 'payments') {
-                             isDuplicate = existingData.some(existing => 
+                             isDuplicate = existingData.some(existing =>
                                 norm(existing.reg_no) === norm(obj.reg_no) &&
-                                Math.abs(parseFloat(existing.amount || 0) - parseFloat(obj.amount || 0)) < 0.01 && 
-                                existing.date === obj.date && 
+                                Math.abs(parseFloat(existing.amount || 0) - parseFloat(obj.amount || 0)) < 0.01 &&
+                                existing.date === obj.date &&
                                 norm(existing.bank) === norm(obj.bank)
+                            );
+                        } else if (type === 'loans') {
+                             isDuplicate = existingData.some(existing =>
+                                norm(existing.reg_no) === norm(obj.reg_no) &&
+                                Math.abs(parseFloat(existing.amount || 0) - parseFloat(obj.amount || 0)) < 0.01 &&
+                                existing.date === obj.date
                             );
                         } else if (type === 'students') {
                              isDuplicate = existingData.some(existing => norm(existing.reg_no) === norm(obj.reg_no));
@@ -1159,13 +1165,15 @@
                 setUploadStatus({ active: true, current: 0, total: importPreview.newItems.length });
                 let actionType = importPreview.type.slice(0, -1);
                 if(importPreview.type === 'others') actionType = 'other';
+                if(importPreview.type === 'loans') actionType = 'payment';
                 let uploadedCount = 0;
-                
+
                 const chunkSize = 25; // Send 25 requests concurrently
                 for (let i = 0; i < importPreview.newItems.length; i += chunkSize) {
                     const chunk = importPreview.newItems.slice(i, i + chunkSize);
                     await Promise.all(chunk.map(async (item) => {
-                        await postToApi(`save_${actionType}`, { data: item }, true); // Skip refresh for speed
+                        const payload = importPreview.type === 'loans' ? { ...item, bank: 'Loan' } : item;
+                        await postToApi(`save_${actionType}`, { data: payload }, true); // Skip refresh for speed
                     }));
                     uploadedCount += chunk.length;
                     if (uploadedCount > importPreview.newItems.length) uploadedCount = importPreview.newItems.length;
@@ -1578,14 +1586,14 @@
                                                 {(activeTab === 'enrollments' || activeTab === 'payments' || activeTab === 'others' || activeTab === 'loans') && <button onClick={deleteBySemester} className="bg-orange-50 border border-orange-200 text-orange-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-orange-100 flex items-center gap-2"><CalendarX className="h-4 w-4" /> Del Sem</button>}
                                                 {user.role === 'admin' && <button onClick={deleteAllInTab} className="bg-white border border-red-200 text-red-600 px-3 py-2 rounded-lg text-sm font-medium hover:bg-red-50 flex items-center gap-2"><XSquare className="h-4 w-4" /> Delete All</button>}
                                                 <div className="h-8 w-px bg-gray-300 mx-1"></div>
-                                                {activeTab !== 'loans' && <button onClick={() => downloadSample(activeTab)} className="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2"><FileSpreadsheet className="h-4 w-4" /> Sample</button>}
-                                                {activeTab !== 'loans' && <label className="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 cursor-pointer flex items-center gap-2"><Download className="h-4 w-4" /><input type="file" onChange={(e) => handleImport(e, activeTab)} className="hidden" accept=".csv" /></label>}
+                                                <button onClick={() => downloadSample(activeTab)} className="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2"><FileSpreadsheet className="h-4 w-4" /> Sample</button>
+                                                <label className="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 cursor-pointer flex items-center gap-2"><Download className="h-4 w-4" /><input type="file" onChange={(e) => handleImport(e, activeTab)} className="hidden" accept=".csv" /></label>
                                                 <button onClick={() => handleExport(activeTab)} className="bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 flex items-center gap-2"><Upload className="h-4 w-4" /> Export</button>
                                             </div>
                                         </div>
                                         
                                         {/* TERM INPUT FOR IMPORT */}
-                                        {(activeTab === 'enrollments' || activeTab === 'payments' || activeTab === 'others' || activeTab === 'discounts') && (
+                                        {(activeTab === 'enrollments' || activeTab === 'payments' || activeTab === 'others' || activeTab === 'discounts' || activeTab === 'loans') && (
                                             <div className="bg-blue-50 border-l-4 border-blue-400 p-2 mb-4 text-sm flex items-center gap-2 no-print">
                                                 <span className="font-bold">Import Setting:</span>
                                                 <input type="text" placeholder="Default Semester/Term (e.g. Fall 2024)" value={importTerm} onChange={(e) => setImportTerm(e.target.value)} className="border p-1 rounded px-2 w-full md:w-64" />
