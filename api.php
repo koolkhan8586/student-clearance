@@ -613,19 +613,36 @@ if ($method === 'POST' && isset($input['action'])) {
                     throw new Exception("Email is not configured yet. Ask an admin to set it up under Settings.");
                 }
                 $fromName = $settings['smtp_from_name'] ?: 'Fee Manager';
+                $fromEmail = $settings['smtp_from_email'] ?: $settings['smtp_username'];
 
-                if ($haveGoogle) {
-                    // Sends via the Gmail API over HTTPS, authenticated as a Workspace
-                    // service account — not affected by a host blocking raw SMTP ports.
-                    $accessToken = getGoogleAccessToken($settings['google_service_account_json'], $settings['google_delegated_user']);
-                    sendGmailApiEmail($accessToken, $settings['google_delegated_user'], $fromName, $recipient, $subject, $message, $attachment);
-                } elseif ($haveBrevo) {
-                    // Sends over HTTPS — not affected by a host blocking raw SMTP ports,
-                    // which is the case for most of what this app has hit so far.
-                    $fromEmail = $settings['smtp_from_email'] ?: $settings['smtp_username'];
-                    sendBrevoEmail($settings['brevo_api_key'], $fromEmail, $fromName, $recipient, $subject, $message, $attachment);
-                } elseif ($haveSmtp) {
-                    $fromEmail = $settings['smtp_from_email'] ?: $settings['smtp_username'];
+                // Try every configured method in priority order and stop at the first
+                // success — a method being configured doesn't guarantee it currently
+                // works (e.g. domain-wide delegation not finished yet), so a
+                // higher-priority method failing should still fall through to a
+                // lower one that might.
+                $sent = false;
+                $errors = [];
+
+                if (!$sent && $haveGoogle) {
+                    try {
+                        $accessToken = getGoogleAccessToken($settings['google_service_account_json'], $settings['google_delegated_user']);
+                        sendGmailApiEmail($accessToken, $settings['google_delegated_user'], $fromName, $recipient, $subject, $message, $attachment);
+                        $sent = true;
+                    } catch (\Throwable $e) {
+                        $errors[] = "Gmail API: " . $e->getMessage();
+                    }
+                }
+
+                if (!$sent && $haveBrevo) {
+                    try {
+                        sendBrevoEmail($settings['brevo_api_key'], $fromEmail, $fromName, $recipient, $subject, $message, $attachment);
+                        $sent = true;
+                    } catch (\Throwable $e) {
+                        $errors[] = "Brevo: " . $e->getMessage();
+                    }
+                }
+
+                if (!$sent && $haveSmtp) {
                     try {
                         sendSmtpMail(
                             $settings['smtp_host'], $settings['smtp_port'] ?: 587,
@@ -633,16 +650,22 @@ if ($method === 'POST' && isset($input['action'])) {
                             $fromEmail, $fromName,
                             $recipient, $subject, $message, $attachment
                         );
+                        $sent = true;
                     } catch (\Throwable $smtpError) {
                         // Many hosts block raw outbound SMTP sockets for customer scripts but
                         // still relay PHP's mail() through their own local mail transfer agent —
                         // worth a shot before giving up.
                         try {
                             sendPhpMail($fromEmail, $fromName, $recipient, $subject, $message, $attachment);
+                            $sent = true;
                         } catch (\Throwable $mailError) {
-                            throw new Exception("SMTP failed (" . $smtpError->getMessage() . "). " . $mailError->getMessage());
+                            $errors[] = "SMTP: " . $smtpError->getMessage() . " | mail(): " . $mailError->getMessage();
                         }
                     }
+                }
+
+                if (!$sent) {
+                    throw new Exception(implode(' — ', $errors));
                 }
             } elseif ($channel === 'whatsapp') {
                 if (empty($settings['waha_url'])) {
