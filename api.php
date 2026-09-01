@@ -152,6 +152,53 @@ function sendPhpMail($fromEmail, $fromName, $toEmail, $subject, $body, $attachme
     return true;
 }
 
+// --- Shared HTTP POST helper (curl if available, stream-context fallback otherwise) ---
+// Returns [httpCode, responseBody]. Throws on a connection-level failure (no response
+// at all) — an HTTP error status is returned normally so callers can read the body.
+function httpPostJson($url, $headers, $payloadJson, $serviceName) {
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => $payloadJson,
+            CURLOPT_HTTPHEADER     => $headers,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 20,
+        ]);
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlErr = curl_error($ch);
+        curl_close($ch);
+
+        if ($curlErr) throw new Exception("$serviceName connection failed: $curlErr");
+        return [$httpCode, $response];
+    }
+
+    // Fall back to a stream-context HTTP request if the curl extension isn't available
+    if (!ini_get('allow_url_fopen')) {
+        throw new Exception("Neither the PHP curl extension nor allow_url_fopen is enabled on this server. Ask your host to enable one of them.");
+    }
+    $context = stream_context_create([
+        'http' => [
+            'method'        => 'POST',
+            'header'        => implode("\r\n", $headers),
+            'content'       => $payloadJson,
+            'timeout'       => 20,
+            'ignore_errors' => true,
+        ],
+    ]);
+    $response = @file_get_contents($url, false, $context);
+    if ($response === false) {
+        $err = error_get_last();
+        throw new Exception("$serviceName connection failed: " . ($err['message'] ?? 'unknown error'));
+    }
+    $httpCode = 200;
+    if (isset($http_response_header[0]) && preg_match('/\s(\d{3})\s/', $http_response_header[0], $m)) {
+        $httpCode = (int) $m[1];
+    }
+    return [$httpCode, $response];
+}
+
 // --- Minimal WAHA (WhatsApp HTTP API) client ---
 function sendWahaText($baseUrl, $session, $apiKey, $chatId, $text) {
     $url = rtrim($baseUrl, '/') . '/api/sendText';
@@ -164,48 +211,35 @@ function sendWahaText($baseUrl, $session, $apiKey, $chatId, $text) {
     $headers = ['Content-Type: application/json'];
     if (!empty($apiKey)) $headers[] = 'X-Api-Key: ' . $apiKey;
 
-    if (function_exists('curl_init')) {
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => $payload,
-            CURLOPT_HTTPHEADER     => $headers,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 20,
-        ]);
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curlErr = curl_error($ch);
-        curl_close($ch);
-
-        if ($curlErr) throw new Exception("WAHA connection failed: $curlErr");
-        if ($httpCode < 200 || $httpCode >= 300) throw new Exception("WAHA error ($httpCode): $response");
-        return true;
-    }
-
-    // Fall back to a stream-context HTTP request if the curl extension isn't available
-    if (!ini_get('allow_url_fopen')) {
-        throw new Exception("Neither the PHP curl extension nor allow_url_fopen is enabled on this server. Ask your host to enable one of them.");
-    }
-    $context = stream_context_create([
-        'http' => [
-            'method'        => 'POST',
-            'header'        => implode("\r\n", $headers),
-            'content'       => $payload,
-            'timeout'       => 20,
-            'ignore_errors' => true,
-        ],
-    ]);
-    $response = @file_get_contents($url, false, $context);
-    if ($response === false) {
-        $err = error_get_last();
-        throw new Exception("WAHA connection failed: " . ($err['message'] ?? 'unknown error'));
-    }
-    $httpCode = 200;
-    if (isset($http_response_header[0]) && preg_match('/\s(\d{3})\s/', $http_response_header[0], $m)) {
-        $httpCode = (int) $m[1];
-    }
+    list($httpCode, $response) = httpPostJson($url, $headers, $payload, 'WAHA');
     if ($httpCode < 200 || $httpCode >= 300) throw new Exception("WAHA error ($httpCode): $response");
+    return true;
+}
+
+// --- Brevo (transactional email API) client — sends over HTTPS, so it isn't
+// affected by a host blocking raw outbound SMTP ports. ---
+function sendBrevoEmail($apiKey, $fromEmail, $fromName, $toEmail, $subject, $body, $attachment = null) {
+    $payload = [
+        'sender'      => ['name' => $fromName, 'email' => $fromEmail],
+        'to'          => [['email' => $toEmail]],
+        'subject'     => $subject,
+        'textContent' => $body,
+    ];
+    if ($attachment) {
+        $payload['attachment'] = [[
+            'content' => base64_encode($attachment['content']),
+            'name'    => $attachment['filename'],
+        ]];
+    }
+
+    $headers = [
+        'Content-Type: application/json',
+        'Accept: application/json',
+        'api-key: ' . $apiKey,
+    ];
+
+    list($httpCode, $response) = httpPostJson('https://api.brevo.com/v3/smtp/email', $headers, json_encode($payload), 'Brevo');
+    if ($httpCode < 200 || $httpCode >= 300) throw new Exception("Brevo error ($httpCode): $response");
     return true;
 }
 
@@ -266,6 +300,7 @@ try {
         ensureColumn($pdo, 'students', 'mobile', 'VARCHAR(50) DEFAULT NULL');
         ensureColumn($pdo, 'students', 'email', 'VARCHAR(100) DEFAULT NULL');
         ensureColumn($pdo, 'students', 'total_package', 'DECIMAL(10,2) DEFAULT NULL');
+        ensureColumn($pdo, 'settings', 'brevo_api_key', 'VARCHAR(255) DEFAULT NULL');
     } catch (\Exception $e) {}
 
     // Seed Admin if missing
@@ -399,7 +434,8 @@ if ($method === 'POST' && isset($input['action'])) {
         if ($row) {
             $row['has_waha_api_key'] = !empty($row['waha_api_key']);
             $row['has_smtp_password'] = !empty($row['smtp_password']);
-            unset($row['waha_api_key'], $row['smtp_password']);
+            $row['has_brevo_api_key'] = !empty($row['brevo_api_key']);
+            unset($row['waha_api_key'], $row['smtp_password'], $row['brevo_api_key']);
         }
         echo json_encode(['status' => 'success', 'settings' => $row]);
         exit;
@@ -411,16 +447,17 @@ if ($method === 'POST' && isset($input['action'])) {
             $current = $pdo->query("SELECT * FROM settings WHERE id = 1")->fetch();
             $wahaApiKey = !empty($data['waha_api_key']) ? $data['waha_api_key'] : $current['waha_api_key'];
             $smtpPassword = !empty($data['smtp_password']) ? $data['smtp_password'] : $current['smtp_password'];
+            $brevoApiKey = !empty($data['brevo_api_key']) ? $data['brevo_api_key'] : $current['brevo_api_key'];
 
             $stmt = $pdo->prepare("UPDATE settings SET
                 waha_url = ?, waha_session = ?, waha_api_key = ?,
                 smtp_host = ?, smtp_port = ?, smtp_username = ?, smtp_password = ?,
-                smtp_from_email = ?, smtp_from_name = ?
+                smtp_from_email = ?, smtp_from_name = ?, brevo_api_key = ?
                 WHERE id = 1");
             $stmt->execute([
                 $data['waha_url'] ?? '', $data['waha_session'] ?? '', $wahaApiKey,
                 $data['smtp_host'] ?? '', $data['smtp_port'] ?? null, $data['smtp_username'] ?? '', $smtpPassword,
-                $data['smtp_from_email'] ?? '', $data['smtp_from_name'] ?? '',
+                $data['smtp_from_email'] ?? '', $data['smtp_from_name'] ?? '', $brevoApiKey,
             ]);
             echo json_encode(['status' => 'success']);
         } catch (Exception $e) {
@@ -458,26 +495,35 @@ if ($method === 'POST' && isset($input['action'])) {
             $settings = $pdo->query("SELECT * FROM settings WHERE id = 1")->fetch();
 
             if ($channel === 'email') {
-                if (empty($settings['smtp_host']) || empty($settings['smtp_username']) || empty($settings['smtp_password'])) {
+                $haveBrevo = !empty($settings['brevo_api_key']);
+                $haveSmtp = !empty($settings['smtp_host']) && !empty($settings['smtp_username']) && !empty($settings['smtp_password']);
+                if (!$haveBrevo && !$haveSmtp) {
                     throw new Exception("Email is not configured yet. Ask an admin to set it up under Settings.");
                 }
                 $fromEmail = $settings['smtp_from_email'] ?: $settings['smtp_username'];
                 $fromName = $settings['smtp_from_name'] ?: 'Fee Manager';
-                try {
-                    sendSmtpMail(
-                        $settings['smtp_host'], $settings['smtp_port'] ?: 587,
-                        $settings['smtp_username'], $settings['smtp_password'],
-                        $fromEmail, $fromName,
-                        $recipient, $subject, $message, $attachment
-                    );
-                } catch (\Throwable $smtpError) {
-                    // Many hosts block raw outbound SMTP sockets for customer scripts but
-                    // still relay PHP's mail() through their own local mail transfer agent —
-                    // worth a shot before giving up.
+
+                if ($haveBrevo) {
+                    // Sends over HTTPS — not affected by a host blocking raw SMTP ports,
+                    // which is the case for most of what this app has hit so far.
+                    sendBrevoEmail($settings['brevo_api_key'], $fromEmail, $fromName, $recipient, $subject, $message, $attachment);
+                } elseif ($haveSmtp) {
                     try {
-                        sendPhpMail($fromEmail, $fromName, $recipient, $subject, $message, $attachment);
-                    } catch (\Throwable $mailError) {
-                        throw new Exception("SMTP failed (" . $smtpError->getMessage() . "). " . $mailError->getMessage());
+                        sendSmtpMail(
+                            $settings['smtp_host'], $settings['smtp_port'] ?: 587,
+                            $settings['smtp_username'], $settings['smtp_password'],
+                            $fromEmail, $fromName,
+                            $recipient, $subject, $message, $attachment
+                        );
+                    } catch (\Throwable $smtpError) {
+                        // Many hosts block raw outbound SMTP sockets for customer scripts but
+                        // still relay PHP's mail() through their own local mail transfer agent —
+                        // worth a shot before giving up.
+                        try {
+                            sendPhpMail($fromEmail, $fromName, $recipient, $subject, $message, $attachment);
+                        } catch (\Throwable $mailError) {
+                            throw new Exception("SMTP failed (" . $smtpError->getMessage() . "). " . $mailError->getMessage());
+                        }
                     }
                 }
             } elseif ($channel === 'whatsapp') {
