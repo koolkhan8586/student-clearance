@@ -698,7 +698,7 @@
                         body: JSON.stringify({ action: 'get_settings' })
                     });
                     const json = await res.json();
-                    if (json.status === 'success') setSettingsForm({ ...(json.settings || {}), waha_api_key: '', smtp_password: '', brevo_api_key: '' });
+                    if (json.status === 'success') setSettingsForm({ ...(json.settings || {}), waha_api_key: '', smtp_password: '', brevo_api_key: '', google_service_account_json: '' });
                     else alert(json.message || "Failed to load settings");
                 } catch(e) { alert("Network Error"); }
             };
@@ -1895,8 +1895,21 @@
                                             </div>
 
                                             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 space-y-4">
-                                                <h3 className="font-bold text-gray-700">Email — Brevo API (Recommended)</h3>
-                                                <p className="text-xs text-gray-500">Sends over HTTPS instead of raw SMTP, so it isn't affected by a host blocking outbound mail ports. Used automatically whenever an API key is set here, in preference to the SMTP settings below. Uses the From Email/Name entered below. Get a free API key at brevo.com.</p>
+                                                <h3 className="font-bold text-gray-700">Email — Gmail API (Google Workspace)</h3>
+                                                <p className="text-xs text-gray-500">Sends via the Gmail API over HTTPS using a Google Workspace service account — not affected by a host blocking outbound SMTP ports. Used automatically whenever both fields below are set, ahead of Brevo/SMTP. Requires one-time setup in Google Cloud + your Workspace Admin console (domain-wide delegation) — ask if you need the exact steps.</p>
+                                                <div>
+                                                    <label className="block text-sm font-bold text-gray-700 mb-1">Send As (Workspace email)</label>
+                                                    <input placeholder="accounts@uolcc.edu.pk" className="w-full border p-2 rounded" value={settingsForm.google_delegated_user || ''} onChange={e => setSettingsForm({...settingsForm, google_delegated_user: e.target.value})} />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-bold text-gray-700 mb-1">Service Account JSON Key {settingsForm.has_google_service_account && <span className="text-green-600 font-normal">(already set — leave blank to keep it)</span>}</label>
+                                                    <textarea rows={4} placeholder={settingsForm.has_google_service_account ? 'Already saved — paste a new key only to replace it' : 'Paste the full contents of the downloaded service-account-key.json file here'} className="w-full border p-2 rounded font-mono text-xs" value={settingsForm.google_service_account_json || ''} onChange={e => setSettingsForm({...settingsForm, google_service_account_json: e.target.value})}></textarea>
+                                                </div>
+                                            </div>
+
+                                            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 space-y-4">
+                                                <h3 className="font-bold text-gray-700">Email — Brevo API</h3>
+                                                <p className="text-xs text-gray-500">Sends over HTTPS instead of raw SMTP. Used automatically if Gmail API above isn't configured. Uses the From Email/Name entered below. Get a free API key at brevo.com.</p>
                                                 <div>
                                                     <label className="block text-sm font-bold text-gray-700 mb-1">Brevo API Key {settingsForm.has_brevo_api_key && <span className="text-green-600 font-normal">(already set — leave blank to keep it)</span>}</label>
                                                     <input type="password" placeholder={settingsForm.has_brevo_api_key ? '••••••••' : ''} className="w-full border p-2 rounded" value={settingsForm.brevo_api_key || ''} onChange={e => setSettingsForm({...settingsForm, brevo_api_key: e.target.value})} />
@@ -1904,7 +1917,7 @@
                                             </div>
 
                                             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 space-y-4">
-                                                <h3 className="font-bold text-gray-700">Email — SMTP (fallback, used only if no Brevo key is set above)</h3>
+                                                <h3 className="font-bold text-gray-700">Email — SMTP (fallback, used only if neither Gmail API nor Brevo is set above)</h3>
                                                 <div className="grid grid-cols-2 gap-4">
                                                     <div>
                                                         <label className="block text-sm font-bold text-gray-700 mb-1">SMTP Host</label>

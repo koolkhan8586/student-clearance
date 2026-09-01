@@ -243,6 +243,107 @@ function sendBrevoEmail($apiKey, $fromEmail, $fromName, $toEmail, $subject, $bod
     return true;
 }
 
+// --- Gmail API (Google Workspace) client, authenticated as a service account
+// with domain-wide delegation. Sends over HTTPS via Google's REST API rather
+// than raw SMTP, so it isn't affected by a host blocking outbound SMTP ports. ---
+function base64UrlEncode($data) {
+    return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
+}
+
+function getGoogleAccessToken($serviceAccountJson, $delegatedUser) {
+    $creds = json_decode($serviceAccountJson, true);
+    if (!$creds || empty($creds['client_email']) || empty($creds['private_key'])) {
+        throw new Exception("Invalid Google service account JSON — check it was pasted in full and correctly under Settings.");
+    }
+
+    $now = time();
+    $header = ['alg' => 'RS256', 'typ' => 'JWT'];
+    $claims = [
+        'iss'   => $creds['client_email'],
+        'scope' => 'https://www.googleapis.com/auth/gmail.send',
+        'aud'   => 'https://oauth2.googleapis.com/token',
+        'exp'   => $now + 3600,
+        'iat'   => $now,
+        'sub'   => $delegatedUser,
+    ];
+
+    $signingInput = base64UrlEncode(json_encode($header)) . '.' . base64UrlEncode(json_encode($claims));
+    $signature = '';
+    $signed = openssl_sign($signingInput, $signature, $creds['private_key'], 'sha256WithRSAEncryption');
+    if (!$signed) throw new Exception("Failed to sign the Google auth request — the service account private key looks invalid.");
+    $jwt = $signingInput . '.' . base64UrlEncode($signature);
+
+    $postFields = http_build_query([
+        'grant_type' => 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+        'assertion'  => $jwt,
+    ]);
+
+    if (function_exists('curl_init')) {
+        $ch = curl_init('https://oauth2.googleapis.com/token');
+        curl_setopt_array($ch, [
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => $postFields,
+            CURLOPT_HTTPHEADER     => ['Content-Type: application/x-www-form-urlencoded'],
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 20,
+        ]);
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlErr = curl_error($ch);
+        curl_close($ch);
+        if ($curlErr) throw new Exception("Google auth connection failed: $curlErr");
+    } else {
+        if (!ini_get('allow_url_fopen')) {
+            throw new Exception("Neither the PHP curl extension nor allow_url_fopen is enabled on this server.");
+        }
+        $context = stream_context_create(['http' => [
+            'method'        => 'POST',
+            'header'        => "Content-Type: application/x-www-form-urlencoded\r\n",
+            'content'       => $postFields,
+            'timeout'       => 20,
+            'ignore_errors' => true,
+        ]]);
+        $response = @file_get_contents('https://oauth2.googleapis.com/token', false, $context);
+        if ($response === false) {
+            $err = error_get_last();
+            throw new Exception("Google auth connection failed: " . ($err['message'] ?? 'unknown error'));
+        }
+        $httpCode = 200;
+        if (isset($http_response_header[0]) && preg_match('/\s(\d{3})\s/', $http_response_header[0], $m)) {
+            $httpCode = (int) $m[1];
+        }
+    }
+
+    $json = json_decode($response, true);
+    if ($httpCode < 200 || $httpCode >= 300 || empty($json['access_token'])) {
+        throw new Exception("Google auth failed ($httpCode): $response");
+    }
+    return $json['access_token'];
+}
+
+function sendGmailApiEmail($accessToken, $fromEmail, $fromName, $toEmail, $subject, $body, $attachment = null) {
+    list($boundary, $mimeBody) = buildMimeBody($body, $attachment);
+
+    $headers = "From: =?UTF-8?B?" . base64_encode($fromName) . "?= <$fromEmail>\r\n";
+    $headers .= "To: <$toEmail>\r\n";
+    $headers .= "Subject: =?UTF-8?B?" . base64_encode($subject) . "?=\r\n";
+    $headers .= "MIME-Version: 1.0\r\n";
+    $headers .= $boundary
+        ? "Content-Type: multipart/mixed; boundary=\"$boundary\"\r\n"
+        : "Content-Type: text/plain; charset=UTF-8\r\n";
+
+    $rawMessage = base64UrlEncode($headers . "\r\n" . $mimeBody);
+
+    list($httpCode, $response) = httpPostJson(
+        'https://gmail.googleapis.com/gmail/v1/users/me/messages/send',
+        ['Content-Type: application/json', 'Authorization: Bearer ' . $accessToken],
+        json_encode(['raw' => $rawMessage]),
+        'Gmail API'
+    );
+    if ($httpCode < 200 || $httpCode >= 300) throw new Exception("Gmail API error ($httpCode): $response");
+    return true;
+}
+
 function normalizeWahaChatId($number) {
     $digits = preg_replace('/\D/', '', $number);
     return $digits . '@c.us';
@@ -301,6 +402,8 @@ try {
         ensureColumn($pdo, 'students', 'email', 'VARCHAR(100) DEFAULT NULL');
         ensureColumn($pdo, 'students', 'total_package', 'DECIMAL(10,2) DEFAULT NULL');
         ensureColumn($pdo, 'settings', 'brevo_api_key', 'VARCHAR(255) DEFAULT NULL');
+        ensureColumn($pdo, 'settings', 'google_service_account_json', 'TEXT DEFAULT NULL');
+        ensureColumn($pdo, 'settings', 'google_delegated_user', 'VARCHAR(255) DEFAULT NULL');
     } catch (\Exception $e) {}
 
     // Seed Admin if missing
@@ -435,7 +538,8 @@ if ($method === 'POST' && isset($input['action'])) {
             $row['has_waha_api_key'] = !empty($row['waha_api_key']);
             $row['has_smtp_password'] = !empty($row['smtp_password']);
             $row['has_brevo_api_key'] = !empty($row['brevo_api_key']);
-            unset($row['waha_api_key'], $row['smtp_password'], $row['brevo_api_key']);
+            $row['has_google_service_account'] = !empty($row['google_service_account_json']);
+            unset($row['waha_api_key'], $row['smtp_password'], $row['brevo_api_key'], $row['google_service_account_json']);
         }
         echo json_encode(['status' => 'success', 'settings' => $row]);
         exit;
@@ -448,16 +552,19 @@ if ($method === 'POST' && isset($input['action'])) {
             $wahaApiKey = !empty($data['waha_api_key']) ? $data['waha_api_key'] : $current['waha_api_key'];
             $smtpPassword = !empty($data['smtp_password']) ? $data['smtp_password'] : $current['smtp_password'];
             $brevoApiKey = !empty($data['brevo_api_key']) ? $data['brevo_api_key'] : $current['brevo_api_key'];
+            $googleServiceAccountJson = !empty($data['google_service_account_json']) ? $data['google_service_account_json'] : $current['google_service_account_json'];
 
             $stmt = $pdo->prepare("UPDATE settings SET
                 waha_url = ?, waha_session = ?, waha_api_key = ?,
                 smtp_host = ?, smtp_port = ?, smtp_username = ?, smtp_password = ?,
-                smtp_from_email = ?, smtp_from_name = ?, brevo_api_key = ?
+                smtp_from_email = ?, smtp_from_name = ?, brevo_api_key = ?,
+                google_service_account_json = ?, google_delegated_user = ?
                 WHERE id = 1");
             $stmt->execute([
                 $data['waha_url'] ?? '', $data['waha_session'] ?? '', $wahaApiKey,
                 $data['smtp_host'] ?? '', $data['smtp_port'] ?? null, $data['smtp_username'] ?? '', $smtpPassword,
                 $data['smtp_from_email'] ?? '', $data['smtp_from_name'] ?? '', $brevoApiKey,
+                $googleServiceAccountJson, $data['google_delegated_user'] ?? '',
             ]);
             echo json_encode(['status' => 'success']);
         } catch (Exception $e) {
@@ -495,19 +602,26 @@ if ($method === 'POST' && isset($input['action'])) {
             $settings = $pdo->query("SELECT * FROM settings WHERE id = 1")->fetch();
 
             if ($channel === 'email') {
+                $haveGoogle = !empty($settings['google_service_account_json']) && !empty($settings['google_delegated_user']);
                 $haveBrevo = !empty($settings['brevo_api_key']);
                 $haveSmtp = !empty($settings['smtp_host']) && !empty($settings['smtp_username']) && !empty($settings['smtp_password']);
-                if (!$haveBrevo && !$haveSmtp) {
+                if (!$haveGoogle && !$haveBrevo && !$haveSmtp) {
                     throw new Exception("Email is not configured yet. Ask an admin to set it up under Settings.");
                 }
-                $fromEmail = $settings['smtp_from_email'] ?: $settings['smtp_username'];
                 $fromName = $settings['smtp_from_name'] ?: 'Fee Manager';
 
-                if ($haveBrevo) {
+                if ($haveGoogle) {
+                    // Sends via the Gmail API over HTTPS, authenticated as a Workspace
+                    // service account — not affected by a host blocking raw SMTP ports.
+                    $accessToken = getGoogleAccessToken($settings['google_service_account_json'], $settings['google_delegated_user']);
+                    sendGmailApiEmail($accessToken, $settings['google_delegated_user'], $fromName, $recipient, $subject, $message, $attachment);
+                } elseif ($haveBrevo) {
                     // Sends over HTTPS — not affected by a host blocking raw SMTP ports,
                     // which is the case for most of what this app has hit so far.
+                    $fromEmail = $settings['smtp_from_email'] ?: $settings['smtp_username'];
                     sendBrevoEmail($settings['brevo_api_key'], $fromEmail, $fromName, $recipient, $subject, $message, $attachment);
                 } elseif ($haveSmtp) {
+                    $fromEmail = $settings['smtp_from_email'] ?: $settings['smtp_username'];
                     try {
                         sendSmtpMail(
                             $settings['smtp_host'], $settings['smtp_port'] ?: 587,
