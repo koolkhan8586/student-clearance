@@ -35,7 +35,15 @@ function requireAdmin() {
 function sendSmtpMail($host, $port, $username, $password, $fromEmail, $fromName, $toEmail, $subject, $body) {
     $secure = ($port == 465) ? 'ssl://' : '';
     $sock = @fsockopen($secure . $host, $port, $errno, $errstr, 15);
-    if (!$sock) throw new Exception("Could not connect to SMTP server: $errstr");
+    if (!$sock) {
+        throw new Exception(
+            "Could not connect to $host:$port ($errstr). This server could not reach the SMTP host at all — " .
+            "usually the hosting provider blocks outbound mail ports (25/465/587), the host/port in Settings is " .
+            "wrong, or the mail server only accepts connections from specific IPs. Check the host/port first, " .
+            "then ask your hosting provider whether outbound SMTP is allowed and try the other common port " .
+            "(465 for implicit TLS, 587 for STARTTLS)."
+        );
+    }
     stream_set_timeout($sock, 15);
 
     $expect = function ($sock, $codes) {
