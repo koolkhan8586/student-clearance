@@ -105,6 +105,23 @@ function sendSmtpMail($host, $port, $username, $password, $fromEmail, $fromName,
     return true;
 }
 
+// --- Fallback: PHP's built-in mail() function, used when a raw SMTP socket
+// connection can't be established (many hosts block outbound SMTP ports for
+// customer scripts but still relay mail() through their own local MTA). ---
+function sendPhpMail($fromEmail, $fromName, $toEmail, $subject, $body) {
+    $headers = "From: =?UTF-8?B?" . base64_encode($fromName) . "?= <$fromEmail>\r\n";
+    $headers .= "MIME-Version: 1.0\r\n";
+    $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
+    $encodedSubject = "=?UTF-8?B?" . base64_encode($subject) . "?=";
+
+    $ok = @mail($toEmail, $encodedSubject, $body, $headers, "-f$fromEmail");
+    if (!$ok) {
+        $err = error_get_last();
+        throw new Exception("PHP mail() also failed" . (!empty($err['message']) ? ": " . $err['message'] : " (no further detail from the server)"));
+    }
+    return true;
+}
+
 // --- Minimal WAHA (WhatsApp HTTP API) client ---
 function sendWahaText($baseUrl, $session, $apiKey, $chatId, $text) {
     $url = rtrim($baseUrl, '/') . '/api/sendText';
@@ -398,12 +415,25 @@ if ($method === 'POST' && isset($input['action'])) {
                 if (empty($settings['smtp_host']) || empty($settings['smtp_username']) || empty($settings['smtp_password'])) {
                     throw new Exception("Email is not configured yet. Ask an admin to set it up under Settings.");
                 }
-                sendSmtpMail(
-                    $settings['smtp_host'], $settings['smtp_port'] ?: 587,
-                    $settings['smtp_username'], $settings['smtp_password'],
-                    $settings['smtp_from_email'] ?: $settings['smtp_username'], $settings['smtp_from_name'] ?: 'Fee Manager',
-                    $recipient, $subject, $message
-                );
+                $fromEmail = $settings['smtp_from_email'] ?: $settings['smtp_username'];
+                $fromName = $settings['smtp_from_name'] ?: 'Fee Manager';
+                try {
+                    sendSmtpMail(
+                        $settings['smtp_host'], $settings['smtp_port'] ?: 587,
+                        $settings['smtp_username'], $settings['smtp_password'],
+                        $fromEmail, $fromName,
+                        $recipient, $subject, $message
+                    );
+                } catch (\Throwable $smtpError) {
+                    // Many hosts block raw outbound SMTP sockets for customer scripts but
+                    // still relay PHP's mail() through their own local mail transfer agent —
+                    // worth a shot before giving up.
+                    try {
+                        sendPhpMail($fromEmail, $fromName, $recipient, $subject, $message);
+                    } catch (\Throwable $mailError) {
+                        throw new Exception("SMTP failed (" . $smtpError->getMessage() . "). " . $mailError->getMessage());
+                    }
+                }
             } elseif ($channel === 'whatsapp') {
                 if (empty($settings['waha_url'])) {
                     throw new Exception("WhatsApp is not configured yet. Ask an admin to set it up under Settings.");
