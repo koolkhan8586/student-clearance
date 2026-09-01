@@ -211,6 +211,8 @@
         const Wallet = (p) => <Icon d="M21 12V7H5a2 2 0 0 1 0-4h14v4M3 5v14a2 2 0 0 0 2 2h16v-5M18 12a2 2 0 0 0 0 4h4v-4h-4z" {...p} />;
         const SettingsIcon = (p) => <Icon d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" {...p} />;
 
+        const DEFAULT_MESSAGE_TEMPLATE = "Dear {name},\n\nYour Fee Clearance Report is ready.\n\nRegistration No: {reg_no}\nDegree Program: {degree}\nBatch/Session: {batch}\n\nTotal Scholarship: {scholarship}\nNet Payable: {net_payable}\n\nRegards,\n{from_name}";
+
         function App() {
             // --- STATE & HELPER FUNCTIONS ---
             const norm = (str) => str ? str.toString().toLowerCase().replace(/[^a-z0-9]/g, '') : '';
@@ -746,25 +748,18 @@
                 if (!recipient) return alert(`Enter ${channel === 'email' ? 'an email address' : 'a mobile number'} to send to.`);
 
                 const s = clearanceResult.student;
-                const lines = [
-                    `Fee Clearance Report`,
-                    `Registration No: ${s.reg_no}`,
-                    `Student Name: ${s.name}`,
-                    `Degree Program: ${s.degree}`,
-                    `Batch / Session: ${s.batch}`,
-                    ``,
-                    ...clearanceResult.rows.map(r => `${r.semester}: Total ${num(r.total)}, Paid ${num(r.totalPaid)}, Balance ${num(r.balance)}`),
-                    ``,
-                    `Total Scholarship: ${num(clearanceResult.summary.fa)}`,
-                    `Net Payable: ${num(clearanceResult.summary.balance)}`,
-                ];
-                const message = lines.join('\n');
-
+                // The message body is rendered server-side from the admin-editable
+                // template in Settings — we just supply the values it can reference.
                 const payload = {
                     channel,
                     recipient,
                     subject: `Fee Clearance Report - ${s.reg_no}`,
-                    message,
+                    student_name: s.name,
+                    reg_no: s.reg_no,
+                    degree: s.degree,
+                    batch: s.batch,
+                    scholarship: num(clearanceResult.summary.fa),
+                    net_payable: num(clearanceResult.summary.balance),
                 };
 
                 setSendBusy(true);
@@ -1878,6 +1873,12 @@
                                         <p className="text-gray-500">Loading...</p>
                                     ) : (
                                         <form onSubmit={saveSettings} className="space-y-6">
+                                            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 space-y-4">
+                                                <h3 className="font-bold text-gray-700">Message Template</h3>
+                                                <p className="text-xs text-gray-500">Used for both Email and WhatsApp sends. Placeholders: {'{name}'}, {'{reg_no}'}, {'{degree}'}, {'{batch}'}, {'{scholarship}'}, {'{net_payable}'}, {'{from_name}'}. The full per-semester breakdown isn't included here — for email it's in the PDF attachment instead.</p>
+                                                <textarea rows={8} className="w-full border p-2 rounded font-mono text-sm" value={settingsForm.message_template ?? DEFAULT_MESSAGE_TEMPLATE} onChange={e => setSettingsForm({...settingsForm, message_template: e.target.value})}></textarea>
+                                            </div>
+
                                             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 space-y-4">
                                                 <h3 className="font-bold text-gray-700">WhatsApp (WAHA)</h3>
                                                 <div>
