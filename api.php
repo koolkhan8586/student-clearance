@@ -391,7 +391,11 @@ try {
             try {
                 $pdo->exec("ALTER TABLE `$table` ADD COLUMN `$column` $definition");
             } catch (\PDOException $e) {
-                // If user lacks ALTER permissions, it fails silently to prevent breaking the API
+                // If the DB user lacks ALTER permissions, this fails silently to avoid
+                // breaking the whole API on every request — but leave a trace in the PHP
+                // error log (visible via most hosting control panels) so a resulting
+                // "Unknown column" error elsewhere is diagnosable instead of a mystery.
+                error_log("ensureColumn: could not add $table.$column — " . $e->getMessage());
             }
         }
     }
