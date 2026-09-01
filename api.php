@@ -109,20 +109,47 @@ function sendWahaText($baseUrl, $session, $apiKey, $chatId, $text) {
     $headers = ['Content-Type: application/json'];
     if (!empty($apiKey)) $headers[] = 'X-Api-Key: ' . $apiKey;
 
-    $ch = curl_init($url);
-    curl_setopt_array($ch, [
-        CURLOPT_POST           => true,
-        CURLOPT_POSTFIELDS     => $payload,
-        CURLOPT_HTTPHEADER     => $headers,
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT        => 20,
-    ]);
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $curlErr = curl_error($ch);
-    curl_close($ch);
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => $payload,
+            CURLOPT_HTTPHEADER     => $headers,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 20,
+        ]);
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlErr = curl_error($ch);
+        curl_close($ch);
 
-    if ($curlErr) throw new Exception("WAHA connection failed: $curlErr");
+        if ($curlErr) throw new Exception("WAHA connection failed: $curlErr");
+        if ($httpCode < 200 || $httpCode >= 300) throw new Exception("WAHA error ($httpCode): $response");
+        return true;
+    }
+
+    // Fall back to a stream-context HTTP request if the curl extension isn't available
+    if (!ini_get('allow_url_fopen')) {
+        throw new Exception("Neither the PHP curl extension nor allow_url_fopen is enabled on this server. Ask your host to enable one of them.");
+    }
+    $context = stream_context_create([
+        'http' => [
+            'method'        => 'POST',
+            'header'        => implode("\r\n", $headers),
+            'content'       => $payload,
+            'timeout'       => 20,
+            'ignore_errors' => true,
+        ],
+    ]);
+    $response = @file_get_contents($url, false, $context);
+    if ($response === false) {
+        $err = error_get_last();
+        throw new Exception("WAHA connection failed: " . ($err['message'] ?? 'unknown error'));
+    }
+    $httpCode = 200;
+    if (isset($http_response_header[0]) && preg_match('/\s(\d{3})\s/', $http_response_header[0], $m)) {
+        $httpCode = (int) $m[1];
+    }
     if ($httpCode < 200 || $httpCode >= 300) throw new Exception("WAHA error ($httpCode): $response");
     return true;
 }
@@ -379,7 +406,7 @@ if ($method === 'POST' && isset($input['action'])) {
             }
 
             echo json_encode(['status' => 'success']);
-        } catch (Exception $e) {
+        } catch (\Throwable $e) {
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
         exit;
