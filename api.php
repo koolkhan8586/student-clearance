@@ -22,6 +22,8 @@ function requireAuth() {
     }
 }
 
+const DEFAULT_MESSAGE_TEMPLATE = "Dear {name},\n\nYour Fee Clearance Report is ready.\n\nRegistration No: {reg_no}\nDegree Program: {degree}\nBatch/Session: {batch}\n\nTotal Scholarship: {scholarship}\nNet Payable: {net_payable}\n\nRegards,\n{from_name}";
+
 function requireAdmin() {
     requireAuth();
     if (($_SESSION['user']['role'] ?? '') !== 'admin') {
@@ -408,6 +410,7 @@ try {
         ensureColumn($pdo, 'settings', 'brevo_api_key', 'VARCHAR(255) DEFAULT NULL');
         ensureColumn($pdo, 'settings', 'google_service_account_json', 'TEXT DEFAULT NULL');
         ensureColumn($pdo, 'settings', 'google_delegated_user', 'VARCHAR(255) DEFAULT NULL');
+        ensureColumn($pdo, 'settings', 'message_template', 'TEXT DEFAULT NULL');
     } catch (\Exception $e) {}
 
     // Seed Admin if missing
@@ -562,13 +565,13 @@ if ($method === 'POST' && isset($input['action'])) {
                 waha_url = ?, waha_session = ?, waha_api_key = ?,
                 smtp_host = ?, smtp_port = ?, smtp_username = ?, smtp_password = ?,
                 smtp_from_email = ?, smtp_from_name = ?, brevo_api_key = ?,
-                google_service_account_json = ?, google_delegated_user = ?
+                google_service_account_json = ?, google_delegated_user = ?, message_template = ?
                 WHERE id = 1");
             $stmt->execute([
                 $data['waha_url'] ?? '', $data['waha_session'] ?? '', $wahaApiKey,
                 $data['smtp_host'] ?? '', $data['smtp_port'] ?? null, $data['smtp_username'] ?? '', $smtpPassword,
                 $data['smtp_from_email'] ?? '', $data['smtp_from_name'] ?? '', $brevoApiKey,
-                $googleServiceAccountJson, $data['google_delegated_user'] ?? '',
+                $googleServiceAccountJson, $data['google_delegated_user'] ?? '', $data['message_template'] ?? '',
             ]);
             echo json_encode(['status' => 'success']);
         } catch (Exception $e) {
@@ -582,10 +585,21 @@ if ($method === 'POST' && isset($input['action'])) {
             $channel = $data['channel'] ?? '';
             $recipient = trim($data['recipient'] ?? '');
             $subject = $data['subject'] ?? 'Fee Clearance Report';
-            $message = $data['message'] ?? '';
 
             if (!$recipient) throw new Exception("Recipient is required");
-            if (!$message) throw new Exception("Message is empty");
+
+            $settings = $pdo->query("SELECT * FROM settings WHERE id = 1")->fetch();
+
+            $template = !empty($settings['message_template']) ? $settings['message_template'] : DEFAULT_MESSAGE_TEMPLATE;
+            $message = strtr($template, [
+                '{name}'        => $data['student_name'] ?? '',
+                '{reg_no}'      => $data['reg_no'] ?? '',
+                '{degree}'      => $data['degree'] ?? '',
+                '{batch}'       => $data['batch'] ?? '',
+                '{scholarship}' => $data['scholarship'] ?? '',
+                '{net_payable}' => $data['net_payable'] ?? '',
+                '{from_name}'   => $settings['smtp_from_name'] ?: 'Fee Manager',
+            ]);
 
             $attachment = null;
             if (!empty($data['attachment'])) {
@@ -602,8 +616,6 @@ if ($method === 'POST' && isset($input['action'])) {
                     'content'  => $decoded,
                 ];
             }
-
-            $settings = $pdo->query("SELECT * FROM settings WHERE id = 1")->fetch();
 
             if ($channel === 'email') {
                 $haveGoogle = !empty($settings['google_service_account_json']) && !empty($settings['google_delegated_user']);
