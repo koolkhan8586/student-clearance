@@ -140,10 +140,14 @@ function sendPhpMail($fromEmail, $fromName, $toEmail, $subject, $body, $attachme
         : "Content-Type: text/plain; charset=UTF-8\r\n";
     $encodedSubject = "=?UTF-8?B?" . base64_encode($subject) . "?=";
 
+    // Reset the last-error tracker first — otherwise a stale warning from an earlier
+    // suppressed call (e.g. the SMTP attempt's @fsockopen) leaks into this message,
+    // since error_get_last() is global and not scoped to this call.
+    error_clear_last();
     $ok = @mail($toEmail, $encodedSubject, $mimeBody, $headers, "-f$fromEmail");
     if (!$ok) {
         $err = error_get_last();
-        throw new Exception("PHP mail() also failed" . (!empty($err['message']) ? ": " . $err['message'] : " (no further detail from the server)"));
+        throw new Exception("PHP mail() also failed" . (!empty($err['message']) ? ": " . $err['message'] : " (mail() returned false with no error detail — this usually means no local mail transfer agent/sendmail is configured on this server)"));
     }
     return true;
 }
