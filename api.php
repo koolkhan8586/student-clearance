@@ -32,7 +32,25 @@ function requireAdmin() {
 }
 
 // --- Minimal SMTP client (no external dependencies) ---
-function sendSmtpMail($host, $port, $username, $password, $fromEmail, $fromName, $toEmail, $subject, $body) {
+// Builds a multipart/mixed body (text + one attachment) when $attachment is given
+// (['filename' => ..., 'mimeType' => ..., 'content' => raw bytes]), otherwise just
+// returns the plain text body unchanged. Returns [boundary-or-null, body-string].
+function buildMimeBody($textBody, $attachment) {
+    if (!$attachment) return [null, $textBody];
+    $boundary = 'b' . md5(uniqid('', true));
+    $mime = "--$boundary\r\n";
+    $mime .= "Content-Type: text/plain; charset=UTF-8\r\n\r\n";
+    $mime .= $textBody . "\r\n\r\n";
+    $mime .= "--$boundary\r\n";
+    $mime .= "Content-Type: {$attachment['mimeType']}; name=\"{$attachment['filename']}\"\r\n";
+    $mime .= "Content-Transfer-Encoding: base64\r\n";
+    $mime .= "Content-Disposition: attachment; filename=\"{$attachment['filename']}\"\r\n\r\n";
+    $mime .= chunk_split(base64_encode($attachment['content']));
+    $mime .= "--$boundary--";
+    return [$boundary, $mime];
+}
+
+function sendSmtpMail($host, $port, $username, $password, $fromEmail, $fromName, $toEmail, $subject, $body, $attachment = null) {
     $secure = ($port == 465) ? 'ssl://' : '';
     $sock = @fsockopen($secure . $host, $port, $errno, $errstr, 15);
     if (!$sock) {
@@ -89,14 +107,18 @@ function sendSmtpMail($host, $port, $username, $password, $fromEmail, $fromName,
     $send($sock, "DATA");
     $expect($sock, 354);
 
+    list($boundary, $mimeBody) = buildMimeBody($body, $attachment);
+
     $headers = "From: =?UTF-8?B?" . base64_encode($fromName) . "?= <$fromEmail>\r\n";
     $headers .= "To: <$toEmail>\r\n";
     $headers .= "Subject: =?UTF-8?B?" . base64_encode($subject) . "?=\r\n";
     $headers .= "MIME-Version: 1.0\r\n";
-    $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
+    $headers .= $boundary
+        ? "Content-Type: multipart/mixed; boundary=\"$boundary\"\r\n"
+        : "Content-Type: text/plain; charset=UTF-8\r\n";
     $headers .= "Date: " . date('r') . "\r\n";
 
-    $escapedBody = preg_replace('/^\./m', '..', $body);
+    $escapedBody = preg_replace('/^\./m', '..', $mimeBody);
     $send($sock, $headers . "\r\n" . $escapedBody . "\r\n.");
     $expect($sock, 250);
 
@@ -108,13 +130,17 @@ function sendSmtpMail($host, $port, $username, $password, $fromEmail, $fromName,
 // --- Fallback: PHP's built-in mail() function, used when a raw SMTP socket
 // connection can't be established (many hosts block outbound SMTP ports for
 // customer scripts but still relay mail() through their own local MTA). ---
-function sendPhpMail($fromEmail, $fromName, $toEmail, $subject, $body) {
+function sendPhpMail($fromEmail, $fromName, $toEmail, $subject, $body, $attachment = null) {
+    list($boundary, $mimeBody) = buildMimeBody($body, $attachment);
+
     $headers = "From: =?UTF-8?B?" . base64_encode($fromName) . "?= <$fromEmail>\r\n";
     $headers .= "MIME-Version: 1.0\r\n";
-    $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
+    $headers .= $boundary
+        ? "Content-Type: multipart/mixed; boundary=\"$boundary\"\r\n"
+        : "Content-Type: text/plain; charset=UTF-8\r\n";
     $encodedSubject = "=?UTF-8?B?" . base64_encode($subject) . "?=";
 
-    $ok = @mail($toEmail, $encodedSubject, $body, $headers, "-f$fromEmail");
+    $ok = @mail($toEmail, $encodedSubject, $mimeBody, $headers, "-f$fromEmail");
     if (!$ok) {
         $err = error_get_last();
         throw new Exception("PHP mail() also failed" . (!empty($err['message']) ? ": " . $err['message'] : " (no further detail from the server)"));
@@ -409,6 +435,22 @@ if ($method === 'POST' && isset($input['action'])) {
             if (!$recipient) throw new Exception("Recipient is required");
             if (!$message) throw new Exception("Message is empty");
 
+            $attachment = null;
+            if (!empty($data['attachment'])) {
+                $raw = $data['attachment'];
+                if (strpos($raw, 'base64,') !== false) {
+                    $raw = substr($raw, strpos($raw, 'base64,') + 7);
+                }
+                $decoded = base64_decode($raw, true);
+                if ($decoded === false) throw new Exception("Attachment could not be decoded");
+                if (strlen($decoded) > 10 * 1024 * 1024) throw new Exception("Attachment is too large (max 10MB)");
+                $attachment = [
+                    'filename' => $data['attachmentName'] ?? 'attachment.pdf',
+                    'mimeType' => 'application/pdf',
+                    'content'  => $decoded,
+                ];
+            }
+
             $settings = $pdo->query("SELECT * FROM settings WHERE id = 1")->fetch();
 
             if ($channel === 'email') {
@@ -422,14 +464,14 @@ if ($method === 'POST' && isset($input['action'])) {
                         $settings['smtp_host'], $settings['smtp_port'] ?: 587,
                         $settings['smtp_username'], $settings['smtp_password'],
                         $fromEmail, $fromName,
-                        $recipient, $subject, $message
+                        $recipient, $subject, $message, $attachment
                     );
                 } catch (\Throwable $smtpError) {
                     // Many hosts block raw outbound SMTP sockets for customer scripts but
                     // still relay PHP's mail() through their own local mail transfer agent —
                     // worth a shot before giving up.
                     try {
-                        sendPhpMail($fromEmail, $fromName, $recipient, $subject, $message);
+                        sendPhpMail($fromEmail, $fromName, $recipient, $subject, $message, $attachment);
                     } catch (\Throwable $mailError) {
                         throw new Exception("SMTP failed (" . $smtpError->getMessage() . "). " . $mailError->getMessage());
                     }

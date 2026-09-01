@@ -30,6 +30,10 @@
     
     <!-- XLSX LIBRARY FOR MULTI-SHEET BACKUP -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <!-- PDF GENERATION FOR EMAILED CLEARANCE REPORTS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     
     <style>
         /* Custom Scrollbar for a cleaner look */
@@ -282,6 +286,7 @@
             const [settingsForm, setSettingsForm] = useState(null);
             const [settingsSaving, setSettingsSaving] = useState(false);
             const [sendPanel, setSendPanel] = useState(null); // { channel, recipient } or null
+            const [sendBusy, setSendBusy] = useState(false);
 
             const TABS = [
                 { id: 'clearance', label: 'Clearance', icon: FileText },
@@ -706,6 +711,35 @@
                 if (ok) { alert("Settings saved."); loadSettings(); }
             };
 
+            // Renders #printableArea to a multi-page A4 PDF matching the current print
+            // orientation, and returns it as a base64 string (no PDF library needed on
+            // the PHP side — it just attaches whatever bytes it's given).
+            const generateClearancePdfBase64 = async () => {
+                const element = document.getElementById('printableArea');
+                const canvas = await window.html2canvas(element, { scale: 2, useCORS: true });
+                const imgData = canvas.toDataURL('image/jpeg', 0.92);
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF({ orientation: printOrientation, unit: 'mm', format: 'a4' });
+                const pageWidth = pdf.internal.pageSize.getWidth();
+                const pageHeight = pdf.internal.pageSize.getHeight();
+                const imgWidth = pageWidth;
+                const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+                let heightLeft = imgHeight;
+                let position = 0;
+                pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+                heightLeft -= pageHeight;
+
+                while (heightLeft > 0) {
+                    position -= pageHeight;
+                    pdf.addPage();
+                    pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+                    heightLeft -= pageHeight;
+                }
+
+                return pdf.output('datauristring').split(',')[1];
+            };
+
             const sendClearance = async () => {
                 if (!sendPanel || !clearanceResult) return;
                 const { channel, recipient } = sendPanel;
@@ -726,14 +760,26 @@
                 ];
                 const message = lines.join('\n');
 
-                const ok = await postToApi('send_clearance', {
-                    data: {
-                        channel,
-                        recipient,
-                        subject: `Fee Clearance Report - ${s.reg_no}`,
-                        message,
+                const payload = {
+                    channel,
+                    recipient,
+                    subject: `Fee Clearance Report - ${s.reg_no}`,
+                    message,
+                };
+
+                setSendBusy(true);
+                if (channel === 'email') {
+                    try {
+                        payload.attachment = await generateClearancePdfBase64();
+                        payload.attachmentName = `Clearance_${s.reg_no}.pdf`;
+                    } catch (e) {
+                        setSendBusy(false);
+                        return alert("Could not generate the PDF attachment: " + e.message);
                     }
-                }, true);
+                }
+
+                const ok = await postToApi('send_clearance', { data: payload }, true);
+                setSendBusy(false);
                 if (ok) { alert(`Sent via ${channel === 'email' ? 'Email' : 'WhatsApp'}.`); setSendPanel(null); }
             };
 
@@ -1542,8 +1588,8 @@
                                                     />
                                                     <p className="text-xs text-gray-400 mt-1">Defaults to the student's registered {sendPanel.channel === 'email' ? 'email' : 'mobile number'} — edit it to send elsewhere (e.g. a parent's number).</p>
                                                 </div>
-                                                <button onClick={sendClearance} className="bg-blue-600 text-white px-5 py-2 rounded-lg font-bold hover:bg-blue-700">Send</button>
-                                                <button onClick={() => setSendPanel(null)} className="text-gray-500 hover:text-gray-700 px-3 py-2">Cancel</button>
+                                                <button onClick={sendClearance} disabled={sendBusy} className="bg-blue-600 text-white px-5 py-2 rounded-lg font-bold hover:bg-blue-700 disabled:opacity-50">{sendBusy ? (sendPanel.channel === 'email' ? 'Generating PDF...' : 'Sending...') : 'Send'}</button>
+                                                <button onClick={() => setSendPanel(null)} disabled={sendBusy} className="text-gray-500 hover:text-gray-700 px-3 py-2 disabled:opacity-50">Cancel</button>
                                             </div>
                                         )}
 
