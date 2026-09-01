@@ -277,7 +277,7 @@
             const [passwordData, setPasswordData] = useState({ current: '', new: '', confirm: '' });
             
             const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
-            const [importPreview, setImportPreview] = useState({ show: false, total: 0, newItems: [], duplicates: [], type: '' });
+            const [importPreview, setImportPreview] = useState({ show: false, total: 0, newItems: [], duplicates: [], updates: [], type: '' });
             const [uploadStatus, setUploadStatus] = useState({ active: false, current: 0, total: 0 });
             const [importTerm, setImportTerm] = useState('');
             const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -1194,6 +1194,7 @@
                     const existingData = type === 'loans' ? (data.payments || []).filter(p => norm(p.bank) === 'loan') : (data[type] || []);
                     const newItems = [];
                     const duplicates = [];
+                    const updates = [];
                     
                     for (let i = 1; i < rows.length; i++) {
                         const values = rows[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
@@ -1239,6 +1240,22 @@
                             if (student) obj.name = student.name;
                         }
 
+                        if (type === 'students') {
+                            // A matching reg_no is treated as an update (merge onto the existing
+                            // student), not a skipped duplicate — this table only ever has one
+                            // row per reg_no, so re-appearing in a CSV almost always means the
+                            // admin is filling in mobile/email/total_package for that student.
+                            const existingStudent = existingData.find(existing => norm(existing.reg_no) === norm(obj.reg_no));
+                            if (existingStudent) {
+                                // Blank cells shouldn't clear existing fields — only overwrite with non-empty values
+                                const nonEmpty = Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== '' && v != null));
+                                updates.push({ ...existingStudent, ...nonEmpty });
+                            } else {
+                                newItems.push(obj);
+                            }
+                            continue;
+                        }
+
                         let isDuplicate = false;
                         if (type === 'payments') {
                              isDuplicate = existingData.some(existing =>
@@ -1253,8 +1270,6 @@
                                 Math.abs(parseFloat(existing.amount || 0) - parseFloat(obj.amount || 0)) < 0.01 &&
                                 existing.date === obj.date
                             );
-                        } else if (type === 'students') {
-                             isDuplicate = existingData.some(existing => norm(existing.reg_no) === norm(obj.reg_no));
                         } else if (type === 'fees') {
                              isDuplicate = existingData.some(existing => norm(existing.degree) === norm(obj.degree) && norm(existing.batch) === norm(obj.batch));
                         } else {
@@ -1269,32 +1284,33 @@
                         else newItems.push(obj);
                     }
                     
-                    setImportPreview({ show: true, total: rows.length - 1, newItems, duplicates, type });
+                    setImportPreview({ show: true, total: rows.length - 1, newItems, duplicates, updates, type });
                     e.target.value = null;
                 };
                 reader.readAsText(file);
             };
 
             const confirmImport = async () => {
-                setUploadStatus({ active: true, current: 0, total: importPreview.newItems.length });
+                const toSave = [...importPreview.newItems, ...(importPreview.updates || [])];
+                setUploadStatus({ active: true, current: 0, total: toSave.length });
                 let actionType = importPreview.type.slice(0, -1);
                 if(importPreview.type === 'others') actionType = 'other';
                 if(importPreview.type === 'loans') actionType = 'payment';
                 let uploadedCount = 0;
 
                 const chunkSize = 25; // Send 25 requests concurrently
-                for (let i = 0; i < importPreview.newItems.length; i += chunkSize) {
-                    const chunk = importPreview.newItems.slice(i, i + chunkSize);
+                for (let i = 0; i < toSave.length; i += chunkSize) {
+                    const chunk = toSave.slice(i, i + chunkSize);
                     await Promise.all(chunk.map(async (item) => {
                         const payload = importPreview.type === 'loans' ? { ...item, bank: 'Loan' } : item;
                         await postToApi(`save_${actionType}`, { data: payload }, true); // Skip refresh for speed
                     }));
                     uploadedCount += chunk.length;
-                    if (uploadedCount > importPreview.newItems.length) uploadedCount = importPreview.newItems.length;
+                    if (uploadedCount > toSave.length) uploadedCount = toSave.length;
                     setUploadStatus(prev => ({ ...prev, current: uploadedCount }));
                 }
-                
-                setImportPreview({ show: false, total: 0, newItems: [], duplicates: [], type: '' });
+
+                setImportPreview({ show: false, total: 0, newItems: [], duplicates: [], updates: [], type: '' });
                 setUploadStatus({ active: false, current: 0, total: 0 });
                 alert(`Successfully imported ${uploadedCount} records!`);
                 refreshData(true); // Single background refresh
@@ -2126,12 +2142,27 @@
                         <div className="fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-center justify-center p-4">
                             <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl p-6 max-h-[90vh] flex flex-col">
                                 <h3 className="text-xl font-bold mb-4">Import Summary ({importPreview.type})</h3>
-                                <div className="grid grid-cols-3 gap-4 mb-4 text-center">
+                                <div className={`grid ${(importPreview.updates || []).length > 0 ? 'grid-cols-4' : 'grid-cols-3'} gap-4 mb-4 text-center`}>
                                      <div className="bg-blue-50 p-2 rounded"><div className="text-xl font-bold text-blue-600">{importPreview.total}</div><div className="text-xs text-gray-500">Total Found</div></div>
                                      <div className="bg-green-50 p-2 rounded"><div className="text-xl font-bold text-green-600">{importPreview.newItems.length}</div><div className="text-xs text-gray-500">New Records</div></div>
+                                     {(importPreview.updates || []).length > 0 && <div className="bg-purple-50 p-2 rounded"><div className="text-xl font-bold text-purple-600">{importPreview.updates.length}</div><div className="text-xs text-gray-500">Existing (Update)</div></div>}
                                      <div className="bg-red-50 p-2 rounded"><div className="text-xl font-bold text-red-600">{importPreview.duplicates.length}</div><div className="text-xs text-gray-500">Duplicates (Skipped)</div></div>
                                 </div>
-                                
+
+                                {(importPreview.updates || []).length > 0 && (
+                                    <div className="flex-1 overflow-hidden flex flex-col mb-4">
+                                        <h4 className="font-bold text-sm text-gray-700 mb-2">Existing students to update (mobile/email/total package):</h4>
+                                        <div className="overflow-y-auto border rounded bg-gray-50 p-2 text-sm text-gray-600 space-y-1 max-h-32">
+                                            {importPreview.updates.map((d, i) => (
+                                                <div key={i} className="flex justify-between border-b border-gray-200 last:border-0 pb-1">
+                                                    <span>{d.reg_no || 'Unknown'} — {d.name}</span>
+                                                    <span className="text-xs bg-gray-200 px-2 rounded text-gray-500">{[d.mobile, d.email, d.total_package].filter(Boolean).join(' / ') || 'no change'}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
                                 {importPreview.duplicates.length > 0 && (
                                     <div className="flex-1 overflow-hidden flex flex-col">
                                         <h4 className="font-bold text-sm text-gray-700 mb-2">Duplicate Entries:</h4>
@@ -2147,8 +2178,8 @@
                                 )}
 
                                 <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
-                                    <button onClick={() => { setImportPreview({show:false, newItems:[], duplicates:[], total:0, type:''}); }} className="px-4 py-2 bg-gray-100 rounded font-bold hover:bg-gray-200">Cancel</button>
-                                    {importPreview.newItems.length > 0 && <button onClick={confirmImport} className="px-6 py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700">Import {importPreview.newItems.length} Records</button>}
+                                    <button onClick={() => { setImportPreview({show:false, newItems:[], duplicates:[], updates:[], total:0, type:''}); }} className="px-4 py-2 bg-gray-100 rounded font-bold hover:bg-gray-200">Cancel</button>
+                                    {(importPreview.newItems.length + (importPreview.updates || []).length) > 0 && <button onClick={confirmImport} className="px-6 py-2 bg-blue-600 text-white rounded font-bold hover:bg-blue-700">Import {importPreview.newItems.length + (importPreview.updates || []).length} Records</button>}
                                 </div>
                             </div>
                         </div>
