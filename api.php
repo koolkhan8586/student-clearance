@@ -22,6 +22,116 @@ function requireAuth() {
     }
 }
 
+function requireAdmin() {
+    requireAuth();
+    if (($_SESSION['user']['role'] ?? '') !== 'admin') {
+        http_response_code(403);
+        echo json_encode(['status' => 'error', 'message' => 'Admin access required']);
+        exit;
+    }
+}
+
+// --- Minimal SMTP client (no external dependencies) ---
+function sendSmtpMail($host, $port, $username, $password, $fromEmail, $fromName, $toEmail, $subject, $body) {
+    $secure = ($port == 465) ? 'ssl://' : '';
+    $sock = @fsockopen($secure . $host, $port, $errno, $errstr, 15);
+    if (!$sock) throw new Exception("Could not connect to SMTP server: $errstr");
+    stream_set_timeout($sock, 15);
+
+    $expect = function ($sock, $codes) {
+        $response = '';
+        while ($line = fgets($sock, 515)) {
+            $response .= $line;
+            if (isset($line[3]) && $line[3] === ' ') break;
+        }
+        $code = (int) substr($response, 0, 3);
+        if (!in_array($code, (array) $codes)) {
+            throw new Exception("SMTP error: " . trim($response));
+        }
+        return $response;
+    };
+
+    $send = function ($sock, $cmd) { fwrite($sock, $cmd . "\r\n"); };
+
+    $expect($sock, 220);
+    $send($sock, "EHLO " . ($_SERVER['SERVER_NAME'] ?? 'localhost'));
+    $expect($sock, 250);
+
+    if ($port == 587) {
+        $send($sock, "STARTTLS");
+        $expect($sock, 220);
+        if (!stream_socket_enable_crypto($sock, true, STREAM_CRYPTO_METHOD_TLS_CLIENT)) {
+            throw new Exception("Failed to enable TLS");
+        }
+        $send($sock, "EHLO " . ($_SERVER['SERVER_NAME'] ?? 'localhost'));
+        $expect($sock, 250);
+    }
+
+    $send($sock, "AUTH LOGIN");
+    $expect($sock, 334);
+    $send($sock, base64_encode($username));
+    $expect($sock, 334);
+    $send($sock, base64_encode($password));
+    $expect($sock, 235);
+
+    $send($sock, "MAIL FROM:<$fromEmail>");
+    $expect($sock, 250);
+    $send($sock, "RCPT TO:<$toEmail>");
+    $expect($sock, [250, 251]);
+    $send($sock, "DATA");
+    $expect($sock, 354);
+
+    $headers = "From: =?UTF-8?B?" . base64_encode($fromName) . "?= <$fromEmail>\r\n";
+    $headers .= "To: <$toEmail>\r\n";
+    $headers .= "Subject: =?UTF-8?B?" . base64_encode($subject) . "?=\r\n";
+    $headers .= "MIME-Version: 1.0\r\n";
+    $headers .= "Content-Type: text/plain; charset=UTF-8\r\n";
+    $headers .= "Date: " . date('r') . "\r\n";
+
+    $escapedBody = preg_replace('/^\./m', '..', $body);
+    $send($sock, $headers . "\r\n" . $escapedBody . "\r\n.");
+    $expect($sock, 250);
+
+    $send($sock, "QUIT");
+    fclose($sock);
+    return true;
+}
+
+// --- Minimal WAHA (WhatsApp HTTP API) client ---
+function sendWahaText($baseUrl, $session, $apiKey, $chatId, $text) {
+    $url = rtrim($baseUrl, '/') . '/api/sendText';
+    $payload = json_encode([
+        'session' => $session ?: 'default',
+        'chatId'  => $chatId,
+        'text'    => $text,
+    ]);
+
+    $headers = ['Content-Type: application/json'];
+    if (!empty($apiKey)) $headers[] = 'X-Api-Key: ' . $apiKey;
+
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => $payload,
+        CURLOPT_HTTPHEADER     => $headers,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 20,
+    ]);
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlErr = curl_error($ch);
+    curl_close($ch);
+
+    if ($curlErr) throw new Exception("WAHA connection failed: $curlErr");
+    if ($httpCode < 200 || $httpCode >= 300) throw new Exception("WAHA error ($httpCode): $response");
+    return true;
+}
+
+function normalizeWahaChatId($number) {
+    $digits = preg_replace('/\D/', '', $number);
+    return $digits . '@c.us';
+}
+
 // --- DATABASE CONFIGURATION ---
 $host = 'localhost';
 $db   = 'fee_system';
@@ -47,6 +157,13 @@ try {
     $pdo->exec("CREATE TABLE IF NOT EXISTS other_charges (id INT AUTO_INCREMENT PRIMARY KEY, reg_no VARCHAR(50), name VARCHAR(100), semester VARCHAR(50), fee_name VARCHAR(100), amount DECIMAL(10,2))");
     $pdo->exec("CREATE TABLE IF NOT EXISTS users (id INT AUTO_INCREMENT PRIMARY KEY, username VARCHAR(50) UNIQUE, password VARCHAR(255), role VARCHAR(20), permissions TEXT)");
     $pdo->exec("CREATE TABLE IF NOT EXISTS banks (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(100) UNIQUE, account_no VARCHAR(100))");
+    $pdo->exec("CREATE TABLE IF NOT EXISTS settings (
+        id INT PRIMARY KEY DEFAULT 1,
+        waha_url VARCHAR(255), waha_session VARCHAR(100), waha_api_key VARCHAR(255),
+        smtp_host VARCHAR(255), smtp_port INT, smtp_username VARCHAR(255), smtp_password VARCHAR(255),
+        smtp_from_email VARCHAR(255), smtp_from_name VARCHAR(255)
+    )");
+    $pdo->exec("INSERT IGNORE INTO settings (id) VALUES (1)");
 
     // --- BULLETPROOF AUTO-COLUMN ADDER ---
     // This safely forces missing columns into existing tables without crashing
@@ -187,6 +304,80 @@ if ($method === 'POST' && isset($input['action'])) {
             $newHash = password_hash($data['new'] ?? '', PASSWORD_DEFAULT);
             $stmt = $pdo->prepare("UPDATE users SET password = ? WHERE id = ?");
             $stmt->execute([$newHash, $_SESSION['user']['id']]);
+            echo json_encode(['status' => 'success']);
+        } catch (Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    if ($action === 'get_settings') {
+        requireAdmin();
+        $row = $pdo->query("SELECT * FROM settings WHERE id = 1")->fetch();
+        if ($row) {
+            $row['has_waha_api_key'] = !empty($row['waha_api_key']);
+            $row['has_smtp_password'] = !empty($row['smtp_password']);
+            unset($row['waha_api_key'], $row['smtp_password']);
+        }
+        echo json_encode(['status' => 'success', 'settings' => $row]);
+        exit;
+    }
+
+    if ($action === 'save_settings') {
+        requireAdmin();
+        try {
+            $current = $pdo->query("SELECT * FROM settings WHERE id = 1")->fetch();
+            $wahaApiKey = !empty($data['waha_api_key']) ? $data['waha_api_key'] : $current['waha_api_key'];
+            $smtpPassword = !empty($data['smtp_password']) ? $data['smtp_password'] : $current['smtp_password'];
+
+            $stmt = $pdo->prepare("UPDATE settings SET
+                waha_url = ?, waha_session = ?, waha_api_key = ?,
+                smtp_host = ?, smtp_port = ?, smtp_username = ?, smtp_password = ?,
+                smtp_from_email = ?, smtp_from_name = ?
+                WHERE id = 1");
+            $stmt->execute([
+                $data['waha_url'] ?? '', $data['waha_session'] ?? '', $wahaApiKey,
+                $data['smtp_host'] ?? '', $data['smtp_port'] ?? null, $data['smtp_username'] ?? '', $smtpPassword,
+                $data['smtp_from_email'] ?? '', $data['smtp_from_name'] ?? '',
+            ]);
+            echo json_encode(['status' => 'success']);
+        } catch (Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    if ($action === 'send_clearance') {
+        try {
+            $channel = $data['channel'] ?? '';
+            $recipient = trim($data['recipient'] ?? '');
+            $subject = $data['subject'] ?? 'Fee Clearance Report';
+            $message = $data['message'] ?? '';
+
+            if (!$recipient) throw new Exception("Recipient is required");
+            if (!$message) throw new Exception("Message is empty");
+
+            $settings = $pdo->query("SELECT * FROM settings WHERE id = 1")->fetch();
+
+            if ($channel === 'email') {
+                if (empty($settings['smtp_host']) || empty($settings['smtp_username']) || empty($settings['smtp_password'])) {
+                    throw new Exception("Email is not configured yet. Ask an admin to set it up under Settings.");
+                }
+                sendSmtpMail(
+                    $settings['smtp_host'], $settings['smtp_port'] ?: 587,
+                    $settings['smtp_username'], $settings['smtp_password'],
+                    $settings['smtp_from_email'] ?: $settings['smtp_username'], $settings['smtp_from_name'] ?: 'Fee Manager',
+                    $recipient, $subject, $message
+                );
+            } elseif ($channel === 'whatsapp') {
+                if (empty($settings['waha_url'])) {
+                    throw new Exception("WhatsApp is not configured yet. Ask an admin to set it up under Settings.");
+                }
+                sendWahaText($settings['waha_url'], $settings['waha_session'], $settings['waha_api_key'], normalizeWahaChatId($recipient), $message);
+            } else {
+                throw new Exception("Unknown channel: $channel");
+            }
+
             echo json_encode(['status' => 'success']);
         } catch (Exception $e) {
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);

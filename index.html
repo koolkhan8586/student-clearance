@@ -205,6 +205,7 @@
         const Eye = (p) => <Icon d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z M12 5c-3.866 0-7 3.134-7 7s3.134 7 7 7 7-3.134 7-7-3.134-7-7-7z M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z" {...p} />;
         const RefreshCw = (p) => <Icon d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" {...p} />;
         const Wallet = (p) => <Icon d="M21 12V7H5a2 2 0 0 1 0-4h14v4M3 5v14a2 2 0 0 0 2 2h16v-5M18 12a2 2 0 0 0 0 4h4v-4h-4z" {...p} />;
+        const SettingsIcon = (p) => <Icon d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" {...p} />;
 
         function App() {
             // --- STATE & HELPER FUNCTIONS ---
@@ -278,6 +279,9 @@
             const [printOrientation, setPrintOrientation] = useState(() => localStorage.getItem('clearancePrintOrientation') || 'portrait');
             const [loanDateFrom, setLoanDateFrom] = useState('');
             const [loanDateTo, setLoanDateTo] = useState('');
+            const [settingsForm, setSettingsForm] = useState(null);
+            const [settingsSaving, setSettingsSaving] = useState(false);
+            const [sendPanel, setSendPanel] = useState(null); // { channel, recipient } or null
 
             const TABS = [
                 { id: 'clearance', label: 'Clearance', icon: FileText },
@@ -294,7 +298,7 @@
 
             const availableTabs = user ? (
                 user.role === 'admin'
-                ? [...TABS, { id: 'users', label: 'Users & Access', icon: Shield }]
+                ? [...TABS, { id: 'users', label: 'Users & Access', icon: Shield }, { id: 'settings', label: 'Settings', icon: SettingsIcon }]
                 : TABS.filter(t => (user.permissions || []).includes(t.id))
             ) : [];
 
@@ -385,6 +389,10 @@
             useEffect(() => {
                 setCurrentPage(1);
             }, [tabSearch, sortConfig, loanDateFrom, loanDateTo]);
+
+            useEffect(() => {
+                if (activeTab === 'settings' && user?.role === 'admin') loadSettings();
+            }, [activeTab]);
 
             useEffect(() => {
                 if (activeTab === 'clearance' && searchReg && clearanceResult) {
@@ -674,6 +682,59 @@
                     }
                     else { alert("Error: " + json.message); return false; }
                 } catch(e) { alert("Network Error"); return false; }
+            };
+
+            const loadSettings = async () => {
+                try {
+                    const res = await fetch(API_URL, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ action: 'get_settings' })
+                    });
+                    const json = await res.json();
+                    if (json.status === 'success') setSettingsForm({ ...(json.settings || {}), waha_api_key: '', smtp_password: '' });
+                    else alert(json.message || "Failed to load settings");
+                } catch(e) { alert("Network Error"); }
+            };
+
+            const saveSettings = async (e) => {
+                e.preventDefault();
+                setSettingsSaving(true);
+                const ok = await postToApi('save_settings', { data: settingsForm }, true);
+                setSettingsSaving(false);
+                if (ok) { alert("Settings saved."); loadSettings(); }
+            };
+
+            const sendClearance = async () => {
+                if (!sendPanel || !clearanceResult) return;
+                const { channel, recipient } = sendPanel;
+                if (!recipient) return alert(`Enter ${channel === 'email' ? 'an email address' : 'a mobile number'} to send to.`);
+
+                const s = clearanceResult.student;
+                const lines = [
+                    `Fee Clearance Report`,
+                    `Registration No: ${s.reg_no}`,
+                    `Student Name: ${s.name}`,
+                    `Degree Program: ${s.degree}`,
+                    `Batch / Session: ${s.batch}`,
+                    ``,
+                    ...clearanceResult.rows.map(r => `${r.semester}: Total ${num(r.total)}, Paid ${num(r.totalPaid)}, Balance ${num(r.balance)}`),
+                    ``,
+                    `Total Scholarship: ${num(clearanceResult.summary.fa)}`,
+                    `Net Payable: ${num(clearanceResult.summary.balance)}`,
+                ];
+                const message = lines.join('\n');
+
+                const ok = await postToApi('send_clearance', {
+                    data: {
+                        channel,
+                        recipient,
+                        subject: `Fee Clearance Report - ${s.reg_no}`,
+                        message,
+                    }
+                }, true);
+                if (ok) { alert(`Sent via ${channel === 'email' ? 'Email' : 'WhatsApp'}.`); setSendPanel(null); }
             };
 
             const syncBrowserDataToDb = async () => {
@@ -1461,7 +1522,31 @@
                                                 <button onClick={() => setPrintOrientation('landscape')} className={`px-3 py-1.5 text-sm font-medium border-l border-gray-300 ${printOrientation === 'landscape' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>Landscape</button>
                                             </div>
                                             <button onClick={() => window.print()} className="bg-gray-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-800 flex items-center gap-2"><Printer className="h-4 w-4" /> Print</button>
+                                            <div className="h-6 w-px bg-gray-300"></div>
+                                            <button onClick={() => setSendPanel({ channel: 'email', recipient: clearanceResult.student.email || '' })} className="bg-white border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-50">Send via Email</button>
+                                            <button onClick={() => setSendPanel({ channel: 'whatsapp', recipient: clearanceResult.student.mobile || '' })} className="bg-white border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-50">Send via WhatsApp</button>
                                         </div>
+
+                                        {sendPanel && (
+                                            <div className="no-print bg-white p-4 rounded-xl shadow-sm border border-blue-200 flex flex-wrap items-end gap-3">
+                                                <div className="flex-1 min-w-[220px]">
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
+                                                        {sendPanel.channel === 'email' ? 'Email address' : 'Mobile number (with country code)'}
+                                                    </label>
+                                                    <input
+                                                        type={sendPanel.channel === 'email' ? 'email' : 'text'}
+                                                        placeholder={sendPanel.channel === 'email' ? 'name@example.com' : 'e.g. 923001234567'}
+                                                        className="w-full border p-2 rounded"
+                                                        value={sendPanel.recipient}
+                                                        onChange={e => setSendPanel({ ...sendPanel, recipient: e.target.value })}
+                                                    />
+                                                    <p className="text-xs text-gray-400 mt-1">Defaults to the student's registered {sendPanel.channel === 'email' ? 'email' : 'mobile number'} — edit it to send elsewhere (e.g. a parent's number).</p>
+                                                </div>
+                                                <button onClick={sendClearance} className="bg-blue-600 text-white px-5 py-2 rounded-lg font-bold hover:bg-blue-700">Send</button>
+                                                <button onClick={() => setSendPanel(null)} className="text-gray-500 hover:text-gray-700 px-3 py-2">Cancel</button>
+                                            </div>
+                                        )}
+
                                         <div className="bg-white rounded-xl shadow-lg overflow-hidden" id="printableArea">
                                             <div className="p-8">
                                                 <div className="border-b-2 border-gray-800 pb-6 mb-6 flex justify-between items-start">
@@ -1577,7 +1662,7 @@
                                 </div>
                             )}
 
-                            {activeTab !== 'clearance' && activeTab !== 'summary' && (
+                            {activeTab !== 'clearance' && activeTab !== 'summary' && activeTab !== 'settings' && (
                                 <div>
                                     <div className="flex flex-col gap-4 mb-6 no-print">
                                         <div className="flex justify-between items-center"><h2 className="text-2xl font-bold text-gray-800 capitalize">{TABS.find(t => t.id === activeTab)?.label || activeTab} Directory</h2><div className="flex gap-2">{(user.role === 'admin' || user.permissions.includes(activeTab)) && <button onClick={() => openModal(activeTab)} className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700 transition flex items-center gap-2 shadow-sm"><Plus className="h-5 w-5" /> Add New</button>}</div></div>
@@ -1736,6 +1821,68 @@
                                             </div>
                                         )}
                                     </div>
+                                </div>
+                            )}
+
+                            {/* SETTINGS TAB — WhatsApp (WAHA) & Email (SMTP) config, admin only */}
+                            {activeTab === 'settings' && (
+                                <div className="max-w-2xl space-y-6">
+                                    <h2 className="text-2xl font-bold text-gray-800">Settings</h2>
+                                    {!settingsForm ? (
+                                        <p className="text-gray-500">Loading...</p>
+                                    ) : (
+                                        <form onSubmit={saveSettings} className="space-y-6">
+                                            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 space-y-4">
+                                                <h3 className="font-bold text-gray-700">WhatsApp (WAHA)</h3>
+                                                <div>
+                                                    <label className="block text-sm font-bold text-gray-700 mb-1">WAHA Base URL</label>
+                                                    <input placeholder="https://your-waha-server.example.com" className="w-full border p-2 rounded" value={settingsForm.waha_url || ''} onChange={e => setSettingsForm({...settingsForm, waha_url: e.target.value})} />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-bold text-gray-700 mb-1">Session Name</label>
+                                                    <input placeholder="default" className="w-full border p-2 rounded" value={settingsForm.waha_session || ''} onChange={e => setSettingsForm({...settingsForm, waha_session: e.target.value})} />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-bold text-gray-700 mb-1">API Key {settingsForm.has_waha_api_key && <span className="text-green-600 font-normal">(already set — leave blank to keep it)</span>}</label>
+                                                    <input type="password" placeholder={settingsForm.has_waha_api_key ? '••••••••' : ''} className="w-full border p-2 rounded" value={settingsForm.waha_api_key || ''} onChange={e => setSettingsForm({...settingsForm, waha_api_key: e.target.value})} />
+                                                </div>
+                                            </div>
+
+                                            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 space-y-4">
+                                                <h3 className="font-bold text-gray-700">Email (SMTP)</h3>
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label className="block text-sm font-bold text-gray-700 mb-1">SMTP Host</label>
+                                                        <input placeholder="smtp.example.com" className="w-full border p-2 rounded" value={settingsForm.smtp_host || ''} onChange={e => setSettingsForm({...settingsForm, smtp_host: e.target.value})} />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-sm font-bold text-gray-700 mb-1">Port</label>
+                                                        <input type="number" placeholder="587" className="w-full border p-2 rounded" value={settingsForm.smtp_port || ''} onChange={e => setSettingsForm({...settingsForm, smtp_port: e.target.value})} />
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-bold text-gray-700 mb-1">Username</label>
+                                                    <input className="w-full border p-2 rounded" value={settingsForm.smtp_username || ''} onChange={e => setSettingsForm({...settingsForm, smtp_username: e.target.value})} />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-bold text-gray-700 mb-1">Password {settingsForm.has_smtp_password && <span className="text-green-600 font-normal">(already set — leave blank to keep it)</span>}</label>
+                                                    <input type="password" placeholder={settingsForm.has_smtp_password ? '••••••••' : ''} className="w-full border p-2 rounded" value={settingsForm.smtp_password || ''} onChange={e => setSettingsForm({...settingsForm, smtp_password: e.target.value})} />
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label className="block text-sm font-bold text-gray-700 mb-1">From Email</label>
+                                                        <input className="w-full border p-2 rounded" value={settingsForm.smtp_from_email || ''} onChange={e => setSettingsForm({...settingsForm, smtp_from_email: e.target.value})} />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-sm font-bold text-gray-700 mb-1">From Name</label>
+                                                        <input className="w-full border p-2 rounded" value={settingsForm.smtp_from_name || ''} onChange={e => setSettingsForm({...settingsForm, smtp_from_name: e.target.value})} />
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <button type="submit" disabled={settingsSaving} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700 disabled:opacity-50">{settingsSaving ? 'Saving...' : 'Save Settings'}</button>
+                                        </form>
+                                    )}
                                 </div>
                             )}
                         </div>
