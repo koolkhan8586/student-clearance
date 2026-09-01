@@ -152,6 +152,53 @@ function sendPhpMail($fromEmail, $fromName, $toEmail, $subject, $body, $attachme
     return true;
 }
 
+// --- Shared HTTP POST helper (curl if available, stream-context fallback otherwise) ---
+// Returns [httpCode, responseBody]. Throws on a connection-level failure (no response
+// at all) — an HTTP error status is returned normally so callers can read the body.
+function httpPostJson($url, $headers, $payloadJson, $serviceName) {
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => $payloadJson,
+            CURLOPT_HTTPHEADER     => $headers,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 20,
+        ]);
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlErr = curl_error($ch);
+        curl_close($ch);
+
+        if ($curlErr) throw new Exception("$serviceName connection failed: $curlErr");
+        return [$httpCode, $response];
+    }
+
+    // Fall back to a stream-context HTTP request if the curl extension isn't available
+    if (!ini_get('allow_url_fopen')) {
+        throw new Exception("Neither the PHP curl extension nor allow_url_fopen is enabled on this server. Ask your host to enable one of them.");
+    }
+    $context = stream_context_create([
+        'http' => [
+            'method'        => 'POST',
+            'header'        => implode("\r\n", $headers),
+            'content'       => $payloadJson,
+            'timeout'       => 20,
+            'ignore_errors' => true,
+        ],
+    ]);
+    $response = @file_get_contents($url, false, $context);
+    if ($response === false) {
+        $err = error_get_last();
+        throw new Exception("$serviceName connection failed: " . ($err['message'] ?? 'unknown error'));
+    }
+    $httpCode = 200;
+    if (isset($http_response_header[0]) && preg_match('/\s(\d{3})\s/', $http_response_header[0], $m)) {
+        $httpCode = (int) $m[1];
+    }
+    return [$httpCode, $response];
+}
+
 // --- Minimal WAHA (WhatsApp HTTP API) client ---
 function sendWahaText($baseUrl, $session, $apiKey, $chatId, $text) {
     $url = rtrim($baseUrl, '/') . '/api/sendText';
@@ -164,12 +211,79 @@ function sendWahaText($baseUrl, $session, $apiKey, $chatId, $text) {
     $headers = ['Content-Type: application/json'];
     if (!empty($apiKey)) $headers[] = 'X-Api-Key: ' . $apiKey;
 
+    list($httpCode, $response) = httpPostJson($url, $headers, $payload, 'WAHA');
+    if ($httpCode < 200 || $httpCode >= 300) throw new Exception("WAHA error ($httpCode): $response");
+    return true;
+}
+
+// --- Brevo (transactional email API) client — sends over HTTPS, so it isn't
+// affected by a host blocking raw outbound SMTP ports. ---
+function sendBrevoEmail($apiKey, $fromEmail, $fromName, $toEmail, $subject, $body, $attachment = null) {
+    $payload = [
+        'sender'      => ['name' => $fromName, 'email' => $fromEmail],
+        'to'          => [['email' => $toEmail]],
+        'subject'     => $subject,
+        'textContent' => $body,
+    ];
+    if ($attachment) {
+        $payload['attachment'] = [[
+            'content' => base64_encode($attachment['content']),
+            'name'    => $attachment['filename'],
+        ]];
+    }
+
+    $headers = [
+        'Content-Type: application/json',
+        'Accept: application/json',
+        'api-key: ' . $apiKey,
+    ];
+
+    list($httpCode, $response) = httpPostJson('https://api.brevo.com/v3/smtp/email', $headers, json_encode($payload), 'Brevo');
+    if ($httpCode < 200 || $httpCode >= 300) throw new Exception("Brevo error ($httpCode): $response");
+    return true;
+}
+
+// --- Gmail API (Google Workspace) client, authenticated as a service account
+// with domain-wide delegation. Sends over HTTPS via Google's REST API rather
+// than raw SMTP, so it isn't affected by a host blocking outbound SMTP ports. ---
+function base64UrlEncode($data) {
+    return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
+}
+
+function getGoogleAccessToken($serviceAccountJson, $delegatedUser) {
+    $creds = json_decode($serviceAccountJson, true);
+    if (!$creds || empty($creds['client_email']) || empty($creds['private_key'])) {
+        throw new Exception("Invalid Google service account JSON — check it was pasted in full and correctly under Settings.");
+    }
+
+    $now = time();
+    $header = ['alg' => 'RS256', 'typ' => 'JWT'];
+    $claims = [
+        'iss'   => $creds['client_email'],
+        'scope' => 'https://www.googleapis.com/auth/gmail.send',
+        'aud'   => 'https://oauth2.googleapis.com/token',
+        'exp'   => $now + 3600,
+        'iat'   => $now,
+        'sub'   => $delegatedUser,
+    ];
+
+    $signingInput = base64UrlEncode(json_encode($header)) . '.' . base64UrlEncode(json_encode($claims));
+    $signature = '';
+    $signed = openssl_sign($signingInput, $signature, $creds['private_key'], 'sha256WithRSAEncryption');
+    if (!$signed) throw new Exception("Failed to sign the Google auth request — the service account private key looks invalid.");
+    $jwt = $signingInput . '.' . base64UrlEncode($signature);
+
+    $postFields = http_build_query([
+        'grant_type' => 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+        'assertion'  => $jwt,
+    ]);
+
     if (function_exists('curl_init')) {
-        $ch = curl_init($url);
+        $ch = curl_init('https://oauth2.googleapis.com/token');
         curl_setopt_array($ch, [
             CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => $payload,
-            CURLOPT_HTTPHEADER     => $headers,
+            CURLOPT_POSTFIELDS     => $postFields,
+            CURLOPT_HTTPHEADER     => ['Content-Type: application/x-www-form-urlencoded'],
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT        => 20,
         ]);
@@ -177,35 +291,56 @@ function sendWahaText($baseUrl, $session, $apiKey, $chatId, $text) {
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $curlErr = curl_error($ch);
         curl_close($ch);
-
-        if ($curlErr) throw new Exception("WAHA connection failed: $curlErr");
-        if ($httpCode < 200 || $httpCode >= 300) throw new Exception("WAHA error ($httpCode): $response");
-        return true;
-    }
-
-    // Fall back to a stream-context HTTP request if the curl extension isn't available
-    if (!ini_get('allow_url_fopen')) {
-        throw new Exception("Neither the PHP curl extension nor allow_url_fopen is enabled on this server. Ask your host to enable one of them.");
-    }
-    $context = stream_context_create([
-        'http' => [
+        if ($curlErr) throw new Exception("Google auth connection failed: $curlErr");
+    } else {
+        if (!ini_get('allow_url_fopen')) {
+            throw new Exception("Neither the PHP curl extension nor allow_url_fopen is enabled on this server.");
+        }
+        $context = stream_context_create(['http' => [
             'method'        => 'POST',
-            'header'        => implode("\r\n", $headers),
-            'content'       => $payload,
+            'header'        => "Content-Type: application/x-www-form-urlencoded\r\n",
+            'content'       => $postFields,
             'timeout'       => 20,
             'ignore_errors' => true,
-        ],
-    ]);
-    $response = @file_get_contents($url, false, $context);
-    if ($response === false) {
-        $err = error_get_last();
-        throw new Exception("WAHA connection failed: " . ($err['message'] ?? 'unknown error'));
+        ]]);
+        $response = @file_get_contents('https://oauth2.googleapis.com/token', false, $context);
+        if ($response === false) {
+            $err = error_get_last();
+            throw new Exception("Google auth connection failed: " . ($err['message'] ?? 'unknown error'));
+        }
+        $httpCode = 200;
+        if (isset($http_response_header[0]) && preg_match('/\s(\d{3})\s/', $http_response_header[0], $m)) {
+            $httpCode = (int) $m[1];
+        }
     }
-    $httpCode = 200;
-    if (isset($http_response_header[0]) && preg_match('/\s(\d{3})\s/', $http_response_header[0], $m)) {
-        $httpCode = (int) $m[1];
+
+    $json = json_decode($response, true);
+    if ($httpCode < 200 || $httpCode >= 300 || empty($json['access_token'])) {
+        throw new Exception("Google auth failed ($httpCode): $response");
     }
-    if ($httpCode < 200 || $httpCode >= 300) throw new Exception("WAHA error ($httpCode): $response");
+    return $json['access_token'];
+}
+
+function sendGmailApiEmail($accessToken, $fromEmail, $fromName, $toEmail, $subject, $body, $attachment = null) {
+    list($boundary, $mimeBody) = buildMimeBody($body, $attachment);
+
+    $headers = "From: =?UTF-8?B?" . base64_encode($fromName) . "?= <$fromEmail>\r\n";
+    $headers .= "To: <$toEmail>\r\n";
+    $headers .= "Subject: =?UTF-8?B?" . base64_encode($subject) . "?=\r\n";
+    $headers .= "MIME-Version: 1.0\r\n";
+    $headers .= $boundary
+        ? "Content-Type: multipart/mixed; boundary=\"$boundary\"\r\n"
+        : "Content-Type: text/plain; charset=UTF-8\r\n";
+
+    $rawMessage = base64UrlEncode($headers . "\r\n" . $mimeBody);
+
+    list($httpCode, $response) = httpPostJson(
+        'https://gmail.googleapis.com/gmail/v1/users/me/messages/send',
+        ['Content-Type: application/json', 'Authorization: Bearer ' . $accessToken],
+        json_encode(['raw' => $rawMessage]),
+        'Gmail API'
+    );
+    if ($httpCode < 200 || $httpCode >= 300) throw new Exception("Gmail API error ($httpCode): $response");
     return true;
 }
 
@@ -266,6 +401,9 @@ try {
         ensureColumn($pdo, 'students', 'mobile', 'VARCHAR(50) DEFAULT NULL');
         ensureColumn($pdo, 'students', 'email', 'VARCHAR(100) DEFAULT NULL');
         ensureColumn($pdo, 'students', 'total_package', 'DECIMAL(10,2) DEFAULT NULL');
+        ensureColumn($pdo, 'settings', 'brevo_api_key', 'VARCHAR(255) DEFAULT NULL');
+        ensureColumn($pdo, 'settings', 'google_service_account_json', 'TEXT DEFAULT NULL');
+        ensureColumn($pdo, 'settings', 'google_delegated_user', 'VARCHAR(255) DEFAULT NULL');
     } catch (\Exception $e) {}
 
     // Seed Admin if missing
@@ -399,7 +537,9 @@ if ($method === 'POST' && isset($input['action'])) {
         if ($row) {
             $row['has_waha_api_key'] = !empty($row['waha_api_key']);
             $row['has_smtp_password'] = !empty($row['smtp_password']);
-            unset($row['waha_api_key'], $row['smtp_password']);
+            $row['has_brevo_api_key'] = !empty($row['brevo_api_key']);
+            $row['has_google_service_account'] = !empty($row['google_service_account_json']);
+            unset($row['waha_api_key'], $row['smtp_password'], $row['brevo_api_key'], $row['google_service_account_json']);
         }
         echo json_encode(['status' => 'success', 'settings' => $row]);
         exit;
@@ -411,16 +551,20 @@ if ($method === 'POST' && isset($input['action'])) {
             $current = $pdo->query("SELECT * FROM settings WHERE id = 1")->fetch();
             $wahaApiKey = !empty($data['waha_api_key']) ? $data['waha_api_key'] : $current['waha_api_key'];
             $smtpPassword = !empty($data['smtp_password']) ? $data['smtp_password'] : $current['smtp_password'];
+            $brevoApiKey = !empty($data['brevo_api_key']) ? $data['brevo_api_key'] : $current['brevo_api_key'];
+            $googleServiceAccountJson = !empty($data['google_service_account_json']) ? $data['google_service_account_json'] : $current['google_service_account_json'];
 
             $stmt = $pdo->prepare("UPDATE settings SET
                 waha_url = ?, waha_session = ?, waha_api_key = ?,
                 smtp_host = ?, smtp_port = ?, smtp_username = ?, smtp_password = ?,
-                smtp_from_email = ?, smtp_from_name = ?
+                smtp_from_email = ?, smtp_from_name = ?, brevo_api_key = ?,
+                google_service_account_json = ?, google_delegated_user = ?
                 WHERE id = 1");
             $stmt->execute([
                 $data['waha_url'] ?? '', $data['waha_session'] ?? '', $wahaApiKey,
                 $data['smtp_host'] ?? '', $data['smtp_port'] ?? null, $data['smtp_username'] ?? '', $smtpPassword,
-                $data['smtp_from_email'] ?? '', $data['smtp_from_name'] ?? '',
+                $data['smtp_from_email'] ?? '', $data['smtp_from_name'] ?? '', $brevoApiKey,
+                $googleServiceAccountJson, $data['google_delegated_user'] ?? '',
             ]);
             echo json_encode(['status' => 'success']);
         } catch (Exception $e) {
@@ -458,26 +602,42 @@ if ($method === 'POST' && isset($input['action'])) {
             $settings = $pdo->query("SELECT * FROM settings WHERE id = 1")->fetch();
 
             if ($channel === 'email') {
-                if (empty($settings['smtp_host']) || empty($settings['smtp_username']) || empty($settings['smtp_password'])) {
+                $haveGoogle = !empty($settings['google_service_account_json']) && !empty($settings['google_delegated_user']);
+                $haveBrevo = !empty($settings['brevo_api_key']);
+                $haveSmtp = !empty($settings['smtp_host']) && !empty($settings['smtp_username']) && !empty($settings['smtp_password']);
+                if (!$haveGoogle && !$haveBrevo && !$haveSmtp) {
                     throw new Exception("Email is not configured yet. Ask an admin to set it up under Settings.");
                 }
-                $fromEmail = $settings['smtp_from_email'] ?: $settings['smtp_username'];
                 $fromName = $settings['smtp_from_name'] ?: 'Fee Manager';
-                try {
-                    sendSmtpMail(
-                        $settings['smtp_host'], $settings['smtp_port'] ?: 587,
-                        $settings['smtp_username'], $settings['smtp_password'],
-                        $fromEmail, $fromName,
-                        $recipient, $subject, $message, $attachment
-                    );
-                } catch (\Throwable $smtpError) {
-                    // Many hosts block raw outbound SMTP sockets for customer scripts but
-                    // still relay PHP's mail() through their own local mail transfer agent —
-                    // worth a shot before giving up.
+
+                if ($haveGoogle) {
+                    // Sends via the Gmail API over HTTPS, authenticated as a Workspace
+                    // service account — not affected by a host blocking raw SMTP ports.
+                    $accessToken = getGoogleAccessToken($settings['google_service_account_json'], $settings['google_delegated_user']);
+                    sendGmailApiEmail($accessToken, $settings['google_delegated_user'], $fromName, $recipient, $subject, $message, $attachment);
+                } elseif ($haveBrevo) {
+                    // Sends over HTTPS — not affected by a host blocking raw SMTP ports,
+                    // which is the case for most of what this app has hit so far.
+                    $fromEmail = $settings['smtp_from_email'] ?: $settings['smtp_username'];
+                    sendBrevoEmail($settings['brevo_api_key'], $fromEmail, $fromName, $recipient, $subject, $message, $attachment);
+                } elseif ($haveSmtp) {
+                    $fromEmail = $settings['smtp_from_email'] ?: $settings['smtp_username'];
                     try {
-                        sendPhpMail($fromEmail, $fromName, $recipient, $subject, $message, $attachment);
-                    } catch (\Throwable $mailError) {
-                        throw new Exception("SMTP failed (" . $smtpError->getMessage() . "). " . $mailError->getMessage());
+                        sendSmtpMail(
+                            $settings['smtp_host'], $settings['smtp_port'] ?: 587,
+                            $settings['smtp_username'], $settings['smtp_password'],
+                            $fromEmail, $fromName,
+                            $recipient, $subject, $message, $attachment
+                        );
+                    } catch (\Throwable $smtpError) {
+                        // Many hosts block raw outbound SMTP sockets for customer scripts but
+                        // still relay PHP's mail() through their own local mail transfer agent —
+                        // worth a shot before giving up.
+                        try {
+                            sendPhpMail($fromEmail, $fromName, $recipient, $subject, $message, $attachment);
+                        } catch (\Throwable $mailError) {
+                            throw new Exception("SMTP failed (" . $smtpError->getMessage() . "). " . $mailError->getMessage());
+                        }
                     }
                 }
             } elseif ($channel === 'whatsapp') {
