@@ -1,0 +1,266 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom Scrollbar for a cleaner look */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@media print {
+  @page {
+    margin: 5mm;
+  }
+
+  /* RESET EVERYTHING FOR PRINT */
+  html,
+  body {
+    height: auto !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    background: white !important;
+    color: black !important;
+  }
+
+  /* Disable Fixed Positioning on Modals for Multi-page Print */
+  .fixed,
+  .absolute,
+  .relative,
+  .inset-0,
+  .h-\[90vh\],
+  .overflow-y-auto,
+  .overflow-auto {
+    position: static !important;
+    overflow: visible !important;
+    height: auto !important;
+    width: auto !important;
+    max-height: none !important;
+  }
+
+  /* HIDE EVERYTHING... */
+  body * {
+    visibility: hidden;
+  }
+
+  /* ...EXCEPT THE PRINT AREA */
+  #printableArea,
+  #printableArea * {
+    visibility: visible;
+  }
+
+  /* POSITION THE PRINT AREA */
+  #printableArea {
+    position: absolute !important;
+    left: 0;
+    top: 0;
+    width: 100% !important;
+    height: auto !important;
+    margin: 0;
+    padding: 0;
+    background: white;
+    font-family: 'Arial', sans-serif;
+    font-size: 9px;
+    color: black;
+    z-index: 9999;
+    overflow: visible !important;
+    display: block !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  /* Force display for print headers even if hidden on screen */
+  .print-only-header {
+    display: block !important;
+    visibility: visible !important;
+  }
+
+  /* TABLE STYLING FOR PRINT */
+  table {
+    width: 100% !important;
+    border-collapse: collapse;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+  tfoot {
+    display: table-footer-group;
+  }
+  tr {
+    page-break-inside: avoid;
+  }
+
+  th,
+  td {
+    border: 1px solid #000 !important;
+    padding: 2px 3px !important;
+    overflow: hidden;
+    white-space: normal;
+    vertical-align: middle;
+  }
+
+  /* --- CLEARANCE REPORT SPECIFIC (13 Columns) --- */
+  .clearance-table {
+    table-layout: fixed;
+  }
+  .clearance-table th:nth-child(1),
+  .clearance-table td:nth-child(1) {
+    width: 14%;
+  }
+  .clearance-table th:nth-child(2),
+  .clearance-table td:nth-child(2) {
+    width: 4%;
+    text-align: center;
+  }
+  .clearance-table th:nth-child(3),
+  .clearance-table td:nth-child(3) {
+    width: 4%;
+    text-align: center;
+  }
+  .clearance-table th:nth-child(4),
+  .clearance-table td:nth-child(4) {
+    width: 8%;
+    text-align: right;
+  }
+  .clearance-table th:nth-child(5),
+  .clearance-table td:nth-child(5) {
+    width: 6%;
+    text-align: right;
+  }
+  .clearance-table th:nth-child(6),
+  .clearance-table td:nth-child(6) {
+    width: 6%;
+    text-align: right;
+  }
+  .clearance-table th:nth-child(7),
+  .clearance-table td:nth-child(7) {
+    width: 6%;
+    text-align: right;
+  }
+  .clearance-table th:nth-child(8),
+  .clearance-table td:nth-child(8) {
+    width: 9%;
+    text-align: right;
+    background-color: #f3f4f6 !important;
+    font-weight: bold;
+  }
+  .clearance-table th:nth-child(9),
+  .clearance-table td:nth-child(9) {
+    width: 5%;
+    text-align: center;
+  }
+  .clearance-table th:nth-child(10),
+  .clearance-table td:nth-child(10) {
+    width: 7%;
+    text-align: right;
+  }
+  .clearance-table th:nth-child(11),
+  .clearance-table td:nth-child(11) {
+    width: 9%;
+    text-align: right;
+    font-weight: bold;
+  }
+  .clearance-table th:nth-child(12),
+  .clearance-table td:nth-child(12) {
+    width: 9%;
+    text-align: right;
+  }
+  .clearance-table th:nth-child(13),
+  .clearance-table td:nth-child(13) {
+    width: 13%;
+    text-align: right;
+    font-weight: bold;
+  }
+
+  /* --- SESSION DETAIL REPORT SPECIFIC (11 Columns) --- */
+  .session-detail-table {
+    table-layout: fixed;
+  }
+  .session-detail-table th:nth-child(1),
+  .session-detail-table td:nth-child(1) {
+    width: 4%;
+    text-align: center;
+  }
+  .session-detail-table th:nth-child(2),
+  .session-detail-table td:nth-child(2) {
+    width: 15%;
+    font-family: monospace;
+  }
+  .session-detail-table th:nth-child(3),
+  .session-detail-table td:nth-child(3) {
+    width: 20%;
+  }
+  .session-detail-table th:nth-child(4),
+  .session-detail-table td:nth-child(4) {
+    width: 5%;
+    text-align: center;
+  }
+  .session-detail-table th:nth-child(5),
+  .session-detail-table td:nth-child(5) {
+    width: 4%;
+    text-align: center;
+  }
+  .session-detail-table th:nth-child(6),
+  .session-detail-table td:nth-child(6) {
+    width: 8%;
+    text-align: right;
+  }
+  .session-detail-table th:nth-child(7),
+  .session-detail-table td:nth-child(7) {
+    width: 8%;
+    text-align: right;
+  }
+  .session-detail-table th:nth-child(8),
+  .session-detail-table td:nth-child(8) {
+    width: 8%;
+    text-align: right;
+  }
+  .session-detail-table th:nth-child(9),
+  .session-detail-table td:nth-child(9) {
+    width: 9%;
+    text-align: right;
+    font-weight: bold;
+  }
+  .session-detail-table th:nth-child(10),
+  .session-detail-table td:nth-child(10) {
+    width: 9%;
+    text-align: right;
+  }
+  .session-detail-table th:nth-child(11),
+  .session-detail-table td:nth-child(11) {
+    width: 10%;
+    text-align: right;
+    font-weight: bold;
+  }
+
+  /* Highlight Total */
+  .print-modern-total {
+    background-color: #000 !important;
+    color: #fff !important;
+    font-weight: 900 !important;
+    border: 2px solid #000 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  thead th {
+    background-color: #e5e7eb !important;
+    font-weight: 800;
+    text-transform: uppercase;
+    font-size: 8px;
+    -webkit-print-color-adjust: exact;
+  }
+
+  /* Force Landscape for Summary Detail if needed */
+  .landscape-mode-print {
+    /* @page { size: A4 landscape; } */
+  }
+}
