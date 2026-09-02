@@ -9,6 +9,7 @@ import {
   XSquare,
 } from '../icons';
 import { ITEMS_PER_PAGE, TABS } from '../../utils/constants';
+import { isLoanBank, rowIdKey } from '../../utils/format';
 import type { FeeAppState } from '../../hooks/useFeeApp';
 import type { TableRow } from '../../types';
 
@@ -50,7 +51,6 @@ export function DataDirectoryTab({ app }: DataDirectoryTabProps) {
     sortConfig,
     openModal,
     handleDelete,
-    norm,
     num,
     currentPage,
     setCurrentPage,
@@ -396,10 +396,10 @@ export function DataDirectoryTab({ app }: DataDirectoryTabProps) {
                 </tr>
               ) : (
                 paginatedData.map((item, idx) => {
-                  const rowId = item.id || item.reg_no || idx;
+                  const rowId = rowIdKey(item.id || item.reg_no || idx);
                   return (
                     <tr
-                      key={String(rowId)}
+                      key={rowId}
                       className={`hover:bg-gray-50 transition ${selected.has(rowId) ? 'bg-blue-50' : ''}`}
                     >
                       <td className="p-4">
@@ -418,7 +418,7 @@ export function DataDirectoryTab({ app }: DataDirectoryTabProps) {
                         >
                           <i className="fas fa-edit"></i> Edit
                         </button>
-                        {activeTab === 'payments' && norm(item.bank) === 'loan' ? (
+                        {activeTab === 'payments' && isLoanBank(item.bank) ? (
                           <span
                             className="p-2 text-gray-300 cursor-not-allowed"
                             title='Loan-sourced — delete from the "Other Bank" tab'

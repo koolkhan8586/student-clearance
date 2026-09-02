@@ -1,6 +1,12 @@
 export const norm = (str: unknown): string =>
   str ? str.toString().toLowerCase().replace(/[^a-z0-9]/g, '') : '';
 
+export const rowIdKey = (id: unknown): string => (id == null ? '' : String(id));
+
+export const isLoanBank = (bank: unknown): boolean => norm(bank) === 'loan';
+
+export const sameRowId = (a: unknown, b: unknown): boolean => rowIdKey(a) === rowIdKey(b);
+
 export const canonicalReg = (str: unknown): string =>
   str ? str.toString().toUpperCase().replace(/[^A-Z0-9]/g, '') : '';
 

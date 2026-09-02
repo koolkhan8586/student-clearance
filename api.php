@@ -433,6 +433,18 @@ function normStr($str) {
     return strtolower(preg_replace('/[^a-z0-9]/', '', (string) $str));
 }
 
+function isLoanBank($bank) {
+    return strtolower(trim((string) ($bank ?? ''))) === 'loan';
+}
+
+function sqlLoanBank() {
+    return "LOWER(TRIM(COALESCE(bank, ''))) = 'loan'";
+}
+
+function sqlNotLoanBank() {
+    return 'NOT (' . sqlLoanBank() . ')';
+}
+
 function canonicalRegNo($regNo) {
     if ($regNo === null || $regNo === '') return '';
     return strtoupper(preg_replace('/[^A-Z0-9]/', '', (string) $regNo));
@@ -852,8 +864,9 @@ function tableConfig($tab) {
         'students'    => ['table' => 'students', 'searchCols' => ['reg_no', 'name', 'degree', 'batch', 'mobile', 'email'], 'orderCol' => 'id'],
         'fees'        => ['table' => 'fee_structure', 'searchCols' => ['degree', 'batch'], 'orderCol' => 'id'],
         'enrollments' => ['table' => 'enrollments', 'searchCols' => ['reg_no', 'name', 'semester'], 'orderCol' => 'id'],
-        'payments'    => ['table' => 'payments', 'searchCols' => ['reg_no', 'name', 'semester', 'bank'], 'where' => "(bank IS NULL OR bank <> 'Loan')", 'orderCol' => 'id'],
-        'loans'       => ['table' => 'payments', 'searchCols' => ['reg_no', 'name', 'semester'], 'where' => "bank = 'Loan'", 'orderCol' => 'id'],
+        // Payments tab lists all payment rows (including Other Bank / Loan), matching legacy index.html.
+        'payments'    => ['table' => 'payments', 'searchCols' => ['reg_no', 'name', 'semester', 'bank'], 'orderCol' => 'id'],
+        'loans'       => ['table' => 'payments', 'searchCols' => ['reg_no', 'name', 'semester'], 'where' => sqlLoanBank(), 'orderCol' => 'id'],
         'discounts'   => ['table' => 'discounts', 'searchCols' => ['reg_no', 'name', 'term'], 'orderCol' => 'id'],
         'others'      => ['table' => 'other_charges', 'searchCols' => ['reg_no', 'name', 'semester', 'fee_name'], 'orderCol' => 'id'],
         'banks'       => ['table' => 'banks', 'searchCols' => ['name', 'account_no'], 'orderCol' => 'id'],
@@ -920,10 +933,11 @@ function fetchTablePage($pdo, $tab, $page, $limit, $search, $sortKey, $sortDir, 
     $stats = null;
     $loanSemesterStats = null;
     if ($tab === 'payments' || $tab === 'loans') {
+        $loanSql = sqlLoanBank();
         $statsStmt = $pdo->prepare("SELECT
             COALESCE(SUM(amount), 0) AS total,
-            COALESCE(SUM(CASE WHEN bank IS NOT NULL AND bank <> '' AND bank <> 'Cash' AND bank <> 'Loan' THEN amount ELSE 0 END), 0) AS bank,
-            COALESCE(SUM(CASE WHEN bank IS NULL OR bank = '' OR bank = 'Cash' OR bank = 'Loan' THEN amount ELSE 0 END), 0) AS cash
+            COALESCE(SUM(CASE WHEN bank IS NOT NULL AND bank <> '' AND bank <> 'Cash' AND NOT ($loanSql) THEN amount ELSE 0 END), 0) AS bank,
+            COALESCE(SUM(CASE WHEN bank IS NULL OR bank = '' OR bank = 'Cash' OR ($loanSql) THEN amount ELSE 0 END), 0) AS cash
             FROM `$table` WHERE $whereSql");
         $statsStmt->execute($params);
         $stats = $statsStmt->fetch();
@@ -1001,8 +1015,8 @@ if ($method === 'GET') {
                 'students'    => (int) $pdo->query("SELECT COUNT(*) FROM students")->fetchColumn(),
                 'fees'        => (int) $pdo->query("SELECT COUNT(*) FROM fee_structure")->fetchColumn(),
                 'enrollments' => (int) $pdo->query("SELECT COUNT(*) FROM enrollments")->fetchColumn(),
-                'payments'    => (int) $pdo->query("SELECT COUNT(*) FROM payments WHERE bank IS NULL OR bank <> 'Loan'")->fetchColumn(),
-                'loans'       => (int) $pdo->query("SELECT COUNT(*) FROM payments WHERE bank = 'Loan'")->fetchColumn(),
+                'payments'    => (int) $pdo->query("SELECT COUNT(*) FROM payments")->fetchColumn(),
+                'loans'       => (int) $pdo->query('SELECT COUNT(*) FROM payments WHERE ' . sqlLoanBank())->fetchColumn(),
                 'discounts'   => (int) $pdo->query("SELECT COUNT(*) FROM discounts")->fetchColumn(),
                 'others'      => (int) $pdo->query("SELECT COUNT(*) FROM other_charges")->fetchColumn(),
                 'banks'       => (int) $pdo->query("SELECT COUNT(*) FROM banks")->fetchColumn(),
@@ -1225,10 +1239,10 @@ if ($method === 'POST' && isset($input['action'])) {
                     $rows = $pdo->query("SELECT degree, batch FROM fee_structure")->fetchAll();
                     break;
                 case 'payments':
-                    $rows = $pdo->query("SELECT reg_no, semester, amount, date, bank FROM payments WHERE bank IS NULL OR bank <> 'Loan'")->fetchAll();
+                    $rows = $pdo->query('SELECT reg_no, semester, amount, date, bank FROM payments WHERE ' . sqlNotLoanBank())->fetchAll();
                     break;
                 case 'loans':
-                    $rows = $pdo->query("SELECT reg_no, semester, amount, date FROM payments WHERE bank = 'Loan'")->fetchAll();
+                    $rows = $pdo->query('SELECT reg_no, semester, amount, date FROM payments WHERE ' . sqlLoanBank())->fetchAll();
                     break;
                 case 'enrollments':
                 case 'discounts':
@@ -1568,10 +1582,10 @@ if ($method === 'POST' && isset($input['action'])) {
 
                 if ($table === 'loans') {
                     // "loans" isn't a real table — it's payments tagged bank = 'Loan'
-                    $pdo->exec("DELETE FROM payments WHERE bank = 'Loan'");
+                    $pdo->exec('DELETE FROM payments WHERE ' . sqlLoanBank());
                 } elseif ($table === 'payments') {
                     // Never let a Payments-tab bulk delete touch loan-sourced rows
-                    $pdo->exec("DELETE FROM payments WHERE bank IS NULL OR bank <> 'Loan'");
+                    $pdo->exec('DELETE FROM payments WHERE ' . sqlNotLoanBank());
                 } else {
                     $allowed = ['students', 'fee_structure', 'enrollments', 'discounts', 'other_charges', 'users', 'banks'];
                     if (in_array($table, $allowed)) {
@@ -1589,10 +1603,10 @@ if ($method === 'POST' && isset($input['action'])) {
                  if (!$term) break;
 
                  if ($table === 'loans') {
-                     $stmt = $pdo->prepare("DELETE FROM payments WHERE bank = 'Loan' AND semester LIKE ?");
+                     $stmt = $pdo->prepare('DELETE FROM payments WHERE ' . sqlLoanBank() . ' AND semester LIKE ?');
                      $stmt->execute(["%$term%"]);
                  } elseif ($table === 'payments') {
-                     $stmt = $pdo->prepare("DELETE FROM payments WHERE (bank IS NULL OR bank <> 'Loan') AND semester LIKE ?");
+                     $stmt = $pdo->prepare('DELETE FROM payments WHERE ' . sqlNotLoanBank() . ' AND semester LIKE ?');
                      $stmt->execute(["%$term%"]);
                  } elseif (in_array($table, ['enrollments', 'other_charges'])) {
                      $stmt = $pdo->prepare("DELETE FROM $table WHERE semester LIKE ?");
