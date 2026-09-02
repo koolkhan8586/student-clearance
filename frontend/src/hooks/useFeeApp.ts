@@ -30,7 +30,7 @@ import type {
   User,
 } from '../types';
 import { ADMIN_EXTRA_TABS, ITEMS_PER_PAGE, TAB_TABLES, TABS } from '../utils/constants';
-import { norm, num } from '../utils/format';
+import { norm, canonicalReg, parseDegreeFromReg, syncDegreeFromReg, num } from '../utils/format';
 
 export function useFeeApp() {
   const [user, setUser] = useState<User | null>(null);
@@ -177,7 +177,8 @@ export function useFeeApp() {
         }
         const json = await res.json();
         if (json.status === 'success') {
-          setTableRows(json.rows || []);
+          const rows = json.rows || [];
+          setTableRows(tab === 'students' ? rows.map((row: TableRow) => syncDegreeFromReg(row)) : rows);
           setTableTotal(json.total || 0);
           setTableStats(json.stats || null);
           setLoanSemesterStats(json.loanSemesterStats || []);
@@ -302,12 +303,20 @@ export function useFeeApp() {
   }, [summaryFilterSession, activeTab, user, loadSummary]);
 
   const generateReport = useCallback(async () => {
-    if (!searchReg) return;
+    const reg = canonicalReg(searchReg);
+    if (!reg) return;
     setClearanceLoading(true);
+    setClearanceResult(null);
     try {
-      const res = await getClearanceRequest(searchReg, filterSession);
+      const res = await getClearanceRequest(reg, filterSession);
       const json = await res.json();
       if (json.status === 'success') {
+        const returnedReg = canonicalReg(json.report?.student?.reg_no || '');
+        if (returnedReg !== reg) {
+          alert(`Wrong student returned. Searched ${reg} but got ${returnedReg}. Please upload the latest api.php to the server.`);
+          setClearanceResult(null);
+          return;
+        }
         setClearanceResult(json.report);
       } else {
         alert(json.message || 'Student not found!');
@@ -315,6 +324,7 @@ export function useFeeApp() {
       }
     } catch {
       alert('Network Error');
+      setClearanceResult(null);
     } finally {
       setClearanceLoading(false);
     }
@@ -693,10 +703,8 @@ export function useFeeApp() {
     const reg = e.target.value;
     if (modalType === 'students') {
       const updates: Record<string, string> = { reg_no: reg };
-      const upper = reg.toUpperCase();
-      if (upper.includes('05')) {
-        updates.degree = upper.split('05')[0];
-      }
+      const degree = parseDegreeFromReg(reg);
+      if (degree) updates.degree = degree;
       setFormData((prev) => ({ ...prev, ...updates }));
       return;
     }
@@ -861,10 +869,8 @@ export function useFeeApp() {
         if (obj.amount) obj.amount = String(obj.amount).replace(/[^0-9.-]/g, '');
 
         if (type === 'students' && obj.reg_no) {
-          const upper = String(obj.reg_no).toUpperCase();
-          if (upper.includes('05')) {
-            obj.degree = upper.split('05')[0];
-          }
+          const degree = parseDegreeFromReg(obj.reg_no);
+          if (degree) obj.degree = degree;
         }
 
         if (!obj.name && obj.reg_no) {

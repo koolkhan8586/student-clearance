@@ -35,10 +35,12 @@ export function ClearanceTab({ app }: ClearanceTabProps) {
           <input
             type="text"
             value={searchReg}
-            onChange={(e) => setSearchReg(e.target.value)}
+            onChange={(e) => setSearchReg(e.target.value.toUpperCase())}
             onKeyDown={(e) => e.key === 'Enter' && generateReport()}
             placeholder="Enter Registration No (e.g. BSCAF052530040)"
-            className="flex-1 block w-full rounded-lg border-gray-300 border p-3 focus:ring-2 focus:ring-blue-500 outline-none"
+            autoCapitalize="characters"
+            spellCheck={false}
+            className="flex-1 block w-full rounded-lg border-gray-300 border p-3 focus:ring-2 focus:ring-blue-500 outline-none uppercase"
           />
           <select
             value={filterSession}

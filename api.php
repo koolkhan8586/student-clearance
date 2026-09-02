@@ -433,6 +433,119 @@ function normStr($str) {
     return strtolower(preg_replace('/[^a-z0-9]/', '', (string) $str));
 }
 
+function canonicalRegNo($regNo) {
+    if ($regNo === null || $regNo === '') return '';
+    return strtoupper(preg_replace('/[^A-Z0-9]/', '', (string) $regNo));
+}
+
+function regNoEquals($a, $b) {
+    // Full registration number must match exactly (case-insensitive).
+    // BSCAF052410025 and BAF052410025 share the same numeric tail but are
+    // different degree programs and different students — never partial-match.
+    return normStr($a) === normStr($b);
+}
+
+function parseDegreeFromRegNo($regNo) {
+    $canonical = canonicalRegNo($regNo);
+    if ($canonical === '') return '';
+    // Degree is everything before the first batch marker "05" (e.g. BSCAF052430051 → BSCAF)
+    $pos = strpos($canonical, '05');
+    if ($pos === false || $pos === 0) return '';
+    return substr($canonical, 0, $pos);
+}
+
+function regNoStrictMatch($stored, $search) {
+    $storedCanonical = canonicalRegNo($stored);
+    $searchCanonical = canonicalRegNo($search);
+    if ($storedCanonical === '' || $searchCanonical === '') return false;
+    if ($storedCanonical !== $searchCanonical) return false;
+    $storedDegree = parseDegreeFromRegNo($storedCanonical);
+    $searchDegree = parseDegreeFromRegNo($searchCanonical);
+    if ($searchDegree !== '' && $storedDegree !== '' && $storedDegree !== $searchDegree) {
+        return false;
+    }
+    return true;
+}
+
+function filterEnrollmentsForReg($enrollments, $searchCanonical, $filterSession = '') {
+    $filtered = [];
+    foreach ($enrollments as $en) {
+        if (!regNoStrictMatch($en['reg_no'] ?? '', $searchCanonical)) continue;
+        if ($filterSession && strpos(normStr($en['semester'] ?? ''), normStr($filterSession)) === false) continue;
+        $filtered[] = $en;
+    }
+
+    // Safety net: one row per semester for this exact registration number
+    $bySemester = [];
+    foreach ($filtered as $en) {
+        $semKey = normStr($en['semester'] ?? '');
+        if ($semKey === '') continue;
+        if (!isset($bySemester[$semKey])) {
+            $bySemester[$semKey] = $en;
+            continue;
+        }
+        $currentId = (int) ($bySemester[$semKey]['id'] ?? 0);
+        $candidateId = (int) ($en['id'] ?? 0);
+        if ($candidateId > $currentId) {
+            $bySemester[$semKey] = $en;
+        }
+    }
+
+    return array_values($bySemester);
+}
+
+/** Restore legacy index.html behavior: degree always follows reg_no prefix (BSCAF vs BAF). */
+function applyDegreeFromRegNo($student) {
+    if (!is_array($student) || empty($student['reg_no'])) return $student;
+    $parsed = parseDegreeFromRegNo($student['reg_no']);
+    if ($parsed !== '') {
+        $student['degree'] = $parsed;
+    }
+    return $student;
+}
+
+function findStudentByRegNo($pdo, $regNo) {
+    $searchCanonical = canonicalRegNo($regNo);
+    $cleanReg = normStr($searchCanonical);
+    if ($cleanReg === '') return null;
+
+    $searchDegree = parseDegreeFromRegNo($searchCanonical);
+
+    $stmt = $pdo->query("SELECT * FROM students");
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        if (normStr($row['reg_no'] ?? '') !== $cleanReg) continue;
+
+        $rowDegree = parseDegreeFromRegNo($row['reg_no']);
+        if ($searchDegree !== '' && $rowDegree !== '' && $searchDegree !== $rowDegree) {
+            continue;
+        }
+
+        $student = applyDegreeFromRegNo($row);
+        $student['reg_no'] = $searchCanonical;
+        return $student;
+    }
+
+    // Student master missing but exact reg exists in transactional tables
+    foreach (['enrollments', 'payments', 'discounts', 'other_charges'] as $table) {
+        $tstmt = $pdo->query("SELECT DISTINCT reg_no, name FROM `$table` WHERE reg_no IS NOT NULL AND reg_no <> ''");
+        while ($row = $tstmt->fetch(PDO::FETCH_ASSOC)) {
+            if (normStr($row['reg_no'] ?? '') !== $cleanReg) continue;
+            return applyDegreeFromRegNo([
+                'id' => null,
+                'reg_no' => $searchCanonical,
+                'name' => $row['name'] ?? '',
+                'degree' => $searchDegree,
+                'batch' => '',
+                'mobile' => '',
+                'email' => '',
+                'total_package' => null,
+            ]);
+        }
+    }
+
+    return null;
+}
+
 function getTermRank($sem) {
     $s = strtolower((string) $sem);
     if (strpos($s, 'fall') !== false) return 1;
@@ -476,6 +589,7 @@ function semestersMatch($a, $b) {
 }
 
 function findMasterFee($fees, $student) {
+    $student = applyDegreeFromRegNo($student);
     $degree = normStr($student['degree'] ?? '');
     $batch = normStr($student['batch'] ?? '');
     foreach ($fees as $f) {
@@ -499,30 +613,34 @@ function findDiscountPct($discounts, $regNo, $semester) {
 }
 
 function computeClearanceReport($pdo, $regNo, $filterSession = '') {
-    $cleanReg = normStr($regNo);
-    $stmt = $pdo->query("SELECT * FROM students");
-    $student = null;
-    while ($row = $stmt->fetch()) {
-        if (normStr($row['reg_no']) === $cleanReg) { $student = $row; break; }
-    }
+    $searchCanonical = canonicalRegNo($regNo);
+    if ($searchCanonical === '') return null;
+
+    $student = findStudentByRegNo($pdo, $searchCanonical);
     if (!$student) return null;
+
+    if (!regNoEquals($student['reg_no'], $searchCanonical)) return null;
+
+    $student['reg_no'] = $searchCanonical;
+    $student = applyDegreeFromRegNo($student);
 
     $fees = $pdo->query("SELECT * FROM fee_structure")->fetchAll();
     $masterFee = findMasterFee($fees, $student);
 
-    $enrollments = [];
-    $estmt = $pdo->prepare("SELECT * FROM enrollments WHERE UPPER(reg_no) = UPPER(?)");
-    $estmt->execute([$student['reg_no']]);
-    while ($en = $estmt->fetch()) {
-        if ($filterSession && strpos(normStr($en['semester']), normStr($filterSession)) === false) continue;
-        $enrollments[] = $en;
-    }
+    $enrollments = filterEnrollmentsForReg(
+        $pdo->query("SELECT * FROM enrollments")->fetchAll(PDO::FETCH_ASSOC),
+        $searchCanonical,
+        $filterSession
+    );
 
     $others = $pdo->query("SELECT * FROM other_charges")->fetchAll();
     $discounts = $pdo->query("SELECT * FROM discounts")->fetchAll();
-    $payments = $pdo->prepare("SELECT * FROM payments WHERE UPPER(reg_no) = UPPER(?)");
-    $payments->execute([$student['reg_no']]);
-    $studentPayments = $payments->fetchAll();
+    $studentPayments = [];
+    foreach ($pdo->query("SELECT * FROM payments")->fetchAll(PDO::FETCH_ASSOC) as $p) {
+        if (regNoStrictMatch($p['reg_no'] ?? '', $searchCanonical)) {
+            $studentPayments[] = $p;
+        }
+    }
 
     $rows = [];
     $enrolledTermsNorm = [];
@@ -538,7 +656,7 @@ function computeClearanceReport($pdo, $regNo, $filterSession = '') {
             $exam = ($courses * (float) ($masterFee['per_course_fee'] ?? 0)) + (float) ($masterFee['other_fee'] ?? 0);
         }
         foreach ($others as $o) {
-            if (normStr($o['reg_no']) !== $cleanReg) continue;
+            if (!regNoStrictMatch($o['reg_no'] ?? '', $searchCanonical)) continue;
             if (semestersMatch($o['semester'], $en['semester'])) $other += (float) ($o['amount'] ?? 0);
         }
         $total = $tuition + $exam + $other;
@@ -560,7 +678,7 @@ function computeClearanceReport($pdo, $regNo, $filterSession = '') {
     $enrolledSet = array_unique($enrolledTermsNorm);
     foreach ($others as $rule) {
         if (strpos(normStr($rule['fee_name']), 'gap') === false) continue;
-        if (!empty($rule['reg_no']) && normStr($rule['reg_no']) !== $cleanReg) continue;
+        if (!empty($rule['reg_no']) && !regNoStrictMatch($rule['reg_no'], $searchCanonical)) continue;
         $ruleTerm = normStr($rule['semester']);
         if ($filterSession && strpos($ruleTerm, normStr($filterSession)) === false) continue;
         if (matchesTermSet($ruleTerm, $enrolledSet)) continue;
@@ -621,7 +739,7 @@ function computeClearanceReport($pdo, $regNo, $filterSession = '') {
 function computeSummaryReport($pdo, $filterSession = '') {
     $students = $pdo->query("SELECT * FROM students")->fetchAll();
     $studentMap = [];
-    foreach ($students as $s) $studentMap[normStr($s['reg_no'])] = $s;
+    foreach ($students as $s) $studentMap[normStr($s['reg_no'])] = applyDegreeFromRegNo($s);
 
     $fees = $pdo->query("SELECT * FROM fee_structure")->fetchAll();
     $others = $pdo->query("SELECT * FROM other_charges")->fetchAll();
@@ -755,7 +873,7 @@ function fetchTablePage($pdo, $tab, $page, $limit, $search, $sortKey, $sortDir, 
     if ($search !== '') {
         $likes = [];
         foreach ($cfg['searchCols'] as $col) {
-            $likes[] = "`$col` LIKE ?";
+            $likes[] = "UPPER(`$col`) LIKE UPPER(?)";
             $params[] = '%' . $search . '%';
         }
         $where[] = '(' . implode(' OR ', $likes) . ')';
@@ -784,6 +902,13 @@ function fetchTablePage($pdo, $tab, $page, $limit, $search, $sortKey, $sortDir, 
     $stmt = $pdo->prepare("SELECT * FROM `$table` WHERE $whereSql ORDER BY `$orderCol` $orderDir LIMIT $limit OFFSET $offset");
     $stmt->execute($params);
     $rows = $stmt->fetchAll();
+
+    if ($tab === 'students') {
+        foreach ($rows as &$row) {
+            $row = applyDegreeFromRegNo($row);
+        }
+        unset($row);
+    }
 
     if ($tab === 'users') {
         foreach ($rows as &$u) {
@@ -1033,7 +1158,7 @@ if ($method === 'POST' && isset($input['action'])) {
 
     if ($action === 'get_clearance') {
         try {
-            $regNo = trim($data['reg_no'] ?? '');
+            $regNo = canonicalRegNo(trim($data['reg_no'] ?? ''));
             $filterSession = trim($data['filter_session'] ?? '');
             if (!$regNo) throw new Exception('Registration number is required');
             $report = computeClearanceReport($pdo, $regNo, $filterSession);
@@ -1065,7 +1190,7 @@ if ($method === 'POST' && isset($input['action'])) {
             }
             $like = '%' . $q . '%';
             $stmt = $pdo->prepare("SELECT reg_no, name, degree, batch, mobile, email FROM students
-                WHERE reg_no LIKE ? OR name LIKE ? ORDER BY id DESC LIMIT $limit");
+                WHERE UPPER(reg_no) LIKE UPPER(?) OR UPPER(name) LIKE UPPER(?) ORDER BY id DESC LIMIT $limit");
             $stmt->execute([$like, $like]);
             echo json_encode(['status' => 'success', 'students' => $stmt->fetchAll()]);
         } catch (Exception $e) {
@@ -1076,10 +1201,11 @@ if ($method === 'POST' && isset($input['action'])) {
 
     if ($action === 'lookup_student') {
         try {
-            $regNo = trim($data['reg_no'] ?? '');
-            $stmt = $pdo->prepare("SELECT reg_no, name, degree, batch, mobile, email FROM students WHERE UPPER(reg_no) = UPPER(?) LIMIT 1");
-            $stmt->execute([$regNo]);
-            $row = $stmt->fetch();
+            $regNo = canonicalRegNo(trim($data['reg_no'] ?? ''));
+            $row = $regNo ? findStudentByRegNo($pdo, $regNo) : null;
+            if ($row) {
+                unset($row['id'], $row['total_package']);
+            }
             echo json_encode(['status' => 'success', 'student' => $row ?: null]);
         } catch (Exception $e) {
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
@@ -1265,13 +1391,9 @@ if ($method === 'POST' && isset($input['action'])) {
                 // ENFORCE UPPERCASE REG NO
                 $reg_no = strtoupper($data['reg_no']);
                 
-                // Auto-Detect Degree if empty
-                $degree = $data['degree'] ?? '';
-                if (empty($degree)) {
-                    if (preg_match('/^([A-Z0-9]+)05/', $reg_no, $matches)) {
-                        $degree = $matches[1];
-                    }
-                }
+                // Degree always follows reg_no prefix (legacy index.html correctedStudents logic)
+                $degreeFromReg = parseDegreeFromRegNo($reg_no);
+                $degree = $degreeFromReg !== '' ? $degreeFromReg : ($data['degree'] ?? '');
                 
                 $mobile = $data['mobile'] ?? '';
                 $email = $data['email'] ?? '';
