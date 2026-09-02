@@ -154,19 +154,27 @@ function sendPhpMail($fromEmail, $fromName, $toEmail, $subject, $body, $attachme
     return true;
 }
 
-// --- Shared HTTP POST helper (curl if available, stream-context fallback otherwise) ---
+// --- Shared HTTP helper (curl if available, stream-context fallback otherwise) ---
 // Returns [httpCode, responseBody]. Throws on a connection-level failure (no response
 // at all) — an HTTP error status is returned normally so callers can read the body.
-function httpPostJson($url, $headers, $payloadJson, $serviceName) {
+function httpJsonRequest($method, $url, $headers, $body, $serviceName, $timeout = 20) {
+    $method = strtoupper($method);
     if (function_exists('curl_init')) {
         $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => $payloadJson,
+        $opts = [
             CURLOPT_HTTPHEADER     => $headers,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 20,
-        ]);
+            CURLOPT_RETURNTRANSFER   => true,
+            CURLOPT_TIMEOUT          => $timeout,
+            CURLOPT_CONNECTTIMEOUT   => min(15, $timeout),
+            CURLOPT_FOLLOWLOCATION   => true,
+        ];
+        if ($method === 'POST') {
+            $opts[CURLOPT_POST] = true;
+            $opts[CURLOPT_POSTFIELDS] = $body;
+        } else {
+            $opts[CURLOPT_HTTPGET] = true;
+        }
+        curl_setopt_array($ch, $opts);
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $curlErr = curl_error($ch);
@@ -176,16 +184,15 @@ function httpPostJson($url, $headers, $payloadJson, $serviceName) {
         return [$httpCode, $response];
     }
 
-    // Fall back to a stream-context HTTP request if the curl extension isn't available
     if (!ini_get('allow_url_fopen')) {
         throw new Exception("Neither the PHP curl extension nor allow_url_fopen is enabled on this server. Ask your host to enable one of them.");
     }
     $context = stream_context_create([
         'http' => [
-            'method'        => 'POST',
+            'method'        => $method,
             'header'        => implode("\r\n", $headers),
-            'content'       => $payloadJson,
-            'timeout'       => 20,
+            'content'       => $body ?? '',
+            'timeout'       => $timeout,
             'ignore_errors' => true,
         ],
     ]);
@@ -201,20 +208,82 @@ function httpPostJson($url, $headers, $payloadJson, $serviceName) {
     return [$httpCode, $response];
 }
 
-// --- Minimal WAHA (WhatsApp HTTP API) client ---
+function httpPostJson($url, $headers, $payloadJson, $serviceName, $timeout = 20) {
+    return httpJsonRequest('POST', $url, $headers, $payloadJson, $serviceName, $timeout);
+}
+
+// --- WAHA (WhatsApp HTTP API) client ---
+function normalizeWahaBaseUrl($baseUrl) {
+    $url = trim((string) $baseUrl);
+    $url = rtrim($url, '/');
+    if (preg_match('#/api$#i', $url)) {
+        $url = substr($url, 0, -4);
+    }
+    return $url;
+}
+
+function wahaHeaders($apiKey, $withJson = false) {
+    $headers = ['Accept: application/json'];
+    if ($withJson) $headers[] = 'Content-Type: application/json';
+    if (!empty($apiKey)) $headers[] = 'X-Api-Key: ' . $apiKey;
+    return $headers;
+}
+
+function formatWahaHttpError($httpCode, $response) {
+    $detail = trim((string) $response);
+    if (strlen($detail) > 300) $detail = substr($detail, 0, 300) . '...';
+    $json = json_decode((string) $response, true);
+    if (is_array($json)) {
+        $msg = $json['exception']['message'] ?? $json['message'] ?? $json['error'] ?? '';
+        if ($msg) $detail = $msg;
+    }
+
+    $hints = [
+        401 => 'Check the WAHA API key in Settings.',
+        404 => 'Check the WAHA Base URL and session name in Settings.',
+        422 => 'The phone number or chat ID may be invalid.',
+        500 => 'WAHA failed to send — try restarting the WhatsApp session in WAHA.',
+        502 => 'WAHA gateway error — the WhatsApp engine may be down. Restart the WAHA session.',
+        503 => 'WAHA is temporarily unavailable. Try again in a minute.',
+        504 => 'WAHA timed out while sending. Restart the session or check server load.',
+        522 => 'WAHA server unreachable (Cloudflare/proxy timeout). Ensure WAHA is running, the Base URL is correct, and this web server can reach it. If WAHA is behind Cloudflare, use DNS-only (grey cloud) or point directly to the server IP/port.',
+    ];
+    $hint = $hints[$httpCode] ?? 'Check WAHA URL, session status, and server connectivity.';
+    $suffix = $detail ? " Response: $detail" : '';
+    return "WAHA error ($httpCode): $hint$suffix";
+}
+
+function ensureWahaSessionReady($baseUrl, $session, $apiKey) {
+    $session = $session ?: 'default';
+    $url = normalizeWahaBaseUrl($baseUrl) . '/api/sessions/' . rawurlencode($session);
+    list($httpCode, $response) = httpJsonRequest('GET', $url, wahaHeaders($apiKey), null, 'WAHA', 30);
+    if ($httpCode < 200 || $httpCode >= 300) {
+        throw new Exception(formatWahaHttpError($httpCode, $response));
+    }
+    $json = json_decode($response, true);
+    if (!is_array($json)) return;
+
+    $status = strtoupper((string) ($json['status'] ?? ''));
+    if ($status && $status !== 'WORKING' && $status !== 'STARTING') {
+        throw new Exception("WAHA session '$session' is not connected (status: $status). Open your WAHA dashboard and scan the QR code or restart the session.");
+    }
+}
+
 function sendWahaText($baseUrl, $session, $apiKey, $chatId, $text) {
-    $url = rtrim($baseUrl, '/') . '/api/sendText';
+    $session = $session ?: 'default';
+    ensureWahaSessionReady($baseUrl, $session, $apiKey);
+
+    $url = normalizeWahaBaseUrl($baseUrl) . '/api/sendText';
     $payload = json_encode([
-        'session' => $session ?: 'default',
+        'session' => $session,
         'chatId'  => $chatId,
         'text'    => $text,
     ]);
 
-    $headers = ['Content-Type: application/json'];
-    if (!empty($apiKey)) $headers[] = 'X-Api-Key: ' . $apiKey;
-
-    list($httpCode, $response) = httpPostJson($url, $headers, $payload, 'WAHA');
-    if ($httpCode < 200 || $httpCode >= 300) throw new Exception("WAHA error ($httpCode): $response");
+    list($httpCode, $response) = httpPostJson($url, wahaHeaders($apiKey, true), $payload, 'WAHA', 60);
+    if ($httpCode < 200 || $httpCode >= 300) {
+        throw new Exception(formatWahaHttpError($httpCode, $response));
+    }
     return true;
 }
 
@@ -347,7 +416,16 @@ function sendGmailApiEmail($accessToken, $fromEmail, $fromName, $toEmail, $subje
 }
 
 function normalizeWahaChatId($number) {
-    $digits = preg_replace('/\D/', '', $number);
+    $digits = preg_replace('/\D/', '', (string) $number);
+    if ($digits === '') {
+        throw new Exception('Invalid mobile number for WhatsApp');
+    }
+    // Pakistan local format: 03XXXXXXXXX -> 923XXXXXXXXX
+    if (strlen($digits) === 11 && $digits[0] === '0') {
+        $digits = '92' . substr($digits, 1);
+    } elseif (strlen($digits) === 10 && $digits[0] === '3') {
+        $digits = '92' . $digits;
+    }
     return $digits . '@c.us';
 }
 
@@ -1147,6 +1225,27 @@ if ($method === 'POST' && isset($input['action'])) {
             ]);
             echo json_encode(['status' => 'success']);
         } catch (Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    if ($action === 'test_waha') {
+        requireAdmin();
+        try {
+            $current = $pdo->query("SELECT * FROM settings WHERE id = 1")->fetch();
+            $baseUrl = trim($data['waha_url'] ?? $current['waha_url'] ?? '');
+            $session = $data['waha_session'] ?? $current['waha_session'] ?? '';
+            $apiKey = !empty($data['waha_api_key']) ? $data['waha_api_key'] : ($current['waha_api_key'] ?? '');
+            if (empty($baseUrl)) {
+                throw new Exception('WAHA Base URL is required');
+            }
+            ensureWahaSessionReady($baseUrl, $session, $apiKey);
+            echo json_encode([
+                'status' => 'success',
+                'message' => "WAHA connection OK — session '" . ($session ?: 'default') . "' is reachable.",
+            ]);
+        } catch (\Throwable $e) {
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
         exit;

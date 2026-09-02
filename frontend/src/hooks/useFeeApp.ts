@@ -104,6 +104,7 @@ export function useFeeApp() {
   const [loanDateTo, setLoanDateTo] = useState('');
   const [settingsForm, setSettingsForm] = useState<SettingsForm | null>(null);
   const [settingsSaving, setSettingsSaving] = useState(false);
+  const [wahaTesting, setWahaTesting] = useState(false);
   const [sendPanel, setSendPanel] = useState<SendPanel | null>(null);
   const [sendBusy, setSendBusy] = useState(false);
 
@@ -440,6 +441,21 @@ export function useFeeApp() {
     if (ok) {
       alert('Settings saved.');
       loadSettings();
+    }
+  };
+
+  const testWahaConnection = async () => {
+    if (!settingsForm) return;
+    setWahaTesting(true);
+    try {
+      const res = await apiPost('test_waha', { data: settingsForm });
+      const json = await res.json();
+      if (json.status === 'success') alert(json.message || 'WAHA connection OK.');
+      else alert(json.message || 'WAHA test failed.');
+    } catch {
+      alert('Network Error');
+    } finally {
+      setWahaTesting(false);
     }
   };
 
@@ -1159,6 +1175,8 @@ export function useFeeApp() {
     settingsForm,
     setSettingsForm,
     settingsSaving,
+    wahaTesting,
+    testWahaConnection,
     sendPanel,
     setSendPanel,
     sendBusy,

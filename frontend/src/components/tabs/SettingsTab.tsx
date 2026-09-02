@@ -6,7 +6,7 @@ interface SettingsTabProps {
 }
 
 export function SettingsTab({ app }: SettingsTabProps) {
-  const { settingsForm, setSettingsForm, settingsSaving, saveSettings } = app;
+  const { settingsForm, setSettingsForm, settingsSaving, saveSettings, wahaTesting, testWahaConnection } = app;
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -35,11 +35,15 @@ export function SettingsTab({ app }: SettingsTabProps) {
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-1">WAHA Base URL</label>
               <input
-                placeholder="https://your-waha-server.example.com"
+                placeholder="https://your-waha-server.example.com:3000"
                 className="w-full border p-2 rounded"
                 value={settingsForm.waha_url || ''}
                 onChange={(e) => setSettingsForm({ ...settingsForm, waha_url: e.target.value })}
               />
+              <p className="text-xs text-gray-500 mt-1">
+                Use the server root only (no <code>/api</code> suffix). If you see error 522, WAHA is unreachable from
+                this web server — check it is running and not blocked by Cloudflare/firewall.
+              </p>
             </div>
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-1">Session Name</label>
@@ -65,6 +69,14 @@ export function SettingsTab({ app }: SettingsTabProps) {
                 onChange={(e) => setSettingsForm({ ...settingsForm, waha_api_key: e.target.value })}
               />
             </div>
+            <button
+              type="button"
+              onClick={testWahaConnection}
+              disabled={wahaTesting}
+              className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-green-700 disabled:opacity-50"
+            >
+              {wahaTesting ? 'Testing...' : 'Test WAHA Connection'}
+            </button>
           </div>
 
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 space-y-4">
