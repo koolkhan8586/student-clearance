@@ -1,6 +1,9 @@
 export const norm = (str: unknown): string =>
   str ? str.toString().toLowerCase().replace(/[^a-z0-9]/g, '') : '';
 
+export const canonicalReg = (str: unknown): string =>
+  str ? str.toString().toUpperCase().replace(/[^A-Z0-9]/g, '') : '';
+
 export const num = (n: unknown): string =>
   parseFloat(String(n || 0)).toLocaleString('en-US');
 
