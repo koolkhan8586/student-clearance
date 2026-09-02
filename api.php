@@ -1155,6 +1155,9 @@ if ($method === 'POST' && isset($input['action'])) {
     if ($action === 'fetch_table') {
         try {
             $tab = $data['table'] ?? '';
+            if ($tab === 'users') {
+                requireAdmin();
+            }
             $page = max(1, (int) ($data['page'] ?? 1));
             $limit = min(500, max(1, (int) ($data['limit'] ?? 100)));
             $search = trim($data['search'] ?? '');
@@ -1549,6 +1552,7 @@ if ($method === 'POST' && isset($input['action'])) {
 
             // --- USERS ---
             case 'save_user':
+                requireAdmin();
                 $dbId = (is_numeric($id) && $id > 0) ? $id : null;
                 $perms = json_encode($data['permissions'] ?? []);
 
@@ -1570,12 +1574,14 @@ if ($method === 'POST' && isset($input['action'])) {
             
             case 'delete_user':
             case 'delete_users':
+                requireAdmin();
                 $stmt = $pdo->prepare("DELETE FROM users WHERE id = ?");
                 $stmt->execute([$id]);
                 break;
 
             // --- BULK OPERATIONS ---
             case 'delete_all':
+                requireAdmin();
                 $table = $input['table'];
                 $map = ['fees' => 'fee_structure', 'others' => 'other_charges'];
                 if(isset($map[$table])) $table = $map[$table];
