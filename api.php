@@ -454,6 +454,16 @@ function parseDegreeFromRegNo($regNo) {
     return '';
 }
 
+/** Restore legacy index.html behavior: degree always follows reg_no prefix (BSCAF vs BAF). */
+function applyDegreeFromRegNo($student) {
+    if (!is_array($student) || empty($student['reg_no'])) return $student;
+    $parsed = parseDegreeFromRegNo($student['reg_no']);
+    if ($parsed !== '') {
+        $student['degree'] = $parsed;
+    }
+    return $student;
+}
+
 function findStudentByRegNo($pdo, $regNo) {
     $cleanReg = normStr($regNo);
     if ($cleanReg === '') return null;
@@ -461,7 +471,7 @@ function findStudentByRegNo($pdo, $regNo) {
     $stmt = $pdo->query("SELECT * FROM students");
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
         if (normStr($row['reg_no']) === $cleanReg) {
-            return $row;
+            return applyDegreeFromRegNo($row);
         }
     }
 
@@ -513,6 +523,7 @@ function semestersMatch($a, $b) {
 }
 
 function findMasterFee($fees, $student) {
+    $student = applyDegreeFromRegNo($student);
     $degree = normStr($student['degree'] ?? '');
     $batch = normStr($student['batch'] ?? '');
     foreach ($fees as $f) {
@@ -529,6 +540,7 @@ function computeClearanceReport($pdo, $regNo, $filterSession = '') {
     $cleanReg = normStr($regNo);
     $student = findStudentByRegNo($pdo, $regNo);
     if (!$student) return null;
+    $student = applyDegreeFromRegNo($student);
 
     $fees = $pdo->query("SELECT * FROM fee_structure")->fetchAll();
     $masterFee = findMasterFee($fees, $student);
@@ -654,7 +666,7 @@ function computeClearanceReport($pdo, $regNo, $filterSession = '') {
 function computeSummaryReport($pdo, $filterSession = '') {
     $students = $pdo->query("SELECT * FROM students")->fetchAll();
     $studentMap = [];
-    foreach ($students as $s) $studentMap[normStr($s['reg_no'])] = $s;
+    foreach ($students as $s) $studentMap[normStr($s['reg_no'])] = applyDegreeFromRegNo($s);
 
     $fees = $pdo->query("SELECT * FROM fee_structure")->fetchAll();
     $others = $pdo->query("SELECT * FROM other_charges")->fetchAll();
@@ -821,6 +833,13 @@ function fetchTablePage($pdo, $tab, $page, $limit, $search, $sortKey, $sortDir, 
     $stmt = $pdo->prepare("SELECT * FROM `$table` WHERE $whereSql ORDER BY `$orderCol` $orderDir LIMIT $limit OFFSET $offset");
     $stmt->execute($params);
     $rows = $stmt->fetchAll();
+
+    if ($tab === 'students') {
+        foreach ($rows as &$row) {
+            $row = applyDegreeFromRegNo($row);
+        }
+        unset($row);
+    }
 
     if ($tab === 'users') {
         foreach ($rows as &$u) {
@@ -1303,11 +1322,9 @@ if ($method === 'POST' && isset($input['action'])) {
                 // ENFORCE UPPERCASE REG NO
                 $reg_no = strtoupper($data['reg_no']);
                 
-                // Auto-detect degree prefix before batch code "05" (e.g. BSCAF, BAF)
-                $degree = $data['degree'] ?? '';
-                if (empty($degree)) {
-                    $degree = parseDegreeFromRegNo($reg_no);
-                }
+                // Degree always follows reg_no prefix (legacy index.html correctedStudents logic)
+                $degreeFromReg = parseDegreeFromRegNo($reg_no);
+                $degree = $degreeFromReg !== '' ? $degreeFromReg : ($data['degree'] ?? '');
                 
                 $mobile = $data['mobile'] ?? '';
                 $email = $data['email'] ?? '';

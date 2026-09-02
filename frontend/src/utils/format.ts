@@ -11,6 +11,15 @@ export const parseDegreeFromReg = (regNo: unknown): string => {
   return match ? match[1] : '';
 };
 
+/** Legacy index.html correctedStudents: degree always follows reg_no prefix. */
+export const syncDegreeFromReg = <T extends { reg_no?: string; degree?: string }>(student: T): T => {
+  const degree = parseDegreeFromReg(student.reg_no);
+  if (degree && student.degree !== degree) {
+    return { ...student, degree };
+  }
+  return student;
+};
+
 export const num = (n: unknown): string =>
   parseFloat(String(n || 0)).toLocaleString('en-US');
 
