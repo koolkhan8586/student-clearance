@@ -448,10 +448,10 @@ function regNoEquals($a, $b) {
 function parseDegreeFromRegNo($regNo) {
     $canonical = canonicalRegNo($regNo);
     if ($canonical === '') return '';
-    if (preg_match('/^([A-Z0-9]+)05/', $canonical, $matches)) {
-        return $matches[1];
-    }
-    return '';
+    // Degree is everything before the first batch marker "05" (e.g. BSCAF052430051 → BSCAF)
+    $pos = strpos($canonical, '05');
+    if ($pos === false || $pos === 0) return '';
+    return substr($canonical, 0, $pos);
 }
 
 function regNoStrictMatch($stored, $search) {
