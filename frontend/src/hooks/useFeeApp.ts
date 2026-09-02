@@ -30,7 +30,7 @@ import type {
   User,
 } from '../types';
 import { ADMIN_EXTRA_TABS, ITEMS_PER_PAGE, TAB_TABLES, TABS } from '../utils/constants';
-import { norm, num } from '../utils/format';
+import { norm, canonicalReg, num } from '../utils/format';
 
 export function useFeeApp() {
   const [user, setUser] = useState<User | null>(null);
@@ -302,10 +302,12 @@ export function useFeeApp() {
   }, [summaryFilterSession, activeTab, user, loadSummary]);
 
   const generateReport = useCallback(async () => {
-    if (!searchReg) return;
+    const reg = canonicalReg(searchReg);
+    if (!reg) return;
     setClearanceLoading(true);
+    setClearanceResult(null);
     try {
-      const res = await getClearanceRequest(searchReg, filterSession);
+      const res = await getClearanceRequest(reg, filterSession);
       const json = await res.json();
       if (json.status === 'success') {
         setClearanceResult(json.report);
@@ -315,6 +317,7 @@ export function useFeeApp() {
       }
     } catch {
       alert('Network Error');
+      setClearanceResult(null);
     } finally {
       setClearanceLoading(false);
     }
