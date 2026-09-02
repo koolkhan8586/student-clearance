@@ -30,7 +30,7 @@ import type {
   User,
 } from '../types';
 import { ADMIN_EXTRA_TABS, ITEMS_PER_PAGE, TAB_TABLES, TABS } from '../utils/constants';
-import { norm, canonicalReg, parseDegreeFromReg, num } from '../utils/format';
+import { norm, canonicalReg, parseDegreeFromReg, syncDegreeFromReg, num } from '../utils/format';
 
 export function useFeeApp() {
   const [user, setUser] = useState<User | null>(null);
@@ -177,7 +177,8 @@ export function useFeeApp() {
         }
         const json = await res.json();
         if (json.status === 'success') {
-          setTableRows(json.rows || []);
+          const rows = json.rows || [];
+          setTableRows(tab === 'students' ? rows.map((row: TableRow) => syncDegreeFromReg(row)) : rows);
           setTableTotal(json.total || 0);
           setTableStats(json.stats || null);
           setLoanSemesterStats(json.loanSemesterStats || []);
