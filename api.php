@@ -5,6 +5,7 @@ session_set_cookie_params([
     'path'     => '/',
     'httponly' => true,
     'samesite' => 'Lax',
+    'secure'   => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
 ]);
 session_start();
 
@@ -1324,6 +1325,9 @@ if ($method === 'POST' && isset($input['action'])) {
             }
 
             if ($channel === 'email') {
+                if (!filter_var($recipient, FILTER_VALIDATE_EMAIL)) {
+                    throw new Exception("Recipient must be a valid email address");
+                }
                 $haveGoogle = !empty($settings['google_service_account_json']) && !empty($settings['google_delegated_user']);
                 $haveBrevo = !empty($settings['brevo_api_key']);
                 $haveSmtp = !empty($settings['smtp_host']) && !empty($settings['smtp_username']) && !empty($settings['smtp_password']);
@@ -1332,6 +1336,9 @@ if ($method === 'POST' && isset($input['action'])) {
                 }
                 $fromName = $settings['smtp_from_name'] ?: 'Fee Manager';
                 $fromEmail = $settings['smtp_from_email'] ?: $settings['smtp_username'];
+                if (!filter_var($fromEmail, FILTER_VALIDATE_EMAIL)) {
+                    throw new Exception("Sender email is not configured correctly. Ask an admin to fix it under Settings.");
+                }
 
                 // Try every configured method in priority order and stop at the first
                 // success — a method being configured doesn't guarantee it currently

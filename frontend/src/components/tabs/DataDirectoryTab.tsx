@@ -174,7 +174,7 @@ export function DataDirectoryTab({ app }: DataDirectoryTabProps) {
     }
   };
 
-  const canAdd = user.role === 'admin' || user.permissions.includes(activeTab);
+  const canAdd = user.role === 'admin' || (user.permissions || []).includes(activeTab);
 
   return (
     <div>
