@@ -1140,15 +1140,16 @@
                 }
                 
                 const wb = window.XLSX.utils.book_new();
-                const categories = ['students', 'fees', 'enrollments', 'payments', 'discounts', 'others', 'users', 'banks'];
-                
+                const categories = ['students', 'fees', 'enrollments', 'payments', 'discounts', 'others', 'loans', 'users', 'banks'];
+                const sheetNames = { loans: 'Other Bank' };
+
                 let hasData = false;
-                
+
                 categories.forEach(cat => {
-                    const records = data[cat] || [];
+                    const records = cat === 'loans' ? (data.payments || []).filter(p => norm(p.bank) === 'loan') : (data[cat] || []);
                     const headers = getHeaders(cat);
                     const displayHeaders = headers.map(h => h === 'fee_name' ? 'fee_head' : h);
-                    
+
                     let wsData = [];
                     if (records.length > 0) {
                         hasData = true;
@@ -1166,9 +1167,9 @@
                         displayHeaders.forEach(h => emptyRow[h] = '');
                         wsData = [emptyRow];
                     }
-                    
+
                     const ws = window.XLSX.utils.json_to_sheet(wsData);
-                    window.XLSX.utils.book_append_sheet(wb, ws, cat.charAt(0).toUpperCase() + cat.slice(1));
+                    window.XLSX.utils.book_append_sheet(wb, ws, sheetNames[cat] || (cat.charAt(0).toUpperCase() + cat.slice(1)));
                 });
                 
                 if (!hasData) {
