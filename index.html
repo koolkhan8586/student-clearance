@@ -230,37 +230,34 @@
             const [activeTab, setActiveTab] = useState('clearance');
             const [isFetching, setIsFetching] = useState(false);
             
-            const [data, setData] = useState(() => {
-                const cached = localStorage.getItem('feeSystemData_v2') || localStorage.getItem('fee_system_local');
-                if (cached) {
-                    try {
-                        const parsed = JSON.parse(cached);
-                        if (parsed && parsed.students) return parsed;
-                    } catch(e) { console.error("Cache read error", e); }
-                }
-                return {
-                    students: [], fees: [], enrollments: [], payments: [], discounts: [], others: [], users: [], banks: []
-                };
-            });
+            const TAB_TABLES = new Set(['students', 'fees', 'enrollments', 'payments', 'loans', 'discounts', 'others', 'banks', 'users']);
 
-            useEffect(() => {
-                if (data.students.length > 0 || data.payments.length > 0) {
-                    try {
-                        localStorage.setItem('feeSystemData_v2', JSON.stringify(data));
-                    } catch (e) {
-                        // Caching is a best-effort speed-up (instant load on next visit) — if the
-                        // browser's storage quota is full (common on iOS/iPadOS with a lot of
-                        // records), skip it silently instead of crashing. The app still works
-                        // fine from in-memory state and a fresh fetch on next load.
-                        console.warn("Could not cache data locally (storage quota likely full):", e);
-                    }
-                }
-            }, [data]);
+            const [meta, setMeta] = useState({ fees: [], banks: [], sessions: [], counts: {}, users: [] });
+            const [tableRows, setTableRows] = useState([]);
+            const [tableTotal, setTableTotal] = useState(0);
+            const [tableStats, setTableStats] = useState(null);
+            const [loanSemesterStats, setLoanSemesterStats] = useState([]);
+            const [summaryData, setSummaryData] = useState([]);
+            const [summaryLoading, setSummaryLoading] = useState(false);
+            const [clearanceLoading, setClearanceLoading] = useState(false);
+
+            // Lightweight compatibility object for code that still reads data.fees / data.banks
+            const data = useMemo(() => ({
+                fees: meta.fees || [],
+                banks: meta.banks || [],
+                users: meta.users || [],
+                students: activeTab === 'students' ? tableRows : [],
+                enrollments: activeTab === 'enrollments' ? tableRows : [],
+                payments: activeTab === 'payments' || activeTab === 'loans' ? tableRows : [],
+                discounts: activeTab === 'discounts' ? tableRows : [],
+                others: activeTab === 'others' ? tableRows : [],
+            }), [meta, tableRows, activeTab]);
 
             const [searchReg, setSearchReg] = useState('');
             const [filterSession, setFilterSession] = useState(''); 
             const [summaryFilterSession, setSummaryFilterSession] = useState(''); 
             const [tabSearch, setTabSearch] = useState('');
+            const [debouncedTabSearch, setDebouncedTabSearch] = useState('');
             const [selectedIds, setSelectedIds] = useState(new Set());
             const [clearanceResult, setClearanceResult] = useState(null);
             
@@ -309,45 +306,106 @@
                 : TABS.filter(t => (user.permissions || []).includes(t.id))
             ) : [];
 
-            // OPTIMIZED FETCH DATA
-            const refreshData = async (isBackground = false) => {
-                if (!isBackground && data.students.length === 0) setIsFetching(true);
+            // Load reference data (fees, banks, sessions, counts) — small payload
+            const loadMeta = async () => {
                 try {
                     const res = await fetch(API_URL, { credentials: 'same-origin' });
+                    if (res.status === 401) {
+                        setUser(null);
+                        sessionStorage.removeItem('feeUser');
+                        return false;
+                    }
+                    const json = await res.json();
+                    if (json.status === 'error') {
+                        alert(json.message || 'Failed to load data');
+                        return false;
+                    }
+                    setMeta({
+                        fees: Array.isArray(json.fees) ? json.fees : [],
+                        banks: Array.isArray(json.banks) ? json.banks : [],
+                        sessions: Array.isArray(json.sessions) ? json.sessions : [],
+                        counts: json.counts || {},
+                        users: Array.isArray(json.users) ? json.users : [],
+                    });
+                    return true;
+                } catch (e) {
+                    console.error('Connection Error:', e);
+                    return false;
+                }
+            };
+
+            // Paginated table fetch — only loads the current tab's page from the server
+            const loadTablePage = async (tab = activeTab, page = currentPage, opts = {}) => {
+                if (!TAB_TABLES.has(tab)) return;
+                const search = opts.search ?? debouncedTabSearch;
+                const sortKey = opts.sortKey ?? sortConfig.key;
+                const sortDir = opts.sortDir ?? sortConfig.direction;
+                const dateFrom = opts.dateFrom ?? loanDateFrom;
+                const dateTo = opts.dateTo ?? loanDateTo;
+                setIsFetching(true);
+                try {
+                    const res = await fetch(API_URL, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            action: 'fetch_table',
+                            data: {
+                                table: tab,
+                                page,
+                                limit: ITEMS_PER_PAGE,
+                                search,
+                                sortKey: sortKey || 'id',
+                                sortDir: sortDir || 'desc',
+                                dateFrom,
+                                dateTo,
+                            },
+                        }),
+                    });
                     if (res.status === 401) {
                         setUser(null);
                         sessionStorage.removeItem('feeUser');
                         return;
                     }
                     const json = await res.json();
-
-                    const correctedStudents = (Array.isArray(json.students) ? json.students : []).map(s => {
-                        if (s.reg_no) {
-                            const upper = s.reg_no.toUpperCase();
-                            if (upper.includes('05')) {
-                                const newDegree = upper.split('05')[0];
-                                if (s.degree !== newDegree) return { ...s, degree: newDegree };
-                            }
-                        }
-                        return s;
-                    });
-
-                    const safeData = {
-                        students: correctedStudents,
-                        fees: Array.isArray(json.fees) ? json.fees : [],
-                        enrollments: Array.isArray(json.enrollments) ? json.enrollments : [],
-                        payments: Array.isArray(json.payments) ? json.payments : [],
-                        discounts: Array.isArray(json.discounts) ? json.discounts : [],
-                        others: Array.isArray(json.others) ? json.others : [],
-                        users: Array.isArray(json.users) ? json.users : [],
-                        banks: Array.isArray(json.banks) ? json.banks : []
-                    };
-                    setData(safeData);
-                } catch(e) { 
-                    console.error("Connection Error:", e);
+                    if (json.status === 'success') {
+                        setTableRows(json.rows || []);
+                        setTableTotal(json.total || 0);
+                        setTableStats(json.stats || null);
+                        setLoanSemesterStats(json.loanSemesterStats || []);
+                    } else {
+                        alert(json.message || 'Failed to load records');
+                    }
+                } catch (e) {
+                    console.error('Table load error:', e);
                 } finally {
-                    if (!isBackground) setIsFetching(false);
+                    setIsFetching(false);
                 }
+            };
+
+            const loadSummary = async (filter = summaryFilterSession) => {
+                setSummaryLoading(true);
+                try {
+                    const res = await fetch(API_URL, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'get_summary', data: { filter_session: filter } }),
+                    });
+                    const json = await res.json();
+                    if (json.status === 'success') setSummaryData(json.summary || []);
+                    else alert(json.message || 'Failed to load summary');
+                } catch (e) {
+                    alert('Network Error');
+                } finally {
+                    setSummaryLoading(false);
+                }
+            };
+
+            const refreshData = async () => {
+                await loadMeta();
+                if (activeTab === 'summary') await loadSummary();
+                else if (TAB_TABLES.has(activeTab)) await loadTablePage(activeTab, currentPage);
             };
 
             useEffect(() => {
@@ -366,7 +424,6 @@
             }, [printOrientation]);
 
             useEffect(() => {
-                refreshData();
                 const storedUser = sessionStorage.getItem('feeUser');
                 if (storedUser) {
                     try {
@@ -383,6 +440,26 @@
             }, []);
 
             useEffect(() => {
+                if (!user) return;
+                loadMeta();
+            }, [user]);
+
+            useEffect(() => {
+                const timer = setTimeout(() => setDebouncedTabSearch(tabSearch), 350);
+                return () => clearTimeout(timer);
+            }, [tabSearch]);
+
+            useEffect(() => {
+                setCurrentPage(1);
+            }, [debouncedTabSearch, sortConfig, loanDateFrom, loanDateTo]);
+
+            useEffect(() => {
+                if (!user) return;
+                if (activeTab === 'summary') loadSummary();
+                else if (TAB_TABLES.has(activeTab)) loadTablePage(activeTab, currentPage);
+            }, [user, activeTab, currentPage, debouncedTabSearch, sortConfig, loanDateFrom, loanDateTo]);
+
+            useEffect(() => {
                 setSelectedIds(new Set());
                 setTabSearch('');
                 setSortConfig({ key: null, direction: 'asc' });
@@ -394,12 +471,12 @@
             }, [activeTab]);
 
             useEffect(() => {
-                setCurrentPage(1);
-            }, [tabSearch, sortConfig, loanDateFrom, loanDateTo]);
-
-            useEffect(() => {
                 if (activeTab === 'settings' && user?.role === 'admin') loadSettings();
             }, [activeTab]);
+
+            useEffect(() => {
+                if (activeTab === 'summary' && user) loadSummary(summaryFilterSession);
+            }, [summaryFilterSession]);
 
             useEffect(() => {
                 if (activeTab === 'clearance' && searchReg && clearanceResult) {
@@ -407,182 +484,10 @@
                 }
             }, [filterSession]);
 
-            const filteredData = useMemo(() => {
-                let result = activeTab === 'loans' ? (data.payments || []).filter(p => norm(p.bank) === 'loan') : (data[activeTab] || []);
-                if (activeTab === 'loans' && (loanDateFrom || loanDateTo)) {
-                    result = result.filter(item => {
-                        if (!item.date) return false;
-                        if (loanDateFrom && item.date < loanDateFrom) return false;
-                        if (loanDateTo && item.date > loanDateTo) return false;
-                        return true;
-                    });
-                }
-                if (tabSearch) {
-                    const searchLower = tabSearch.toLowerCase();
-                    result = result.filter(item => {
-                        for (let key in item) {
-                            if (item[key] && String(item[key]).toLowerCase().includes(searchLower)) return true;
-                        }
-                        return false;
-                    });
-                }
-                if (sortConfig.key) {
-                    result = [...result].sort((a, b) => {
-                        let valA = a[sortConfig.key]?.toString().toLowerCase() || '';
-                        let valB = b[sortConfig.key]?.toString().toLowerCase() || '';
-                        const numA = parseFloat(valA); const numB = parseFloat(valB);
-                        if (!isNaN(numA) && !isNaN(numB) && isFinite(valA) && isFinite(valB)) {
-                             return sortConfig.direction === 'asc' ? numA - numB : numB - numA;
-                        }
-                        if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
-                        if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
-                        return 0;
-                    });
-                }
-                return result;
-            }, [data, activeTab, tabSearch, sortConfig, loanDateFrom, loanDateTo]);
-
-            const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
-            const paginatedData = useMemo(() => {
-                return filteredData.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
-            }, [filteredData, currentPage]);
-            
-            // Unique Sessions
-            const uniqueSessions = [...new Set((data.enrollments || []).map(e => e.semester).filter(Boolean))].sort((a, b) => {
-                const yearA = parseInt(String(a).replace(/\D/g, '')) || 0;
-                const yearB = parseInt(String(b).replace(/\D/g, '')) || 0;
-                if (yearA !== yearB) return yearA - yearB;
-                return getTermRank(a) - getTermRank(b);
-            });
-            
-            // --- SUMMARY LOGIC (OPTIMIZED WITH INDEXING) ---
-            const getSummaryData = useMemo(() => {
-                if(activeTab !== 'summary') return [];
-                const studentMap = new Map((data.students || []).map(s => [norm(s.reg_no), s]));
-                
-                const otherChargesMap = new Map();
-                (data.others || []).forEach(o => {
-                     const k = `${norm(o.reg_no)}_${norm(o.semester)}`;
-                     otherChargesMap.set(k, (otherChargesMap.get(k) || 0) + (parseFloat(o.amount) || 0));
-                });
-                
-                const discountMap = new Map();
-                (data.discounts || []).forEach(d => {
-                     const k = `${norm(d.reg_no)}_${norm(d.term)}`;
-                     discountMap.set(k, parseFloat(d.discount) || 0);
-                });
-
-                // INDEX PAYMENTS
-                const paymentsMap = new Map();
-                (data.payments || []).forEach(p => {
-                    const r = norm(p.reg_no);
-                    if (!paymentsMap.has(r)) paymentsMap.set(r, []);
-                    paymentsMap.get(r).push(p);
-                });
-
-                const summary = new Map();
-                const sessionDetailsMap = new Map();
-
-                (data.enrollments || []).forEach(en => {
-                    const sem = en.semester; 
-                    const semKey = norm(sem);
-                    if (summaryFilterSession && !semKey.includes(norm(summaryFilterSession))) return;
-                    if(!summary.has(semKey)) {
-                         summary.set(semKey, { session: sem, enrolled: new Set(), charged: 0, discount: 0, other: 0, exam: 0, paid: 0 });
-                         sessionDetailsMap.set(semKey, []);
-                    }
-                    const entry = summary.get(semKey);
-                    const detailList = sessionDetailsMap.get(semKey);
-
-                    entry.enrolled.add(norm(en.reg_no));
-                    
-                    const student = studentMap.get(norm(en.reg_no));
-                    let feeDetails = { total: 0, other: 0, tuition: 0, exam: 0 };
-                    
-                    if (student) {
-                         let fee = data.fees.find(f => norm(f.degree) === norm(student.degree) && norm(f.batch) === norm(student.batch));
-                         if(!fee) {
-                            fee = data.fees.find(f => norm(f.degree) === norm(student.degree) && (
-                                norm(student.batch).includes(norm(f.batch)) || norm(f.batch).includes(norm(student.batch))
-                            ));
-                         }
-                         if (fee) {
-                             const cr = parseFloat(en.cr || 0);
-                             const courses = parseFloat(en.courses || 0);
-                             const tuition = cr * parseFloat(fee.per_cr_fee || 0);
-                             const exam = courses * parseFloat(fee.per_course_fee || 0);
-                             const reg = parseFloat(fee.reg_fee || 0);
-                             const otherBase = parseFloat(fee.other_fee || 0);
-                             
-                             feeDetails.tuition = tuition;
-                             feeDetails.exam = exam; 
-                             feeDetails.total = tuition + exam + reg + otherBase;
-                             feeDetails.other = otherBase;
-                         }
-                    }
-                    const specificOther = otherChargesMap.get(`${norm(en.reg_no)}_${semKey}`) || 0;
-                    feeDetails.other += specificOther; 
-                    feeDetails.total += specificOther;
-
-                    const discPct = discountMap.get(`${norm(en.reg_no)}_${semKey}`) || 0;
-                    const discAmt = (feeDetails.tuition * discPct) / 100;
-                    
-                    // Retrieve pre-indexed payments
-                    let studentPaid = 0;
-                    const studentPayments = paymentsMap.get(norm(en.reg_no)) || [];
-                    studentPayments.forEach(p => {
-                         const pSem = norm(p.semester);
-                         if (pSem === semKey || (semKey.includes(pSem) && pSem.length > 3) || (pSem.includes(semKey) && semKey.length > 3)) {
-                            studentPaid += parseFloat(p.amount || 0);
-                         }
-                    });
-
-                    entry.charged += feeDetails.total;
-                    entry.discount += discAmt;
-                    entry.other += feeDetails.other;
-                    entry.exam += feeDetails.exam;
-
-                    detailList.push({
-                        reg_no: en.reg_no,
-                        name: en.name,
-                        courses: en.courses,
-                        cr: en.cr,
-                        tuition: feeDetails.tuition,
-                        exam: feeDetails.exam, 
-                        other: feeDetails.other,
-                        discount: discAmt,
-                        paid: studentPaid,
-                        balance: (feeDetails.total - discAmt) - studentPaid
-                    });
-                });
-                
-                (data.payments || []).forEach(p => {
-                    const pSem = norm(p.semester);
-                    if (summaryFilterSession && !pSem.includes(norm(summaryFilterSession))) return;
-                    let targetKey = null;
-                    for (let key of summary.keys()) {
-                        if (pSem === key || (key.includes(pSem) && pSem.length > 3) || (pSem.includes(key) && key.length > 3)) {
-                            targetKey = key;
-                            break;
-                        }
-                    }
-                    if(targetKey) {
-                        summary.get(targetKey).paid += parseFloat(p.amount || 0);
-                    }
-                });
-
-                return Array.from(summary.values()).sort((a,b) => {
-                     const yearA = parseInt(a.session.replace(/\D/g, '')) || 0;
-                     const yearB = parseInt(b.session.replace(/\D/g, '')) || 0;
-                     if (yearA !== yearB) return yearA - yearB;
-                     return getTermRank(a.session) - getTermRank(b.session);
-                }).map(s => ({
-                    ...s,
-                    enrolled: s.enrolled.size,
-                    balance: (s.charged - s.discount) - s.paid,
-                    details: sessionDetailsMap.get(norm(s.session)) || []
-                }));
-            }, [activeTab, data, summaryFilterSession]);
+            const filteredData = tableRows;
+            const paginatedData = tableRows;
+            const totalPages = Math.max(1, Math.ceil(tableTotal / ITEMS_PER_PAGE));
+            const uniqueSessions = meta.sessions || [];
 
             // --- OPEN SESSION DETAIL ---
             const openSessionDetail = (sessionData) => {
@@ -639,33 +544,13 @@
                 document.body.removeChild(link);
             };
 
-            const paymentStats = activeTab === 'payments' ? filteredData.reduce((acc, item) => {
-                 const amt = parseFloat(item.amount) || 0;
-                 acc.total += amt;
-                 const isBank = item.bank && item.bank !== 'Cash' && item.bank !== 'Loan' && item.bank.trim() !== '';
-                 if(isBank) acc.bank += amt;
-                 else acc.cash += amt; // includes loan-sourced rows
-                 return acc;
-            }, { total: 0, bank: 0, cash: 0 }) : { total: 0, bank: 0, cash: 0 };
+            const paymentStats = (activeTab === 'payments' && tableStats) ? {
+                total: parseFloat(tableStats.total || 0),
+                bank: parseFloat(tableStats.bank || 0),
+                cash: parseFloat(tableStats.cash || 0),
+            } : { total: 0, bank: 0, cash: 0 };
 
-            // Per-semester breakdown for the Other Bank (Loan) tab
-            const loanSemesterStats = useMemo(() => {
-                if (activeTab !== 'loans') return [];
-                const map = new Map();
-                filteredData.forEach(item => {
-                    const key = item.semester || 'Unspecified';
-                    if (!map.has(key)) map.set(key, { semester: key, total: 0, count: 0 });
-                    const entry = map.get(key);
-                    entry.total += parseFloat(item.amount || 0);
-                    entry.count += 1;
-                });
-                return Array.from(map.values()).sort((a, b) => {
-                    const yearA = parseInt(String(a.semester).replace(/\D/g, '')) || 0;
-                    const yearB = parseInt(String(b.semester).replace(/\D/g, '')) || 0;
-                    if (yearA !== yearB) return yearA - yearB;
-                    return getTermRank(a.semester) - getTermRank(b.semester);
-                });
-            }, [activeTab, filteredData]);
+            // Per-semester breakdown for the Other Bank (Loan) tab — computed server-side across all matching loans
 
             // OPTIMIZED API POST (skipRefresh controls blocking fetch)
             const postToApi = async (action, payload = {}, skipRefresh = false) => {
@@ -684,7 +569,7 @@
                     }
                     const json = await res.json();
                     if(json.status === 'success') {
-                        if (!skipRefresh) refreshData(true); // Default to background refresh
+                        if (!skipRefresh) refreshData();
                         return true;
                     }
                     else { alert("Error: " + json.message); return false; }
@@ -808,7 +693,7 @@
                 }
                 setUploadStatus({ active: false, current: 0, total: 0 });
                 alert(`Sync Complete! Uploaded/Checked ${count} records.`);
-                refreshData(true); // Refresh in background once done
+                refreshData();
             };
 
             const handleLogin = async (e) => {
@@ -878,141 +763,37 @@
                 setSortConfig({ key, direction });
             };
 
-            const generateReport = () => {
+            const generateReport = async () => {
                 if (!searchReg) return;
-                const cleanReg = norm(searchReg);
-                const student = data.students?.find(s => norm(s.reg_no) === cleanReg);
-                if (!student) { alert("Student not found!"); setClearanceResult(null); return; }
-                
-                let masterFee = data.fees?.find(f => norm(f.degree) === norm(student.degree) && norm(f.batch) === norm(student.batch));
-                if (!masterFee) {
-                    masterFee = data.fees?.find(f => norm(f.degree) === norm(student.degree) && (
-                        norm(student.batch).includes(norm(f.batch)) || norm(f.batch).includes(norm(student.batch))
-                    ));
-                }
-                
-                let studentEnrollments = data.enrollments?.filter(e => norm(e.reg_no) === cleanReg);
-
-                if (filterSession) {
-                    const cleanSession = norm(filterSession);
-                    studentEnrollments = studentEnrollments.filter(en => norm(en.semester).includes(cleanSession));
-                }
-                
-                studentEnrollments = studentEnrollments.map(en => {
-                    const enSem = norm(en.semester);
-                    const cr = parseFloat(en.cr || 0);
-                    const courses = parseFloat(en.courses || 0);
-                    let feeDetails = { tuition: 0, exam: 0, reg: 0, other: 0, total: 0 };
-                    
-                    if (masterFee) {
-                        feeDetails.tuition = cr * parseFloat(masterFee.per_cr_fee || 0);
-                        feeDetails.exam = (courses * parseFloat(masterFee.per_course_fee || 0)) + parseFloat(masterFee.other_fee || 0); 
-                        feeDetails.reg = 0; 
-                        feeDetails.other = 0;
-                    }
-                    const otherCharges = data.others?.filter(o => norm(o.reg_no) === cleanReg && (norm(o.semester) === enSem || enSem.includes(norm(o.semester)))) || [];
-                    const extraCharges = otherCharges.reduce((sum, o) => sum + parseFloat(o.amount || 0), 0);
-                    
-                    feeDetails.other += extraCharges;
-                    feeDetails.total = feeDetails.tuition + feeDetails.exam + feeDetails.other;
-
-                    const discRecord = data.discounts?.find(d => norm(d.reg_no) === cleanReg && norm(d.term) === enSem);
-                    const discPct = discRecord ? parseFloat(discRecord.discount || 0) : 0;
-                    const discAmt = (feeDetails.tuition * discPct) / 100;
-                    
-                    const netFee = feeDetails.total - discAmt;
-                    
-                    const payments = data.payments?.filter(p => {
-                        if (norm(p.reg_no) !== cleanReg) return false;
-                        const pSem = norm(p.semester);
-                        return pSem === enSem || (enSem.includes(pSem) && pSem.length > 3) || (pSem.includes(enSem) && enSem.length > 3);
-                    }) || [];
-                    const totalPaid = payments.reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
-                    const balance = netFee - totalPaid;
-                    return { ...en, ...feeDetails, discPct, discAmt, netFee, totalPaid, balance };
-                }) || [];
-
-                // --- GAP FEE: Other Charges named "Gap Fee" for a term this student has no
-                // enrollment record for. Works whether the charge was saved for this specific
-                // student's reg_no, or left blank as a blanket rule for everyone. ---
-                const enrolledTermsNorm = new Set(
-                    (data.enrollments?.filter(e => norm(e.reg_no) === cleanReg) || []).map(e => norm(e.semester))
-                );
-                const gapFeeRows = (data.others || [])
-                    .filter(o => norm(o.fee_name).includes('gap'))
-                    .filter(o => !norm(o.reg_no) || norm(o.reg_no) === cleanReg)
-                    .filter(rule => {
-                        const ruleTerm = norm(rule.semester);
-                        if (filterSession && !ruleTerm.includes(norm(filterSession))) return false;
-                        for (const t of enrolledTermsNorm) {
-                            if (t === ruleTerm || t.includes(ruleTerm) || ruleTerm.includes(t)) return false;
-                        }
-                        return true;
-                    })
-                    .map(rule => {
-                        const ruleTerm = norm(rule.semester);
-                        const amount = parseFloat(rule.amount || 0);
-                        const payments = data.payments?.filter(p => {
-                            if (norm(p.reg_no) !== cleanReg) return false;
-                            const pSem = norm(p.semester);
-                            return pSem === ruleTerm || (ruleTerm.includes(pSem) && pSem.length > 3) || (pSem.includes(ruleTerm) && ruleTerm.length > 3);
-                        }) || [];
-                        const totalPaid = payments.reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
-                        return {
-                            semester: rule.semester, cr: 0, courses: 0,
-                            tuition: 0, exam: 0, reg: 0, other: amount, total: amount,
-                            discPct: 0, discAmt: 0, netFee: amount, totalPaid,
-                            balance: amount - totalPaid,
-                            isGapFee: true, feeName: rule.fee_name
-                        };
+                setClearanceLoading(true);
+                try {
+                    const res = await fetch(API_URL, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            action: 'get_clearance',
+                            data: { reg_no: searchReg, filter_session: filterSession },
+                        }),
                     });
-
-                studentEnrollments = [...studentEnrollments, ...gapFeeRows];
-
-                // --- PAYMENT WITHOUT ENROLLMENT: if money was received for a term the student
-                // has no enrollment record for (and it isn't already covered by a Gap Fee row
-                // above), still surface it on the clearance report instead of hiding it. ---
-                const matchesTermSet = (termNorm, termSet) => {
-                    for (const t of termSet) {
-                        if (t === termNorm || t.includes(termNorm) || termNorm.includes(t)) return true;
+                    const json = await res.json();
+                    if (json.status === 'success') {
+                        setClearanceResult(json.report);
+                    } else {
+                        alert(json.message || 'Student not found!');
+                        setClearanceResult(null);
                     }
-                    return false;
-                };
-                const gapFeeTermsNorm = new Set(gapFeeRows.map(r => norm(r.semester)));
-
-                const uncoveredPaymentTerms = new Map();
-                (data.payments?.filter(p => norm(p.reg_no) === cleanReg) || []).forEach(p => {
-                    const pSem = norm(p.semester);
-                    if (filterSession && !pSem.includes(norm(filterSession))) return;
-                    if (matchesTermSet(pSem, enrolledTermsNorm) || matchesTermSet(pSem, gapFeeTermsNorm)) return;
-                    if (!uncoveredPaymentTerms.has(pSem)) uncoveredPaymentTerms.set(pSem, { semester: p.semester, total: 0 });
-                    uncoveredPaymentTerms.get(pSem).total += parseFloat(p.amount || 0);
-                });
-
-                const paymentOnlyRows = Array.from(uncoveredPaymentTerms.values()).map(({ semester, total }) => ({
-                    semester, cr: 0, courses: 0,
-                    tuition: 0, exam: 0, reg: 0, other: 0, total: 0,
-                    discPct: 0, discAmt: 0, netFee: 0, totalPaid: total,
-                    balance: -total,
-                    isPaymentOnly: true
-                }));
-
-                studentEnrollments = [...studentEnrollments, ...paymentOnlyRows];
-
-                const summary = studentEnrollments.reduce((acc, curr) => ({
-                    total: acc.total + curr.total, fa: acc.fa + curr.discAmt,
-                    paid: acc.paid + curr.totalPaid, balance: acc.balance + curr.balance,
-                    cr: acc.cr + (parseFloat(curr.cr) || 0), 
-                    courses: acc.courses + (parseFloat(curr.courses) || 0)
-                }), { total: 0, fa: 0, paid: 0, balance: 0, cr: 0, courses: 0 });
-
-                setClearanceResult({ student, rows: studentEnrollments, summary, masterFeeFound: !!masterFee, masterFee });
+                } catch (e) {
+                    alert('Network Error');
+                } finally {
+                    setClearanceLoading(false);
+                }
             };
 
-            // OPTIMIZED DELETE: Update UI Instantly, Delete in Background
+            // DELETE: refresh current table page after delete
             const handleDelete = async (type, id) => {
                 if (type === 'payments') {
-                    const target = data.payments.find(p => p.id === id);
+                    const target = tableRows.find(p => p.id === id);
                     if (target && norm(target.bank) === 'loan') {
                         alert('This is a loan-sourced payment. Delete it from the "Other Bank" tab instead.');
                         return;
@@ -1021,22 +802,13 @@
 
                 if(!confirm("Are you sure?")) return;
 
-                const dataKey = type === 'loans' ? 'payments' : type;
                 const actionName = type === 'loans' ? 'payment' : type;
-
-                // Optimistic Update: Remove from UI immediately
-                setData(prev => {
-                    const updated = { ...prev };
-                    if (dataKey === 'students') {
-                        updated[dataKey] = updated[dataKey].filter(item => item.reg_no !== id);
-                    } else {
-                        updated[dataKey] = updated[dataKey].filter(item => item.id !== id);
-                    }
-                    return updated;
-                });
-
-                // Perform the backend delete silently
-                await postToApi(`delete_${actionName}`, { id }, true); // true = skip refresh
+                const ok = await postToApi(`delete_${actionName}`, { id }, true);
+                if (ok) {
+                    setTableRows(prev => prev.filter(item => (type === 'students' ? item.reg_no !== id : item.id !== id)));
+                    setTableTotal(prev => Math.max(0, prev - 1));
+                    loadMeta();
+                }
             };
 
             // OPTIMIZED SAVE: Update UI Instantly, Save in Background
@@ -1051,53 +823,35 @@
                 }
                 if (modalType === 'loans') newData.bank = 'Loan';
 
-                if ((modalType === 'payments' || modalType === 'others' || modalType === 'discounts' || modalType === 'loans') && !newData.name) {
-                    const s = data.students.find(st => norm(st.reg_no) === norm(newData.reg_no));
-                    if(s) newData.name = s.name;
+                if ((modalType === 'payments' || modalType === 'others' || modalType === 'discounts' || modalType === 'loans') && !newData.name && newData.reg_no) {
+                    try {
+                        const res = await fetch(API_URL, {
+                            method: 'POST', credentials: 'same-origin',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ action: 'lookup_student', data: { reg_no: newData.reg_no } }),
+                        });
+                        const json = await res.json();
+                        if (json.status === 'success' && json.student) newData.name = json.student.name;
+                    } catch (e) {}
                 }
 
                 const isEdit = !!editingId;
-                const tempId = editingId || Date.now();
-                newData.id = tempId; // Assure it has an ID for React maps immediately
-
-                // Loan entries are stored as regular payments (bank = "Loan") so they
-                // automatically show up on the Payments tab and count toward balances.
-                const dataKey = modalType === 'loans' ? 'payments' : modalType;
-
-                // Optimistic UI Update: Add/Edit instantly
-                setData(prev => {
-                    const updated = { ...prev };
-                    // Clone the array properly to trigger React render
-                    const list = [...(updated[dataKey] || [])];
-                    if (isEdit) {
-                        const idx = list.findIndex(x => (modalType === 'students' ? x.reg_no === editingId : x.id === editingId));
-                        if (idx > -1) list[idx] = newData;
-                    } else {
-                        list.unshift(newData); // Add new items to top
-                    }
-                    updated[dataKey] = list;
-                    return updated;
-                });
-
                 setShowModal(false); setFormData({}); setEditingId(null);
 
                 let actionType = modalType.slice(0, -1);
                 if(modalType === 'others') actionType = 'other';
                 if(modalType === 'loans') actionType = 'payment';
 
-                // FIX: Strip the fake Date.now() ID so backend doesn't try to UPDATE instead of INSERT
                 const apiData = { ...newData };
                 if (!isEdit) {
-                    delete apiData.id; 
-                    apiData.id = -1; // Standardize new record ID for PHP backend
+                    delete apiData.id;
+                    apiData.id = -1;
                 }
 
-                // Perform Save
                 const success = await postToApi(`save_${actionType}`, { data: apiData, id: isEdit ? editingId : null }, true);
-                
-                // Background refresh only for new items to get true Database ID
-                if(success && !isEdit) { 
-                    refreshData(true); 
+                if (success) {
+                    if (modalType === 'fees' || modalType === 'banks') loadMeta();
+                    else if (TAB_TABLES.has(modalType) || modalType === 'loans') loadTablePage(modalType === 'loans' ? 'loans' : modalType, isEdit ? currentPage : 1);
                 }
             };
             
@@ -1113,7 +867,7 @@
                 setShowModal(true);
             };
 
-            const handleRegChange = (e) => {
+            const handleRegChange = async (e) => {
                 const reg = e.target.value;
                 if (modalType === 'students') {
                      let updates = { reg_no: reg };
@@ -1124,19 +878,40 @@
                      setFormData(prev => ({ ...prev, ...updates }));
                      return;
                 }
-                const student = data.students.find(s => norm(s.reg_no) === norm(reg));
-                setFormData(prev => ({
-                    ...prev, 
-                    reg_no: reg,
-                    name: student ? student.name : ''
-                }));
+                setFormData(prev => ({ ...prev, reg_no: reg }));
+                if (!reg || reg.length < 3) return;
+                try {
+                    const res = await fetch(API_URL, {
+                        method: 'POST', credentials: 'same-origin',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'lookup_student', data: { reg_no: reg } }),
+                    });
+                    const json = await res.json();
+                    if (json.status === 'success' && json.student) {
+                        setFormData(prev => ({ ...prev, reg_no: reg, name: json.student.name }));
+                    }
+                } catch (e) {}
             };
 
             // --- EXCEL FULL BACKUP FEATURE ---
-            const handleFullBackup = () => {
+            const handleFullBackup = async () => {
                 if (typeof window.XLSX === 'undefined') {
                     alert("Excel library is still loading. Please try again in a moment.");
                     return;
+                }
+
+                let exportData;
+                try {
+                    const res = await fetch(API_URL, {
+                        method: 'POST', credentials: 'same-origin',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'export_all' }),
+                    });
+                    const json = await res.json();
+                    if (json.status !== 'success') return alert(json.message || 'Export failed');
+                    exportData = json.data;
+                } catch (e) {
+                    return alert('Network Error');
                 }
                 
                 const wb = window.XLSX.utils.book_new();
@@ -1145,7 +920,7 @@
                 let hasData = false;
                 
                 categories.forEach(cat => {
-                    const records = data[cat] || [];
+                    const records = exportData[cat] || [];
                     const headers = getHeaders(cat);
                     const displayHeaders = headers.map(h => h === 'fee_name' ? 'fee_head' : h);
                     
@@ -1190,8 +965,30 @@
                     const rows = text.split('\n').map(r => r.trim()).filter(r => r);
                     if (rows.length < 2) return; 
                     const headers = rows[0].split(',').map(h => h.trim().replace(/ /g, '_').toLowerCase());
-                    
-                    const existingData = type === 'loans' ? (data.payments || []).filter(p => norm(p.bank) === 'loan') : (data[type] || []);
+
+                    let existingData = [];
+                    const studentNameMap = new Map();
+                    try {
+                        const indexRes = await fetch(API_URL, {
+                            method: 'POST', credentials: 'same-origin',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ action: 'get_import_index', data: { type } }),
+                        });
+                        const indexJson = await indexRes.json();
+                        if (indexJson.status === 'success') existingData = indexJson.rows || [];
+                        if (type !== 'students') {
+                            const stRes = await fetch(API_URL, {
+                                method: 'POST', credentials: 'same-origin',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ action: 'get_import_index', data: { type: 'students' } }),
+                            });
+                            const stJson = await stRes.json();
+                            (stJson.rows || []).forEach(s => studentNameMap.set(norm(s.reg_no), s.name));
+                        }
+                    } catch (e) {
+                        return alert('Could not load existing records for duplicate check');
+                    }
+
                     const newItems = [];
                     const duplicates = [];
                     const updates = [];
@@ -1236,8 +1033,8 @@
                         }
 
                         if (!obj.name && obj.reg_no) {
-                            const student = data.students.find(s => norm(s.reg_no) === norm(obj.reg_no));
-                            if (student) obj.name = student.name;
+                            const studentName = studentNameMap.get(norm(obj.reg_no));
+                            if (studentName) obj.name = studentName;
                         }
 
                         if (type === 'students') {
@@ -1313,7 +1110,7 @@
                 setImportPreview({ show: false, total: 0, newItems: [], duplicates: [], updates: [], type: '' });
                 setUploadStatus({ active: false, current: 0, total: 0 });
                 alert(`Successfully imported ${uploadedCount} records!`);
-                refreshData(true); // Single background refresh
+                refreshData();
             };
 
             const handleSelectAll = (e) => {
@@ -1328,7 +1125,7 @@
             const deleteSelected = async () => {
                 let idsToDelete = selectedIds;
                 if (activeTab === 'payments') {
-                    const loanIds = new Set(data.payments.filter(p => selectedIds.has(p.id) && norm(p.bank) === 'loan').map(p => p.id));
+                    const loanIds = new Set(tableRows.filter(p => selectedIds.has(p.id) && norm(p.bank) === 'loan').map(p => p.id));
                     if (loanIds.size > 0) {
                         alert(`${loanIds.size} selected record(s) are loan-sourced payments and were skipped. Delete them from the "Other Bank" tab instead.`);
                         idsToDelete = new Set([...selectedIds].filter(id => !loanIds.has(id)));
@@ -1337,15 +1134,6 @@
                 if (idsToDelete.size === 0) { setSelectedIds(new Set()); return; }
                 if (!confirm(`Delete ${idsToDelete.size} records?`)) return;
 
-                const dataKey = activeTab === 'loans' ? 'payments' : activeTab;
-
-                // Optimistic UI Update
-                setData(prev => {
-                    const updated = { ...prev };
-                    updated[dataKey] = updated[dataKey].filter(item => !idsToDelete.has(item.id || item.reg_no));
-                    return updated;
-                });
-
                 for (let id of idsToDelete) {
                     let type = activeTab;
                     if(type === 'others') type = 'other';
@@ -1353,33 +1141,26 @@
                     await postToApi(`delete_${type.slice(0,-1)}`, { id }, true);
                 }
                 setSelectedIds(new Set());
+                loadTablePage(activeTab, currentPage);
+                loadMeta();
             };
             const deleteAllInTab = async () => {
                 if (!confirm(`Permanently delete ALL ${TABS.find(t => t.id === activeTab)?.label || activeTab} records?`)) return;
-                setData(prev => {
-                    if (activeTab === 'loans') return { ...prev, payments: prev.payments.filter(p => norm(p.bank) !== 'loan') };
-                    if (activeTab === 'payments') return { ...prev, payments: prev.payments.filter(p => norm(p.bank) === 'loan') };
-                    return { ...prev, [activeTab]: [] };
-                });
-                await postToApi('delete_all', { table: activeTab }, true);
+                const ok = await postToApi('delete_all', { table: activeTab }, true);
+                if (ok) {
+                    setTableRows([]);
+                    setTableTotal(0);
+                    loadMeta();
+                }
             };
             const deleteBySemester = async () => {
                 const term = prompt("Enter Semester Name to delete:");
                 if (!term) return;
-                const lowerTerm = term.toLowerCase();
-                setData(prev => {
-                    const updated = {...prev};
-                    const matchesTerm = x => x.semester && x.semester.toLowerCase() === lowerTerm;
-                    if (activeTab === 'loans') {
-                        updated.payments = updated.payments.filter(x => !(norm(x.bank) === 'loan' && matchesTerm(x)));
-                    } else if (activeTab === 'payments') {
-                        updated.payments = updated.payments.filter(x => !(norm(x.bank) !== 'loan' && matchesTerm(x)));
-                    } else {
-                        updated[activeTab] = updated[activeTab].filter(x => !matchesTerm(x));
-                    }
-                    return updated;
-                });
-                await postToApi('delete_semester', { table: activeTab, term }, true);
+                const ok = await postToApi('delete_semester', { table: activeTab, term }, true);
+                if (ok) {
+                    loadTablePage(activeTab, 1);
+                    loadMeta();
+                }
             };
 
             const togglePermission = (tabId) => {
@@ -1416,8 +1197,26 @@
                 document.body.removeChild(link);
             };
 
-            const handleExport = (type) => {
-                const records = (type === activeTab) ? filteredData : data[type];
+            const handleExport = async (type) => {
+                let records = [];
+                if (type === activeTab) {
+                    records = filteredData;
+                } else {
+                    try {
+                        const res = await fetch(API_URL, {
+                            method: 'POST', credentials: 'same-origin',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                action: 'fetch_table',
+                                data: { table: type, page: 1, limit: 50000, search: '', sortKey: 'id', sortDir: 'desc' },
+                            }),
+                        });
+                        const json = await res.json();
+                        if (json.status === 'success') records = json.rows || [];
+                    } catch (e) {
+                        return alert('Export failed');
+                    }
+                }
                 if (!records || records.length === 0) return alert("No data to export");
                 let headers = getHeaders(type);
                 let displayHeaders = headers.map(h => h === 'fee_name' ? 'fee_head' : h);
@@ -1518,7 +1317,7 @@
                                             <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
                                                 activeTab === tab.id ? 'bg-blue-200 text-blue-800' : 'bg-gray-200 text-gray-600'
                                             }`}>
-                                                {tab.id === 'clearance' ? '-' : (activeTab === tab.id ? filteredData.length : (tab.id === 'loans' ? (data.payments || []).filter(p => norm(p.bank) === 'loan').length : (data[tab.id]?.length || 0)))}
+                                                {tab.id === 'clearance' ? '-' : (tab.id === 'summary' ? (meta.counts?.enrollments || '-') : (meta.counts?.[tab.id] ?? (activeTab === tab.id ? tableTotal : '-')))}
                                             </span>
                                         </button>
                                     </div>
@@ -1566,7 +1365,7 @@
                                                 <option value="">All Sessions</option>
                                                 {uniqueSessions.map(s => <option key={s} value={s}>{s}</option>)}
                                             </select>
-                                            <button onClick={generateReport} className="w-full md:w-auto bg-blue-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-blue-700 transition flex items-center justify-center gap-2"><Search className="h-5 w-5" /> Generate</button>
+                                            <button onClick={generateReport} disabled={clearanceLoading} className="w-full md:w-auto bg-blue-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-blue-700 transition flex items-center justify-center gap-2 disabled:opacity-50"><Search className="h-5 w-5" /> {clearanceLoading ? 'Generating...' : 'Generate'}</button>
                                         </div>
                                     </div>
                                     {/* Clearance Result */}
@@ -1685,7 +1484,9 @@
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-gray-100">
-                                                    {getSummaryData.map((row, idx) => (
+                                                    {summaryLoading ? (
+                                                        <tr><td colSpan="8" className="p-8 text-center text-blue-500 font-bold"><i className="fas fa-circle-notch fa-spin mr-2"></i> Loading summary...</td></tr>
+                                                    ) : summaryData.map((row, idx) => (
                                                         <tr key={idx} className="hover:bg-gray-50 transition cursor-pointer" onClick={() => openSessionDetail(row)}>
                                                             <td className="p-4 font-bold text-blue-600 hover:text-blue-800 flex items-center gap-2">
                                                                 <Eye className="h-4 w-4" /> {row.session}
@@ -1699,17 +1500,17 @@
                                                             <td className={`p-4 text-right font-mono font-bold ${row.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>{num(row.balance)}</td>
                                                         </tr>
                                                     ))}
-                                                    {getSummaryData.length === 0 && <tr><td colSpan="8" className="p-8 text-center text-gray-400">No session data available.</td></tr>}
-                                                    {getSummaryData.length > 0 && (
+                                                    {summaryData.length === 0 && <tr><td colSpan="8" className="p-8 text-center text-gray-400">No session data available.</td></tr>}
+                                                    {summaryData.length > 0 && (
                                                         <tr className="bg-gray-800 text-white font-bold">
                                                             <td className="p-4">TOTALS</td>
-                                                            <td className="p-4 text-center">{getSummaryData.reduce((s, r) => s + r.enrolled, 0)}</td>
-                                                            <td className="p-4 text-right">{num(getSummaryData.reduce((s, r) => s + r.charged, 0))}</td>
-                                                            <td className="p-4 text-right">{num(getSummaryData.reduce((s, r) => s + r.exam, 0))}</td>
-                                                            <td className="p-4 text-right">{num(getSummaryData.reduce((s, r) => s + r.discount, 0))}</td>
-                                                            <td className="p-4 text-right">{num(getSummaryData.reduce((s, r) => s + r.other, 0))}</td>
-                                                            <td className="p-4 text-right text-green-400">{num(getSummaryData.reduce((s, r) => s + r.paid, 0))}</td>
-                                                            <td className="p-4 text-right text-red-400">{num(getSummaryData.reduce((s, r) => s + r.balance, 0))}</td>
+                                                            <td className="p-4 text-center">{summaryData.reduce((s, r) => s + r.enrolled, 0)}</td>
+                                                            <td className="p-4 text-right">{num(summaryData.reduce((s, r) => s + r.charged, 0))}</td>
+                                                            <td className="p-4 text-right">{num(summaryData.reduce((s, r) => s + r.exam, 0))}</td>
+                                                            <td className="p-4 text-right">{num(summaryData.reduce((s, r) => s + r.discount, 0))}</td>
+                                                            <td className="p-4 text-right">{num(summaryData.reduce((s, r) => s + r.other, 0))}</td>
+                                                            <td className="p-4 text-right text-green-400">{num(summaryData.reduce((s, r) => s + r.paid, 0))}</td>
+                                                            <td className="p-4 text-right text-red-400">{num(summaryData.reduce((s, r) => s + r.balance, 0))}</td>
                                                         </tr>
                                                     )}
                                                 </tbody>
@@ -1732,7 +1533,7 @@
                                                     <input type="text" value={tabSearch} onChange={(e) => setTabSearch(e.target.value)} placeholder={`Filter ${TABS.find(t => t.id === activeTab)?.label || activeTab}...`} className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" />
                                                 </div>
                                                 {/* VISIBLE COUNT BADGE */}
-                                                <span className="bg-blue-100 text-blue-800 text-xs font-bold px-3 py-1 rounded-full whitespace-nowrap">Showing {filteredData.length} Records</span>
+                                                <span className="bg-blue-100 text-blue-800 text-xs font-bold px-3 py-1 rounded-full whitespace-nowrap">Showing {tableTotal} Records</span>
                                             </div>
 
                                             <div className="flex gap-2 flex-wrap md:flex-nowrap">
@@ -1790,8 +1591,8 @@
                                                 <>
                                                     <div className="bg-purple-50 border-l-4 border-purple-500 rounded-lg px-4 py-2">
                                                         <div className="text-xs font-bold text-gray-500 uppercase">Total for Selected Dates</div>
-                                                        <div className="text-xl font-bold text-gray-800">{num(filteredData.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0))}</div>
-                                                        <div className="text-xs text-gray-400">{filteredData.length} record{filteredData.length !== 1 ? 's' : ''}</div>
+                                                        <div className="text-xl font-bold text-gray-800">{num(tableStats?.total || 0)}</div>
+                                                        <div className="text-xs text-gray-400">{tableTotal} record{tableTotal !== 1 ? 's' : ''}</div>
                                                     </div>
                                                     <button onClick={() => { setLoanDateFrom(''); setLoanDateTo(''); }} className="text-sm text-gray-500 hover:text-gray-700 underline mb-2">Clear</button>
                                                 </>
@@ -1816,12 +1617,12 @@
                                         <div className="overflow-x-auto">
                                             <table className="w-full text-sm text-left">
                                                 <thead className="bg-gray-50 text-gray-700 uppercase font-bold text-xs border-b border-gray-200">
-                                                    <tr><th className="p-4 w-10"><input type="checkbox" onChange={handleSelectAll} checked={filteredData.length > 0 && selectedIds.size === filteredData.length} className="rounded" /></th>{getHeaders(activeTab).map(h => <th key={h} className="p-4 cursor-pointer select-none hover:bg-gray-100" onClick={() => handleSort(h)}>{h.replace(/_/g, ' ')}{sortConfig.key === h && (sortConfig.direction === 'asc' ? ' ▲' : ' ▼')}</th>)}<th className="p-4 text-center">Actions</th></tr>
+                                                    <tr><th className="p-4 w-10"><input type="checkbox" onChange={handleSelectAll} checked={tableRows.length > 0 && selectedIds.size === tableRows.length} className="rounded" /></th>{getHeaders(activeTab).map(h => <th key={h} className="p-4 cursor-pointer select-none hover:bg-gray-100" onClick={() => handleSort(h)}>{h.replace(/_/g, ' ')}{sortConfig.key === h && (sortConfig.direction === 'asc' ? ' ▲' : ' ▼')}</th>)}<th className="p-4 text-center">Actions</th></tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-gray-100">
-                                                    {isFetching && filteredData.length === 0 ? (
+                                                    {isFetching && tableRows.length === 0 ? (
                                                         <tr><td colSpan="10" className="p-8 text-center text-blue-500 font-bold"><i className="fas fa-circle-notch fa-spin mr-2"></i> Loading data from server...</td></tr>
-                                                    ) : filteredData.length === 0 ? (
+                                                    ) : tableRows.length === 0 ? (
                                                         <tr><td colSpan="10" className="p-8 text-center text-gray-400">No records found.</td></tr>
                                                     ) : paginatedData.map((item, idx) => (
                                                         <tr key={item.id || idx} className={`hover:bg-gray-50 transition ${selectedIds.has(item.id || item.reg_no) ? 'bg-blue-50' : ''}`}>
@@ -1854,7 +1655,7 @@
                                         {totalPages > 1 && (
                                             <div className="bg-gray-50 p-4 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-4 no-print">
                                                 <span className="text-sm text-gray-600 font-medium">
-                                                    Showing <span className="font-bold text-gray-900">{((currentPage - 1) * ITEMS_PER_PAGE) + 1}</span> to <span className="font-bold text-gray-900">{Math.min(currentPage * ITEMS_PER_PAGE, filteredData.length)}</span> of <span className="font-bold text-gray-900">{filteredData.length}</span> Records
+                                                    Showing <span className="font-bold text-gray-900">{tableTotal === 0 ? 0 : ((currentPage - 1) * ITEMS_PER_PAGE) + 1}</span> to <span className="font-bold text-gray-900">{Math.min(currentPage * ITEMS_PER_PAGE, tableTotal)}</span> of <span className="font-bold text-gray-900">{tableTotal}</span> Records
                                                 </span>
                                                 <div className="flex items-center gap-2">
                                                     <button 

@@ -427,6 +427,380 @@ try {
     exit;
 }
 
+// --- FEE ENGINE (shared by clearance + summary endpoints) ---
+function normStr($str) {
+    if ($str === null || $str === '') return '';
+    return strtolower(preg_replace('/[^a-z0-9]/', '', (string) $str));
+}
+
+function getTermRank($sem) {
+    $s = strtolower((string) $sem);
+    if (strpos($s, 'fall') !== false) return 1;
+    if (strpos($s, 'spring') !== false) return 2;
+    if (strpos($s, 'summer') !== false) return 3;
+    return 4;
+}
+
+function matchesTermSet($termNorm, $termSet) {
+    foreach ($termSet as $t) {
+        if ($t === $termNorm || strpos($t, $termNorm) !== false || strpos($termNorm, $t) !== false) return true;
+    }
+    return false;
+}
+
+function semestersMatch($a, $b) {
+    $a = normStr($a);
+    $b = normStr($b);
+    if ($a === $b) return true;
+    if (strlen($a) > 3 && strpos($b, $a) !== false) return true;
+    if (strlen($b) > 3 && strpos($a, $b) !== false) return true;
+    return false;
+}
+
+function findMasterFee($fees, $student) {
+    $degree = normStr($student['degree'] ?? '');
+    $batch = normStr($student['batch'] ?? '');
+    foreach ($fees as $f) {
+        if (normStr($f['degree']) === $degree && normStr($f['batch']) === $batch) return $f;
+    }
+    foreach ($fees as $f) {
+        $fb = normStr($f['batch']);
+        if (normStr($f['degree']) === $degree && (strpos($batch, $fb) !== false || strpos($fb, $batch) !== false)) return $f;
+    }
+    return null;
+}
+
+function computeClearanceReport($pdo, $regNo, $filterSession = '') {
+    $cleanReg = normStr($regNo);
+    $stmt = $pdo->query("SELECT * FROM students");
+    $student = null;
+    while ($row = $stmt->fetch()) {
+        if (normStr($row['reg_no']) === $cleanReg) { $student = $row; break; }
+    }
+    if (!$student) return null;
+
+    $fees = $pdo->query("SELECT * FROM fee_structure")->fetchAll();
+    $masterFee = findMasterFee($fees, $student);
+
+    $enrollments = [];
+    $estmt = $pdo->prepare("SELECT * FROM enrollments WHERE UPPER(reg_no) = UPPER(?)");
+    $estmt->execute([$student['reg_no']]);
+    while ($en = $estmt->fetch()) {
+        if ($filterSession && strpos(normStr($en['semester']), normStr($filterSession)) === false) continue;
+        $enrollments[] = $en;
+    }
+
+    $others = $pdo->query("SELECT * FROM other_charges")->fetchAll();
+    $discounts = $pdo->query("SELECT * FROM discounts")->fetchAll();
+    $payments = $pdo->prepare("SELECT * FROM payments WHERE UPPER(reg_no) = UPPER(?)");
+    $payments->execute([$student['reg_no']]);
+    $studentPayments = $payments->fetchAll();
+
+    $rows = [];
+    $enrolledTermsNorm = [];
+
+    foreach ($enrollments as $en) {
+        $enSem = normStr($en['semester']);
+        $enrolledTermsNorm[] = $enSem;
+        $cr = (float) ($en['cr'] ?? 0);
+        $courses = (float) ($en['courses'] ?? 0);
+        $tuition = 0; $exam = 0; $other = 0;
+        if ($masterFee) {
+            $tuition = $cr * (float) ($masterFee['per_cr_fee'] ?? 0);
+            $exam = ($courses * (float) ($masterFee['per_course_fee'] ?? 0)) + (float) ($masterFee['other_fee'] ?? 0);
+        }
+        foreach ($others as $o) {
+            if (normStr($o['reg_no']) !== $cleanReg) continue;
+            if (semestersMatch($o['semester'], $en['semester'])) $other += (float) ($o['amount'] ?? 0);
+        }
+        $total = $tuition + $exam + $other;
+        $discPct = 0;
+        foreach ($discounts as $d) {
+            if (normStr($d['reg_no']) === $cleanReg && normStr($d['term']) === $enSem) {
+                $discPct = (float) ($d['discount'] ?? 0);
+                break;
+            }
+        }
+        $discAmt = ($tuition * $discPct) / 100;
+        $netFee = $total - $discAmt;
+        $totalPaid = 0;
+        foreach ($studentPayments as $p) {
+            if (semestersMatch($p['semester'], $en['semester'])) $totalPaid += (float) ($p['amount'] ?? 0);
+        }
+        $rows[] = [
+            'semester' => $en['semester'], 'cr' => $cr, 'courses' => $courses,
+            'tuition' => $tuition, 'exam' => $exam, 'reg' => 0, 'other' => $other,
+            'total' => $total, 'discPct' => $discPct, 'discAmt' => $discAmt,
+            'netFee' => $netFee, 'totalPaid' => $totalPaid, 'balance' => $netFee - $totalPaid,
+        ];
+    }
+
+    $enrolledSet = array_unique($enrolledTermsNorm);
+    foreach ($others as $rule) {
+        if (strpos(normStr($rule['fee_name']), 'gap') === false) continue;
+        if (!empty($rule['reg_no']) && normStr($rule['reg_no']) !== $cleanReg) continue;
+        $ruleTerm = normStr($rule['semester']);
+        if ($filterSession && strpos($ruleTerm, normStr($filterSession)) === false) continue;
+        if (matchesTermSet($ruleTerm, $enrolledSet)) continue;
+        $amount = (float) ($rule['amount'] ?? 0);
+        $totalPaid = 0;
+        foreach ($studentPayments as $p) {
+            if (semestersMatch($p['semester'], $rule['semester'])) $totalPaid += (float) ($p['amount'] ?? 0);
+        }
+        $rows[] = [
+            'semester' => $rule['semester'], 'cr' => 0, 'courses' => 0,
+            'tuition' => 0, 'exam' => 0, 'reg' => 0, 'other' => $amount, 'total' => $amount,
+            'discPct' => 0, 'discAmt' => 0, 'netFee' => $amount, 'totalPaid' => $totalPaid,
+            'balance' => $amount - $totalPaid, 'isGapFee' => true, 'feeName' => $rule['fee_name'],
+        ];
+        $enrolledSet[] = $ruleTerm;
+    }
+
+    $gapTerms = [];
+    foreach ($rows as $r) {
+        if (!empty($r['isGapFee'])) $gapTerms[] = normStr($r['semester']);
+    }
+    $uncovered = [];
+    foreach ($studentPayments as $p) {
+        $pSem = normStr($p['semester']);
+        if ($filterSession && strpos($pSem, normStr($filterSession)) === false) continue;
+        if (matchesTermSet($pSem, $enrolledSet) || matchesTermSet($pSem, $gapTerms)) continue;
+        if (!isset($uncovered[$pSem])) $uncovered[$pSem] = ['semester' => $p['semester'], 'total' => 0];
+        $uncovered[$pSem]['total'] += (float) ($p['amount'] ?? 0);
+    }
+    foreach ($uncovered as $u) {
+        $rows[] = [
+            'semester' => $u['semester'], 'cr' => 0, 'courses' => 0,
+            'tuition' => 0, 'exam' => 0, 'reg' => 0, 'other' => 0, 'total' => 0,
+            'discPct' => 0, 'discAmt' => 0, 'netFee' => 0, 'totalPaid' => $u['total'],
+            'balance' => -$u['total'], 'isPaymentOnly' => true,
+        ];
+    }
+
+    $summary = ['total' => 0, 'fa' => 0, 'paid' => 0, 'balance' => 0, 'cr' => 0, 'courses' => 0];
+    foreach ($rows as $r) {
+        $summary['total'] += $r['total'];
+        $summary['fa'] += $r['discAmt'];
+        $summary['paid'] += $r['totalPaid'];
+        $summary['balance'] += $r['balance'];
+        $summary['cr'] += (float) ($r['cr'] ?? 0);
+        $summary['courses'] += (float) ($r['courses'] ?? 0);
+    }
+
+    return [
+        'student' => $student,
+        'rows' => $rows,
+        'summary' => $summary,
+        'masterFeeFound' => (bool) $masterFee,
+        'masterFee' => $masterFee,
+    ];
+}
+
+function computeSummaryReport($pdo, $filterSession = '') {
+    $students = $pdo->query("SELECT * FROM students")->fetchAll();
+    $studentMap = [];
+    foreach ($students as $s) $studentMap[normStr($s['reg_no'])] = $s;
+
+    $fees = $pdo->query("SELECT * FROM fee_structure")->fetchAll();
+    $others = $pdo->query("SELECT * FROM other_charges")->fetchAll();
+    $discounts = $pdo->query("SELECT * FROM discounts")->fetchAll();
+    $payments = $pdo->query("SELECT * FROM payments")->fetchAll();
+    $enrollments = $pdo->query("SELECT * FROM enrollments")->fetchAll();
+
+    $otherChargesMap = [];
+    foreach ($others as $o) {
+        $k = normStr($o['reg_no']) . '_' . normStr($o['semester']);
+        $otherChargesMap[$k] = ($otherChargesMap[$k] ?? 0) + (float) ($o['amount'] ?? 0);
+    }
+    $discountMap = [];
+    foreach ($discounts as $d) {
+        $discountMap[normStr($d['reg_no']) . '_' . normStr($d['term'])] = (float) ($d['discount'] ?? 0);
+    }
+    $paymentsMap = [];
+    foreach ($payments as $p) {
+        $r = normStr($p['reg_no']);
+        if (!isset($paymentsMap[$r])) $paymentsMap[$r] = [];
+        $paymentsMap[$r][] = $p;
+    }
+
+    $summary = [];
+    $sessionDetailsMap = [];
+
+    foreach ($enrollments as $en) {
+        $sem = $en['semester'];
+        $semKey = normStr($sem);
+        if ($filterSession && strpos($semKey, normStr($filterSession)) === false) continue;
+        if (!isset($summary[$semKey])) {
+            $summary[$semKey] = ['session' => $sem, 'enrolled' => [], 'charged' => 0, 'discount' => 0, 'other' => 0, 'exam' => 0, 'paid' => 0];
+            $sessionDetailsMap[$semKey] = [];
+        }
+        $regNorm = normStr($en['reg_no']);
+        $summary[$semKey]['enrolled'][$regNorm] = true;
+
+        $student = $studentMap[$regNorm] ?? null;
+        $tuition = 0; $exam = 0; $otherBase = 0; $total = 0;
+        if ($student) {
+            $fee = findMasterFee($fees, $student);
+            if ($fee) {
+                $cr = (float) ($en['cr'] ?? 0);
+                $courses = (float) ($en['courses'] ?? 0);
+                $tuition = $cr * (float) ($fee['per_cr_fee'] ?? 0);
+                $exam = $courses * (float) ($fee['per_course_fee'] ?? 0);
+                $otherBase = (float) ($fee['other_fee'] ?? 0);
+                $total = $tuition + $exam + (float) ($fee['reg_fee'] ?? 0) + $otherBase;
+            }
+        }
+        $specificOther = $otherChargesMap[$regNorm . '_' . $semKey] ?? 0;
+        $other = $otherBase + $specificOther;
+        $total += $specificOther;
+
+        $discPct = $discountMap[$regNorm . '_' . $semKey] ?? 0;
+        $discAmt = ($tuition * $discPct) / 100;
+
+        $studentPaid = 0;
+        foreach ($paymentsMap[$regNorm] ?? [] as $p) {
+            if (semestersMatch($p['semester'], $sem)) $studentPaid += (float) ($p['amount'] ?? 0);
+        }
+
+        $summary[$semKey]['charged'] += $total;
+        $summary[$semKey]['discount'] += $discAmt;
+        $summary[$semKey]['other'] += $other;
+        $summary[$semKey]['exam'] += $exam;
+
+        $sessionDetailsMap[$semKey][] = [
+            'reg_no' => $en['reg_no'], 'name' => $en['name'],
+            'courses' => $en['courses'], 'cr' => $en['cr'],
+            'tuition' => $tuition, 'exam' => $exam, 'other' => $other,
+            'discount' => $discAmt, 'paid' => $studentPaid,
+            'balance' => ($total - $discAmt) - $studentPaid,
+        ];
+    }
+
+    foreach ($payments as $p) {
+        $pSem = normStr($p['semester']);
+        if ($filterSession && strpos($pSem, normStr($filterSession)) === false) continue;
+        $targetKey = null;
+        foreach (array_keys($summary) as $key) {
+            if (semestersMatch($pSem, $key)) { $targetKey = $key; break; }
+        }
+        if ($targetKey) $summary[$targetKey]['paid'] += (float) ($p['amount'] ?? 0);
+    }
+
+    $result = [];
+    foreach ($summary as $semKey => $s) {
+        $result[] = [
+            'session' => $s['session'],
+            'enrolled' => count($s['enrolled']),
+            'charged' => $s['charged'],
+            'discount' => $s['discount'],
+            'other' => $s['other'],
+            'exam' => $s['exam'],
+            'paid' => $s['paid'],
+            'balance' => ($s['charged'] - $s['discount']) - $s['paid'],
+            'details' => $sessionDetailsMap[$semKey] ?? [],
+        ];
+    }
+
+    usort($result, function ($a, $b) {
+        $yearA = (int) preg_replace('/\D/', '', $a['session']);
+        $yearB = (int) preg_replace('/\D/', '', $b['session']);
+        if ($yearA !== $yearB) return $yearA - $yearB;
+        return getTermRank($a['session']) - getTermRank($b['session']);
+    });
+
+    return $result;
+}
+
+function tableConfig($tab) {
+    $map = [
+        'students'    => ['table' => 'students', 'searchCols' => ['reg_no', 'name', 'degree', 'batch', 'mobile', 'email'], 'orderCol' => 'id'],
+        'fees'        => ['table' => 'fee_structure', 'searchCols' => ['degree', 'batch'], 'orderCol' => 'id'],
+        'enrollments' => ['table' => 'enrollments', 'searchCols' => ['reg_no', 'name', 'semester'], 'orderCol' => 'id'],
+        'payments'    => ['table' => 'payments', 'searchCols' => ['reg_no', 'name', 'semester', 'bank'], 'where' => "(bank IS NULL OR bank <> 'Loan')", 'orderCol' => 'id'],
+        'loans'       => ['table' => 'payments', 'searchCols' => ['reg_no', 'name', 'semester'], 'where' => "bank = 'Loan'", 'orderCol' => 'id'],
+        'discounts'   => ['table' => 'discounts', 'searchCols' => ['reg_no', 'name', 'term'], 'orderCol' => 'id'],
+        'others'      => ['table' => 'other_charges', 'searchCols' => ['reg_no', 'name', 'semester', 'fee_name'], 'orderCol' => 'id'],
+        'banks'       => ['table' => 'banks', 'searchCols' => ['name', 'account_no'], 'orderCol' => 'id'],
+        'users'       => ['table' => 'users', 'searchCols' => ['username', 'role'], 'orderCol' => 'id'],
+    ];
+    return $map[$tab] ?? null;
+}
+
+function fetchTablePage($pdo, $tab, $page, $limit, $search, $sortKey, $sortDir, $dateFrom, $dateTo) {
+    $cfg = tableConfig($tab);
+    if (!$cfg) throw new Exception("Invalid table: $tab");
+
+    $table = $cfg['table'];
+    $where = [$cfg['where'] ?? '1=1'];
+    $params = [];
+
+    if ($search !== '') {
+        $likes = [];
+        foreach ($cfg['searchCols'] as $col) {
+            $likes[] = "`$col` LIKE ?";
+            $params[] = '%' . $search . '%';
+        }
+        $where[] = '(' . implode(' OR ', $likes) . ')';
+    }
+
+    if (($tab === 'loans' || $tab === 'payments') && $dateFrom) {
+        $where[] = '`date` >= ?';
+        $params[] = $dateFrom;
+    }
+    if (($tab === 'loans' || $tab === 'payments') && $dateTo) {
+        $where[] = '`date` <= ?';
+        $params[] = $dateTo;
+    }
+
+    $whereSql = implode(' AND ', $where);
+
+    $countStmt = $pdo->prepare("SELECT COUNT(*) FROM `$table` WHERE $whereSql");
+    $countStmt->execute($params);
+    $total = (int) $countStmt->fetchColumn();
+
+    $allowedSort = array_merge($cfg['searchCols'], ['id', 'amount', 'date', 'cr', 'courses', 'discount', 'per_cr_fee', 'per_course_fee']);
+    $orderCol = in_array($sortKey, $allowedSort, true) ? $sortKey : $cfg['orderCol'];
+    $orderDir = strtolower($sortDir) === 'asc' ? 'ASC' : 'DESC';
+    $offset = max(0, ($page - 1) * $limit);
+
+    $stmt = $pdo->prepare("SELECT * FROM `$table` WHERE $whereSql ORDER BY `$orderCol` $orderDir LIMIT $limit OFFSET $offset");
+    $stmt->execute($params);
+    $rows = $stmt->fetchAll();
+
+    if ($tab === 'users') {
+        foreach ($rows as &$u) {
+            $u['permissions'] = json_decode($u['permissions'] ?? '[]');
+            unset($u['password']);
+        }
+    }
+
+    $stats = null;
+    $loanSemesterStats = null;
+    if ($tab === 'payments' || $tab === 'loans') {
+        $statsStmt = $pdo->prepare("SELECT
+            COALESCE(SUM(amount), 0) AS total,
+            COALESCE(SUM(CASE WHEN bank IS NOT NULL AND bank <> '' AND bank <> 'Cash' AND bank <> 'Loan' THEN amount ELSE 0 END), 0) AS bank,
+            COALESCE(SUM(CASE WHEN bank IS NULL OR bank = '' OR bank = 'Cash' OR bank = 'Loan' THEN amount ELSE 0 END), 0) AS cash
+            FROM `$table` WHERE $whereSql");
+        $statsStmt->execute($params);
+        $stats = $statsStmt->fetch();
+    }
+    if ($tab === 'loans') {
+        $semStmt = $pdo->prepare("SELECT semester, COALESCE(SUM(amount), 0) AS total, COUNT(*) AS count
+            FROM `$table` WHERE $whereSql GROUP BY semester");
+        $semStmt->execute($params);
+        $loanSemesterStats = $semStmt->fetchAll();
+        usort($loanSemesterStats, function ($a, $b) {
+            $yearA = (int) preg_replace('/\D/', '', $a['semester'] ?? '');
+            $yearB = (int) preg_replace('/\D/', '', $b['semester'] ?? '');
+            if ($yearA !== $yearB) return $yearA - $yearB;
+            return getTermRank($a['semester']) - getTermRank($b['semester']);
+        });
+    }
+
+    return ['rows' => $rows, 'total' => $total, 'page' => $page, 'limit' => $limit, 'stats' => $stats, 'loanSemesterStats' => $loanSemesterStats];
+}
+
 // --- HELPER: Date Formatter ---
 function formatDateForDB($dateString) {
     if (empty($dateString)) return date('Y-m-d');
@@ -439,28 +813,69 @@ function formatDateForDB($dateString) {
 $method = $_SERVER['REQUEST_METHOD'];
 $input = json_decode(file_get_contents('php://input'), true);
 
-// GET Request: Fetch All Data (Load App)
+// GET Request: lightweight meta (counts + reference data)
 if ($method === 'GET') {
     requireAuth();
     try {
-        $data = [
-            'students'    => $pdo->query("SELECT * FROM students ORDER BY id DESC")->fetchAll(),
-            'fees'        => $pdo->query("SELECT * FROM fee_structure ORDER BY id DESC")->fetchAll(),
-            'enrollments' => $pdo->query("SELECT * FROM enrollments ORDER BY id DESC")->fetchAll(),
-            'payments'    => $pdo->query("SELECT * FROM payments ORDER BY id DESC")->fetchAll(),
-            'discounts'   => $pdo->query("SELECT * FROM discounts ORDER BY id DESC")->fetchAll(),
-            'others'      => $pdo->query("SELECT * FROM other_charges ORDER BY id DESC")->fetchAll(),
-            'users'       => $pdo->query("SELECT * FROM users ORDER BY id DESC")->fetchAll(),
-            'banks'       => $pdo->query("SELECT * FROM banks ORDER BY id DESC")->fetchAll()
-        ];
-        
-        foreach ($data['users'] as &$u) {
-            $u['permissions'] = json_decode($u['permissions'] ?? '[]');
-            unset($u['password']);
+        $mode = $_GET['mode'] ?? 'meta';
+        if ($mode === 'full') {
+            // Legacy: full dump (avoid for large datasets)
+            $data = [
+                'students'    => $pdo->query("SELECT * FROM students ORDER BY id DESC")->fetchAll(),
+                'fees'        => $pdo->query("SELECT * FROM fee_structure ORDER BY id DESC")->fetchAll(),
+                'enrollments' => $pdo->query("SELECT * FROM enrollments ORDER BY id DESC")->fetchAll(),
+                'payments'    => $pdo->query("SELECT * FROM payments ORDER BY id DESC")->fetchAll(),
+                'discounts'   => $pdo->query("SELECT * FROM discounts ORDER BY id DESC")->fetchAll(),
+                'others'      => $pdo->query("SELECT * FROM other_charges ORDER BY id DESC")->fetchAll(),
+                'users'       => $pdo->query("SELECT * FROM users ORDER BY id DESC")->fetchAll(),
+                'banks'       => $pdo->query("SELECT * FROM banks ORDER BY id DESC")->fetchAll()
+            ];
+            foreach ($data['users'] as &$u) {
+                $u['permissions'] = json_decode($u['permissions'] ?? '[]');
+                unset($u['password']);
+            }
+            echo json_encode($data);
+            exit;
         }
 
-        // Return the clean data structure directly
-        echo json_encode($data);
+        $sessions = $pdo->query("SELECT DISTINCT semester FROM enrollments WHERE semester IS NOT NULL AND semester <> ''")->fetchAll(PDO::FETCH_COLUMN);
+        usort($sessions, function ($a, $b) {
+            $yearA = (int) preg_replace('/\D/', '', $a);
+            $yearB = (int) preg_replace('/\D/', '', $b);
+            if ($yearA !== $yearB) return $yearA - $yearB;
+            return getTermRank($a) - getTermRank($b);
+        });
+
+        $users = [];
+        if (($_SESSION['user']['role'] ?? '') === 'admin') {
+            $users = $pdo->query("SELECT id, username, role, permissions FROM users ORDER BY id DESC")->fetchAll();
+            foreach ($users as &$u) {
+                $u['permissions'] = json_decode($u['permissions'] ?? '[]');
+            }
+        }
+
+        $counts = [
+                'students'    => (int) $pdo->query("SELECT COUNT(*) FROM students")->fetchColumn(),
+                'fees'        => (int) $pdo->query("SELECT COUNT(*) FROM fee_structure")->fetchColumn(),
+                'enrollments' => (int) $pdo->query("SELECT COUNT(*) FROM enrollments")->fetchColumn(),
+                'payments'    => (int) $pdo->query("SELECT COUNT(*) FROM payments WHERE bank IS NULL OR bank <> 'Loan'")->fetchColumn(),
+                'loans'       => (int) $pdo->query("SELECT COUNT(*) FROM payments WHERE bank = 'Loan'")->fetchColumn(),
+                'discounts'   => (int) $pdo->query("SELECT COUNT(*) FROM discounts")->fetchColumn(),
+                'others'      => (int) $pdo->query("SELECT COUNT(*) FROM other_charges")->fetchColumn(),
+                'banks'       => (int) $pdo->query("SELECT COUNT(*) FROM banks")->fetchColumn(),
+            ];
+        if (($_SESSION['user']['role'] ?? '') === 'admin') {
+            $counts['users'] = (int) $pdo->query("SELECT COUNT(*) FROM users")->fetchColumn();
+        }
+
+        echo json_encode([
+            'status' => 'success',
+            'fees' => $pdo->query("SELECT * FROM fee_structure ORDER BY id DESC")->fetchAll(),
+            'banks' => $pdo->query("SELECT * FROM banks ORDER BY id DESC")->fetchAll(),
+            'sessions' => array_values($sessions),
+            'users' => $users,
+            'counts' => $counts,
+        ]);
     } catch (Exception $e) {
         echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
     }
@@ -574,6 +989,136 @@ if ($method === 'POST' && isset($input['action'])) {
                 $googleServiceAccountJson, $data['google_delegated_user'] ?? '', $data['message_template'] ?? '',
             ]);
             echo json_encode(['status' => 'success']);
+        } catch (Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    if ($action === 'fetch_table') {
+        try {
+            $tab = $data['table'] ?? '';
+            $page = max(1, (int) ($data['page'] ?? 1));
+            $limit = min(500, max(1, (int) ($data['limit'] ?? 100)));
+            $search = trim($data['search'] ?? '');
+            $sortKey = $data['sortKey'] ?? 'id';
+            $sortDir = $data['sortDir'] ?? 'desc';
+            $dateFrom = $data['dateFrom'] ?? '';
+            $dateTo = $data['dateTo'] ?? '';
+            $result = fetchTablePage($pdo, $tab, $page, $limit, $search, $sortKey, $sortDir, $dateFrom, $dateTo);
+            echo json_encode(['status' => 'success'] + $result);
+        } catch (Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    if ($action === 'get_clearance') {
+        try {
+            $regNo = trim($data['reg_no'] ?? '');
+            $filterSession = trim($data['filter_session'] ?? '');
+            if (!$regNo) throw new Exception('Registration number is required');
+            $report = computeClearanceReport($pdo, $regNo, $filterSession);
+            if (!$report) throw new Exception('Student not found');
+            echo json_encode(['status' => 'success', 'report' => $report]);
+        } catch (Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    if ($action === 'get_summary') {
+        try {
+            $filterSession = trim($data['filter_session'] ?? '');
+            echo json_encode(['status' => 'success', 'summary' => computeSummaryReport($pdo, $filterSession)]);
+        } catch (Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    if ($action === 'search_students') {
+        try {
+            $q = trim($data['q'] ?? '');
+            $limit = min(50, max(1, (int) ($data['limit'] ?? 20)));
+            if ($q === '') {
+                echo json_encode(['status' => 'success', 'students' => []]);
+                exit;
+            }
+            $like = '%' . $q . '%';
+            $stmt = $pdo->prepare("SELECT reg_no, name, degree, batch, mobile, email FROM students
+                WHERE reg_no LIKE ? OR name LIKE ? ORDER BY id DESC LIMIT $limit");
+            $stmt->execute([$like, $like]);
+            echo json_encode(['status' => 'success', 'students' => $stmt->fetchAll()]);
+        } catch (Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    if ($action === 'lookup_student') {
+        try {
+            $regNo = trim($data['reg_no'] ?? '');
+            $stmt = $pdo->prepare("SELECT reg_no, name, degree, batch, mobile, email FROM students WHERE UPPER(reg_no) = UPPER(?) LIMIT 1");
+            $stmt->execute([$regNo]);
+            $row = $stmt->fetch();
+            echo json_encode(['status' => 'success', 'student' => $row ?: null]);
+        } catch (Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    if ($action === 'get_import_index') {
+        try {
+            $type = $data['type'] ?? '';
+            $rows = [];
+            switch ($type) {
+                case 'students':
+                    $rows = $pdo->query("SELECT reg_no, name, degree, batch, mobile, email, total_package FROM students")->fetchAll();
+                    break;
+                case 'fees':
+                    $rows = $pdo->query("SELECT degree, batch FROM fee_structure")->fetchAll();
+                    break;
+                case 'payments':
+                    $rows = $pdo->query("SELECT reg_no, semester, amount, date, bank FROM payments WHERE bank IS NULL OR bank <> 'Loan'")->fetchAll();
+                    break;
+                case 'loans':
+                    $rows = $pdo->query("SELECT reg_no, semester, amount, date FROM payments WHERE bank = 'Loan'")->fetchAll();
+                    break;
+                case 'enrollments':
+                case 'discounts':
+                case 'others':
+                    $table = $type === 'others' ? 'other_charges' : $type;
+                    $rows = $pdo->query("SELECT * FROM `$table`")->fetchAll();
+                    break;
+                default:
+                    throw new Exception('Invalid import type');
+            }
+            echo json_encode(['status' => 'success', 'rows' => $rows]);
+        } catch (Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    if ($action === 'export_all') {
+        try {
+            $exportData = [
+                'students'    => $pdo->query("SELECT * FROM students ORDER BY id DESC")->fetchAll(),
+                'fees'        => $pdo->query("SELECT * FROM fee_structure ORDER BY id DESC")->fetchAll(),
+                'enrollments' => $pdo->query("SELECT * FROM enrollments ORDER BY id DESC")->fetchAll(),
+                'payments'    => $pdo->query("SELECT * FROM payments ORDER BY id DESC")->fetchAll(),
+                'discounts'   => $pdo->query("SELECT * FROM discounts ORDER BY id DESC")->fetchAll(),
+                'others'      => $pdo->query("SELECT * FROM other_charges ORDER BY id DESC")->fetchAll(),
+                'users'       => $pdo->query("SELECT * FROM users ORDER BY id DESC")->fetchAll(),
+                'banks'       => $pdo->query("SELECT * FROM banks ORDER BY id DESC")->fetchAll(),
+            ];
+            foreach ($exportData['users'] as &$u) {
+                $u['permissions'] = json_decode($u['permissions'] ?? '[]');
+                unset($u['password']);
+            }
+            echo json_encode(['status' => 'success', 'data' => $exportData]);
         } catch (Exception $e) {
             echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
         }
