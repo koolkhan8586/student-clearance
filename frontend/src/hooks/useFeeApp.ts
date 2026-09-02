@@ -30,7 +30,7 @@ import type {
   User,
 } from '../types';
 import { ADMIN_EXTRA_TABS, ITEMS_PER_PAGE, TAB_TABLES, TABS } from '../utils/constants';
-import { norm, canonicalReg, num } from '../utils/format';
+import { norm, canonicalReg, parseDegreeFromReg, num } from '../utils/format';
 
 export function useFeeApp() {
   const [user, setUser] = useState<User | null>(null);
@@ -696,10 +696,8 @@ export function useFeeApp() {
     const reg = e.target.value;
     if (modalType === 'students') {
       const updates: Record<string, string> = { reg_no: reg };
-      const upper = reg.toUpperCase();
-      if (upper.includes('05')) {
-        updates.degree = upper.split('05')[0];
-      }
+      const degree = parseDegreeFromReg(reg);
+      if (degree) updates.degree = degree;
       setFormData((prev) => ({ ...prev, ...updates }));
       return;
     }
@@ -864,10 +862,8 @@ export function useFeeApp() {
         if (obj.amount) obj.amount = String(obj.amount).replace(/[^0-9.-]/g, '');
 
         if (type === 'students' && obj.reg_no) {
-          const upper = String(obj.reg_no).toUpperCase();
-          if (upper.includes('05')) {
-            obj.degree = upper.split('05')[0];
-          }
+          const degree = parseDegreeFromReg(obj.reg_no);
+          if (degree) obj.degree = degree;
         }
 
         if (!obj.name && obj.reg_no) {

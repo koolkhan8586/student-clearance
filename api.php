@@ -439,7 +439,19 @@ function canonicalRegNo($regNo) {
 }
 
 function regNoEquals($a, $b) {
+    // Full registration number must match exactly (case-insensitive).
+    // BSCAF052410025 and BAF052410025 share the same numeric tail but are
+    // different degree programs and different students — never partial-match.
     return normStr($a) === normStr($b);
+}
+
+function parseDegreeFromRegNo($regNo) {
+    $canonical = canonicalRegNo($regNo);
+    if ($canonical === '') return '';
+    if (preg_match('/^([A-Z0-9]+)05/', $canonical, $matches)) {
+        return $matches[1];
+    }
+    return '';
 }
 
 function findStudentByRegNo($pdo, $regNo) {
@@ -459,10 +471,7 @@ function findStudentByRegNo($pdo, $regNo) {
         while ($row = $tstmt->fetch(PDO::FETCH_ASSOC)) {
             if (normStr($row['reg_no']) !== $cleanReg) continue;
             $canonical = canonicalRegNo($row['reg_no']);
-            $degree = '';
-            if (preg_match('/^([A-Z0-9]+)05/', $canonical, $matches)) {
-                $degree = $matches[1];
-            }
+            $degree = parseDegreeFromRegNo($canonical);
             return [
                 'id' => null,
                 'reg_no' => $canonical,
@@ -1294,12 +1303,10 @@ if ($method === 'POST' && isset($input['action'])) {
                 // ENFORCE UPPERCASE REG NO
                 $reg_no = strtoupper($data['reg_no']);
                 
-                // Auto-Detect Degree if empty
+                // Auto-detect degree prefix before batch code "05" (e.g. BSCAF, BAF)
                 $degree = $data['degree'] ?? '';
                 if (empty($degree)) {
-                    if (preg_match('/^([A-Z0-9]+)05/', $reg_no, $matches)) {
-                        $degree = $matches[1];
-                    }
+                    $degree = parseDegreeFromRegNo($reg_no);
                 }
                 
                 $mobile = $data['mobile'] ?? '';
