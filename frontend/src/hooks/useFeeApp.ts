@@ -311,6 +311,12 @@ export function useFeeApp() {
       const res = await getClearanceRequest(reg, filterSession);
       const json = await res.json();
       if (json.status === 'success') {
+        const returnedReg = canonicalReg(json.report?.student?.reg_no || '');
+        if (returnedReg !== reg) {
+          alert(`Wrong student returned. Searched ${reg} but got ${returnedReg}. Please upload the latest api.php to the server.`);
+          setClearanceResult(null);
+          return;
+        }
         setClearanceResult(json.report);
       } else {
         alert(json.message || 'Student not found!');
