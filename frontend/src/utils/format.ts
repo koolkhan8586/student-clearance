@@ -4,11 +4,12 @@ export const norm = (str: unknown): string =>
 export const canonicalReg = (str: unknown): string =>
   str ? str.toString().toUpperCase().replace(/[^A-Z0-9]/g, '') : '';
 
-/** Degree prefix before batch code "05" — BSCAF and BAF are distinct. */
+/** Degree prefix before the first batch code "05" (e.g. BSCAF052430051 → BSCAF). */
 export const parseDegreeFromReg = (regNo: unknown): string => {
   const canonical = canonicalReg(regNo);
-  const match = canonical.match(/^([A-Z0-9]+)05/);
-  return match ? match[1] : '';
+  const pos = canonical.indexOf('05');
+  if (pos <= 0) return '';
+  return canonical.slice(0, pos);
 };
 
 /** Legacy index.html correctedStudents: degree always follows reg_no prefix. */
