@@ -454,6 +454,46 @@ function parseDegreeFromRegNo($regNo) {
     return '';
 }
 
+function regNoStrictMatch($stored, $search) {
+    $storedCanonical = canonicalRegNo($stored);
+    $searchCanonical = canonicalRegNo($search);
+    if ($storedCanonical === '' || $searchCanonical === '') return false;
+    if ($storedCanonical !== $searchCanonical) return false;
+    $storedDegree = parseDegreeFromRegNo($storedCanonical);
+    $searchDegree = parseDegreeFromRegNo($searchCanonical);
+    if ($searchDegree !== '' && $storedDegree !== '' && $storedDegree !== $searchDegree) {
+        return false;
+    }
+    return true;
+}
+
+function filterEnrollmentsForReg($enrollments, $searchCanonical, $filterSession = '') {
+    $filtered = [];
+    foreach ($enrollments as $en) {
+        if (!regNoStrictMatch($en['reg_no'] ?? '', $searchCanonical)) continue;
+        if ($filterSession && strpos(normStr($en['semester'] ?? ''), normStr($filterSession)) === false) continue;
+        $filtered[] = $en;
+    }
+
+    // Safety net: one row per semester for this exact registration number
+    $bySemester = [];
+    foreach ($filtered as $en) {
+        $semKey = normStr($en['semester'] ?? '');
+        if ($semKey === '') continue;
+        if (!isset($bySemester[$semKey])) {
+            $bySemester[$semKey] = $en;
+            continue;
+        }
+        $currentId = (int) ($bySemester[$semKey]['id'] ?? 0);
+        $candidateId = (int) ($en['id'] ?? 0);
+        if ($candidateId > $currentId) {
+            $bySemester[$semKey] = $en;
+        }
+    }
+
+    return array_values($bySemester);
+}
+
 /** Restore legacy index.html behavior: degree always follows reg_no prefix (BSCAF vs BAF). */
 function applyDegreeFromRegNo($student) {
     if (!is_array($student) || empty($student['reg_no'])) return $student;
@@ -559,20 +599,17 @@ function computeClearanceReport($pdo, $regNo, $filterSession = '') {
     $fees = $pdo->query("SELECT * FROM fee_structure")->fetchAll();
     $masterFee = findMasterFee($fees, $student);
 
-    $enrollments = [];
-    $estmt = $pdo->query("SELECT * FROM enrollments");
-    while ($en = $estmt->fetch()) {
-        if (!regNoEquals($en['reg_no'], $searchCanonical)) continue;
-        if ($filterSession && strpos(normStr($en['semester']), normStr($filterSession)) === false) continue;
-        $enrollments[] = $en;
-    }
+    $enrollments = filterEnrollmentsForReg(
+        $pdo->query("SELECT * FROM enrollments")->fetchAll(PDO::FETCH_ASSOC),
+        $searchCanonical,
+        $filterSession
+    );
 
     $others = $pdo->query("SELECT * FROM other_charges")->fetchAll();
     $discounts = $pdo->query("SELECT * FROM discounts")->fetchAll();
     $studentPayments = [];
-    $pstmt = $pdo->query("SELECT * FROM payments");
-    while ($p = $pstmt->fetch()) {
-        if (regNoEquals($p['reg_no'], $searchCanonical)) {
+    foreach ($pdo->query("SELECT * FROM payments")->fetchAll(PDO::FETCH_ASSOC) as $p) {
+        if (regNoStrictMatch($p['reg_no'] ?? '', $searchCanonical)) {
             $studentPayments[] = $p;
         }
     }
@@ -591,13 +628,13 @@ function computeClearanceReport($pdo, $regNo, $filterSession = '') {
             $exam = ($courses * (float) ($masterFee['per_course_fee'] ?? 0)) + (float) ($masterFee['other_fee'] ?? 0);
         }
         foreach ($others as $o) {
-            if (!regNoEquals($o['reg_no'], $searchCanonical)) continue;
+            if (!regNoStrictMatch($o['reg_no'] ?? '', $searchCanonical)) continue;
             if (semestersMatch($o['semester'], $en['semester'])) $other += (float) ($o['amount'] ?? 0);
         }
         $total = $tuition + $exam + $other;
         $discPct = 0;
         foreach ($discounts as $d) {
-            if (regNoEquals($d['reg_no'], $searchCanonical) && normStr($d['term']) === $enSem) {
+            if (regNoStrictMatch($d['reg_no'] ?? '', $searchCanonical) && normStr($d['term']) === $enSem) {
                 $discPct = (float) ($d['discount'] ?? 0);
                 break;
             }
@@ -619,7 +656,7 @@ function computeClearanceReport($pdo, $regNo, $filterSession = '') {
     $enrolledSet = array_unique($enrolledTermsNorm);
     foreach ($others as $rule) {
         if (strpos(normStr($rule['fee_name']), 'gap') === false) continue;
-        if (!empty($rule['reg_no']) && !regNoEquals($rule['reg_no'], $searchCanonical)) continue;
+        if (!empty($rule['reg_no']) && !regNoStrictMatch($rule['reg_no'], $searchCanonical)) continue;
         $ruleTerm = normStr($rule['semester']);
         if ($filterSession && strpos($ruleTerm, normStr($filterSession)) === false) continue;
         if (matchesTermSet($ruleTerm, $enrolledSet)) continue;
