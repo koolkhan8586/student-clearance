@@ -448,12 +448,30 @@ function matchesTermSet($termNorm, $termSet) {
     return false;
 }
 
+function extractSessionParts($sem) {
+    $s = strtolower((string) $sem);
+    $term = null;
+    if (strpos($s, 'fall') !== false) $term = 'fall';
+    elseif (strpos($s, 'spring') !== false) $term = 'spring';
+    elseif (strpos($s, 'summer') !== false) $term = 'summer';
+    $year = null;
+    if (preg_match('/(\d{4})/', $s, $m)) {
+        $year = $m[1];
+    } elseif (preg_match('/(\d{2})/', $s, $m)) {
+        $year = '20' . $m[1];
+    }
+    return [$term, $year];
+}
+
 function semestersMatch($a, $b) {
     $a = normStr($a);
     $b = normStr($b);
     if ($a === $b) return true;
     if (strlen($a) > 3 && strpos($b, $a) !== false) return true;
     if (strlen($b) > 3 && strpos($a, $b) !== false) return true;
+    [$termA, $yearA] = extractSessionParts($a);
+    [$termB, $yearB] = extractSessionParts($b);
+    if ($termA && $termB && $yearA && $yearB && $termA === $termB && $yearA === $yearB) return true;
     return false;
 }
 
@@ -468,6 +486,16 @@ function findMasterFee($fees, $student) {
         if (normStr($f['degree']) === $degree && (strpos($batch, $fb) !== false || strpos($fb, $batch) !== false)) return $f;
     }
     return null;
+}
+
+function findDiscountPct($discounts, $regNo, $semester) {
+    $cleanReg = normStr($regNo);
+    foreach ($discounts as $d) {
+        if (normStr($d['reg_no']) === $cleanReg && semestersMatch($d['term'], $semester)) {
+            return (float) ($d['discount'] ?? 0);
+        }
+    }
+    return 0;
 }
 
 function computeClearanceReport($pdo, $regNo, $filterSession = '') {
@@ -514,13 +542,7 @@ function computeClearanceReport($pdo, $regNo, $filterSession = '') {
             if (semestersMatch($o['semester'], $en['semester'])) $other += (float) ($o['amount'] ?? 0);
         }
         $total = $tuition + $exam + $other;
-        $discPct = 0;
-        foreach ($discounts as $d) {
-            if (normStr($d['reg_no']) === $cleanReg && normStr($d['term']) === $enSem) {
-                $discPct = (float) ($d['discount'] ?? 0);
-                break;
-            }
-        }
+        $discPct = findDiscountPct($discounts, $student['reg_no'], $en['semester']);
         $discAmt = ($tuition * $discPct) / 100;
         $netFee = $total - $discAmt;
         $totalPaid = 0;
@@ -612,10 +634,6 @@ function computeSummaryReport($pdo, $filterSession = '') {
         $k = normStr($o['reg_no']) . '_' . normStr($o['semester']);
         $otherChargesMap[$k] = ($otherChargesMap[$k] ?? 0) + (float) ($o['amount'] ?? 0);
     }
-    $discountMap = [];
-    foreach ($discounts as $d) {
-        $discountMap[normStr($d['reg_no']) . '_' . normStr($d['term'])] = (float) ($d['discount'] ?? 0);
-    }
     $paymentsMap = [];
     foreach ($payments as $p) {
         $r = normStr($p['reg_no']);
@@ -654,7 +672,7 @@ function computeSummaryReport($pdo, $filterSession = '') {
         $other = $otherBase + $specificOther;
         $total += $specificOther;
 
-        $discPct = $discountMap[$regNorm . '_' . $semKey] ?? 0;
+        $discPct = findDiscountPct($discounts, $en['reg_no'], $sem);
         $discAmt = ($tuition * $discPct) / 100;
 
         $studentPaid = 0;
