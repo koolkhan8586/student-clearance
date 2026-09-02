@@ -552,6 +552,9 @@ export function useFeeApp() {
       const json = await res.json();
       if (json.status === 'success' && json.user) {
         const found = json.user as User;
+        if (!Array.isArray(found.permissions)) {
+          found.permissions = [];
+        }
         setUser(found);
         sessionStorage.setItem('feeUser', JSON.stringify(found));
         setLoginData({ username: '', password: '' });
