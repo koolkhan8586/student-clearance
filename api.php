@@ -1265,6 +1265,7 @@ if ($method === 'POST' && isset($input['action'])) {
     }
 
     if ($action === 'export_all') {
+        requireAdmin();
         try {
             $exportData = [
                 'students'    => $pdo->query("SELECT * FROM students ORDER BY id DESC")->fetchAll(),
