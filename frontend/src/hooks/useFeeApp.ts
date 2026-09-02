@@ -30,7 +30,7 @@ import type {
   User,
 } from '../types';
 import { ADMIN_EXTRA_TABS, ITEMS_PER_PAGE, TAB_TABLES, TABS } from '../utils/constants';
-import { norm, canonicalReg, parseDegreeFromReg, syncDegreeFromReg, num } from '../utils/format';
+import { norm, canonicalReg, parseDegreeFromReg, syncDegreeFromReg, num, isLoanBank, rowIdKey, sameRowId } from '../utils/format';
 
 export function useFeeApp() {
   const [user, setUser] = useState<User | null>(null);
@@ -71,7 +71,7 @@ export function useFeeApp() {
   const [summaryFilterSession, setSummaryFilterSession] = useState('');
   const [tabSearch, setTabSearch] = useState('');
   const [debouncedTabSearch, setDebouncedTabSearch] = useState('');
-  const [selectedIds, setSelectedIds] = useState<Set<string | number>>(new Set());
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [clearanceResult, setClearanceResult] = useState<ClearanceReport | null>(null);
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -605,8 +605,8 @@ export function useFeeApp() {
 
   const handleDelete = async (type: string, id: string | number) => {
     if (type === 'payments') {
-      const target = tableRows.find((p) => p.id === id);
-      if (target && norm(target.bank) === 'loan') {
+      const target = tableRows.find((p) => sameRowId(p.id, id));
+      if (target && isLoanBank(target.bank)) {
         alert('This is a loan-sourced payment. Delete it from the "Other Bank" tab instead.');
         return;
       }
@@ -614,10 +614,12 @@ export function useFeeApp() {
 
     if (!confirm('Are you sure?')) return;
 
-    const actionName = type === 'loans' ? 'payment' : type;
+    const actionName = type === 'loans' || type === 'payments' ? 'payment' : type;
     const ok = await postToApi(`delete_${actionName}`, { id }, true);
     if (ok) {
-      setTableRows((prev) => prev.filter((item) => (type === 'students' ? item.reg_no !== id : item.id !== id)));
+      setTableRows((prev) =>
+        prev.filter((item) => (type === 'students' ? item.reg_no !== id : !sameRowId(item.id, id))),
+      );
       setTableTotal((prev) => Math.max(0, prev - 1));
       loadMeta();
     }
@@ -959,14 +961,16 @@ export function useFeeApp() {
   };
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.checked) setSelectedIds(new Set(filteredData.map((i) => i.id || i.reg_no || '')));
+    if (e.target.checked)
+      setSelectedIds(new Set(filteredData.map((i) => rowIdKey(i.id || i.reg_no || ''))));
     else setSelectedIds(new Set());
   };
 
   const handleSelectRow = (id: string | number) => {
+    const key = rowIdKey(id);
     const newSet = new Set(selectedIds);
-    if (newSet.has(id)) newSet.delete(id);
-    else newSet.add(id);
+    if (newSet.has(key)) newSet.delete(key);
+    else newSet.add(key);
     setSelectedIds(newSet);
   };
 
@@ -974,13 +978,15 @@ export function useFeeApp() {
     let idsToDelete = selectedIds;
     if (activeTab === 'payments') {
       const loanIds = new Set(
-        tableRows.filter((p) => selectedIds.has(p.id!) && norm(p.bank) === 'loan').map((p) => p.id!),
+        tableRows
+          .filter((p) => selectedIds.has(rowIdKey(p.id)) && isLoanBank(p.bank))
+          .map((p) => rowIdKey(p.id)),
       );
       if (loanIds.size > 0) {
         alert(
           `${loanIds.size} selected record(s) are loan-sourced payments and were skipped. Delete them from the "Other Bank" tab instead.`,
         );
-        idsToDelete = new Set([...selectedIds].filter((id) => !loanIds.has(id as number)));
+        idsToDelete = new Set([...selectedIds].filter((id) => !loanIds.has(rowIdKey(id))));
       }
     }
     if (idsToDelete.size === 0) {
