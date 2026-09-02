@@ -511,40 +511,6 @@ export function useFeeApp() {
     }
   };
 
-  const syncBrowserDataToDb = async () => {
-    if (!confirm('Sync browser data to database?')) return;
-    const local = localStorage.getItem('feeSystemData_v2') || localStorage.getItem('fee_system_local');
-    if (!local) return alert('No local data found.');
-    const localData = JSON.parse(local) as Record<string, TableRow[]>;
-    const categories = ['students', 'fees', 'enrollments', 'payments', 'discounts', 'others', 'banks'];
-    let count = 0;
-
-    let totalToSync = 0;
-    for (const cat of categories) {
-      totalToSync += (localData[cat] || []).length;
-    }
-    if (totalToSync === 0) return alert('No data to sync.');
-
-    setUploadStatus({ active: true, current: 0, total: totalToSync });
-
-    const chunkSize = 25;
-    for (const cat of categories) {
-      const items = localData[cat] || [];
-      let actionType = cat.endsWith('s') ? cat.slice(0, -1) : cat;
-      if (cat === 'others') actionType = 'other';
-
-      for (let i = 0; i < items.length; i += chunkSize) {
-        const chunk = items.slice(i, i + chunkSize);
-        await Promise.all(chunk.map((item) => postToApi(`save_${actionType}`, { data: item }, true)));
-        count += chunk.length;
-        setUploadStatus((prev) => ({ ...prev, current: count }));
-      }
-    }
-    setUploadStatus({ active: false, current: 0, total: 0 });
-    alert(`Sync Complete! Uploaded/Checked ${count} records.`);
-    refreshData();
-  };
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -1194,7 +1160,6 @@ export function useFeeApp() {
     openSessionDetail,
     exportSessionDetailExcel,
     exportSessionDetailCsv,
-    syncBrowserDataToDb,
     saveSettings,
     sendClearance,
     norm,
