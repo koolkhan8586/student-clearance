@@ -605,23 +605,43 @@ function findMasterFee($fees, $student) {
     $student = applyDegreeFromRegNo($student);
     $degree = normStr($student['degree'] ?? '');
     $batch = normStr($student['batch'] ?? '');
+    // save_fee dedupes on id, not on (degree, batch), so more than one row can
+    // exist for the same degree/batch (re-import, or "Add New" instead of
+    // "Edit"). Prefer the most recently saved row (highest id) in each match
+    // tier, same as findDiscountPct.
+    $exact = null;
     foreach ($fees as $f) {
-        if (normStr($f['degree']) === $degree && normStr($f['batch']) === $batch) return $f;
+        if (normStr($f['degree']) === $degree && normStr($f['batch']) === $batch) {
+            if ($exact === null || (int) ($f['id'] ?? 0) > (int) ($exact['id'] ?? 0)) $exact = $f;
+        }
     }
+    if ($exact !== null) return $exact;
+
+    $partial = null;
     foreach ($fees as $f) {
         $fb = normStr($f['batch']);
-        if (normStr($f['degree']) === $degree && (strpos($batch, $fb) !== false || strpos($fb, $batch) !== false)) return $f;
+        if (normStr($f['degree']) === $degree && (strpos($batch, $fb) !== false || strpos($fb, $batch) !== false)) {
+            if ($partial === null || (int) ($f['id'] ?? 0) > (int) ($partial['id'] ?? 0)) $partial = $f;
+        }
     }
-    return null;
+    return $partial;
 }
 
 function findDiscountPct($discounts, $regNo, $semester) {
     $cleanReg = normStr($regNo);
+    // save_discount can leave more than one row for the same reg_no + term
+    // (e.g. re-importing, or "Add New" instead of "Edit") since it dedupes
+    // on id, not on (reg_no, term). When that happens, the most recently
+    // saved row (highest id) should win, not whichever one the query
+    // happens to return first.
+    $best = null;
     foreach ($discounts as $d) {
-        if (normStr($d['reg_no']) === $cleanReg && semestersMatch($d['term'], $semester)) {
-            return (float) ($d['discount'] ?? 0);
+        if (normStr($d['reg_no']) !== $cleanReg || !semestersMatch($d['term'], $semester)) continue;
+        if ($best === null || (int) ($d['id'] ?? 0) > (int) ($best['id'] ?? 0)) {
+            $best = $d;
         }
     }
+    if ($best !== null) return (float) ($best['discount'] ?? 0);
     return 0;
 }
 
