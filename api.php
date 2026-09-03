@@ -627,7 +627,7 @@ function findMasterFee($fees, $student) {
     return $partial;
 }
 
-function findDiscountPct($discounts, $regNo, $semester) {
+function findDiscountRow($discounts, $regNo, $semester) {
     $cleanReg = normStr($regNo);
     // save_discount can leave more than one row for the same reg_no + term
     // (e.g. re-importing, or "Add New" instead of "Edit") since it dedupes
@@ -641,8 +641,12 @@ function findDiscountPct($discounts, $regNo, $semester) {
             $best = $d;
         }
     }
-    if ($best !== null) return (float) ($best['discount'] ?? 0);
-    return 0;
+    return $best;
+}
+
+function findDiscountPct($discounts, $regNo, $semester) {
+    $row = findDiscountRow($discounts, $regNo, $semester);
+    return $row ? (float) ($row['discount'] ?? 0) : 0;
 }
 
 function computeClearanceReport($pdo, $regNo, $filterSession = '') {
@@ -693,7 +697,8 @@ function computeClearanceReport($pdo, $regNo, $filterSession = '') {
             if (semestersMatch($o['semester'], $en['semester'])) $other += (float) ($o['amount'] ?? 0);
         }
         $total = $tuition + $exam + $other;
-        $discPct = findDiscountPct($discounts, $student['reg_no'], $en['semester']);
+        $discRow = findDiscountRow($discounts, $student['reg_no'], $en['semester']);
+        $discPct = $discRow ? (float) ($discRow['discount'] ?? 0) : 0;
         $discAmt = ($tuition * $discPct) / 100;
         $netFee = $total - $discAmt;
         $totalPaid = 0;
@@ -705,6 +710,10 @@ function computeClearanceReport($pdo, $regNo, $filterSession = '') {
             'tuition' => $tuition, 'exam' => $exam, 'reg' => 0, 'other' => $other,
             'total' => $total, 'discPct' => $discPct, 'discAmt' => $discAmt,
             'netFee' => $netFee, 'totalPaid' => $totalPaid, 'balance' => $netFee - $totalPaid,
+            // Temporary diagnostic fields — remove once the discount-matching bug is confirmed fixed.
+            'discMatchId' => $discRow['id'] ?? null,
+            'discMatchRegNo' => $discRow['reg_no'] ?? null,
+            'discMatchTerm' => $discRow['term'] ?? null,
         ];
     }
 

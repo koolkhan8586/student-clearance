@@ -71,6 +71,10 @@ export interface ClearanceRow {
   isGapFee?: boolean;
   isPaymentOnly?: boolean;
   feeName?: string;
+  /** Temporary diagnostic fields — remove once the discount-matching bug is confirmed fixed. */
+  discMatchId?: number | string | null;
+  discMatchRegNo?: string | null;
+  discMatchTerm?: string | null;
 }
 
 export interface ClearanceSummary {
