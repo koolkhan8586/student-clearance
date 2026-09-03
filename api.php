@@ -707,8 +707,7 @@ function computeClearanceReport($pdo, $regNo, $filterSession = '') {
             if (semestersMatch($o['semester'], $en['semester'])) $other += (float) ($o['amount'] ?? 0);
         }
         $total = $tuition + $exam + $other;
-        $discRow = findDiscountRow($discounts, $student['reg_no'], $en['semester']);
-        $discPct = $discRow ? (float) ($discRow['discount'] ?? 0) : 0;
+        $discPct = findDiscountPct($discounts, $student['reg_no'], $en['semester']);
         $discAmt = ($tuition * $discPct) / 100;
         $netFee = $total - $discAmt;
         $totalPaid = 0;
@@ -720,10 +719,6 @@ function computeClearanceReport($pdo, $regNo, $filterSession = '') {
             'tuition' => $tuition, 'exam' => $exam, 'reg' => 0, 'other' => $other,
             'total' => $total, 'discPct' => $discPct, 'discAmt' => $discAmt,
             'netFee' => $netFee, 'totalPaid' => $totalPaid, 'balance' => $netFee - $totalPaid,
-            // Temporary diagnostic fields — remove once the discount-matching bug is confirmed fixed.
-            'discMatchId' => $discRow['id'] ?? null,
-            'discMatchRegNo' => $discRow['reg_no'] ?? null,
-            'discMatchTerm' => $discRow['term'] ?? null,
         ];
     }
 
