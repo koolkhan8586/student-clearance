@@ -431,7 +431,14 @@ try {
 // --- FEE ENGINE (shared by clearance + summary endpoints) ---
 function normStr($str) {
     if ($str === null || $str === '') return '';
-    return strtolower(preg_replace('/[^a-z0-9]/', '', (string) $str));
+    // Lowercase FIRST, then strip non-alphanumeric — doing it in the other
+    // order (as this used to) runs the case-sensitive [^a-z0-9] pattern
+    // against the original mixed-case string, so every uppercase letter
+    // fails to match "a-z" and gets deleted outright instead of lowercased.
+    // That silently collapsed e.g. "BAF052510002" and "MSFP052510002" (and
+    // "BAF"/"BSCAF" degree names) down to identical strings, causing
+    // discount/fee rows from a completely different degree program to match.
+    return preg_replace('/[^a-z0-9]/', '', strtolower((string) $str));
 }
 
 function isLoanBank($bank) {
@@ -448,7 +455,10 @@ function sqlNotLoanBank() {
 
 function canonicalRegNo($regNo) {
     if ($regNo === null || $regNo === '') return '';
-    return strtoupper(preg_replace('/[^A-Z0-9]/', '', (string) $regNo));
+    // Same fix as normStr(): uppercase FIRST, then strip — otherwise a
+    // lowercase-typed reg_no (e.g. "baf052510002") has its letters deleted
+    // instead of uppercased, since [^A-Z0-9] doesn't match lowercase "a-z".
+    return preg_replace('/[^A-Z0-9]/', '', strtoupper((string) $regNo));
 }
 
 function regNoEquals($a, $b) {
