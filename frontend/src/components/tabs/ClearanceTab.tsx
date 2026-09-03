@@ -239,11 +239,6 @@ export function ClearanceTab({ app }: ClearanceTabProps) {
                         <td className="p-2 border text-right font-bold bg-gray-50">{num(row.total)}</td>
                         <td className="p-2 border text-center text-gray-500">
                           {row.discPct > 0 ? `${row.discPct}%` : '-'}
-                          {row.discMatchId != null && (
-                            <div className="text-[9px] text-red-500 leading-tight">
-                              id:{row.discMatchId} "{row.discMatchTerm}" ({row.discMatchRegNo})
-                            </div>
-                          )}
                         </td>
                         <td className="p-2 border text-right text-gray-500">
                           {row.discAmt > 0 ? num(row.discAmt) : '-'}
