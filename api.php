@@ -805,6 +805,20 @@ function computeSummaryReport($pdo, $filterSession = '') {
         if (!isset($paymentsMap[$r])) $paymentsMap[$r] = [];
         $paymentsMap[$r][] = $p;
     }
+    // findDiscountPct/findMasterFee just scan whatever array they're handed —
+    // bucketing discounts by reg_no and fees by degree up front (same idea as
+    // paymentsMap above) turns each enrollment's lookup into a scan of a
+    // handful of rows instead of the full table. With thousands of
+    // enrollments this is the difference between a couple hundred thousand
+    // comparisons and tens of millions.
+    $discountsByReg = [];
+    foreach ($discounts as $d) {
+        $discountsByReg[normStr($d['reg_no'])][] = $d;
+    }
+    $feesByDegree = [];
+    foreach ($fees as $f) {
+        $feesByDegree[normStr($f['degree'])][] = $f;
+    }
 
     $summary = [];
     $sessionDetailsMap = [];
@@ -823,7 +837,7 @@ function computeSummaryReport($pdo, $filterSession = '') {
         $student = $studentMap[$regNorm] ?? null;
         $tuition = 0; $exam = 0; $otherBase = 0; $total = 0;
         if ($student) {
-            $fee = findMasterFee($fees, $student);
+            $fee = findMasterFee($feesByDegree[normStr($student['degree'] ?? '')] ?? [], $student);
             if ($fee) {
                 $cr = (float) ($en['cr'] ?? 0);
                 $courses = (float) ($en['courses'] ?? 0);
@@ -837,7 +851,7 @@ function computeSummaryReport($pdo, $filterSession = '') {
         $other = $otherBase + $specificOther;
         $total += $specificOther;
 
-        $discPct = findDiscountPct($discounts, $en['reg_no'], $sem);
+        $discPct = findDiscountPct($discountsByReg[$regNorm] ?? [], $en['reg_no'], $sem);
         $discAmt = ($tuition * $discPct) / 100;
 
         $studentPaid = 0;
