@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { TABS } from '../../utils/constants';
 import type { FeeAppState } from '../../hooks/useFeeApp';
 
@@ -18,6 +19,11 @@ export function RecordModal({ app }: RecordModalProps) {
     togglePermission,
     norm,
   } = app;
+
+  const [customBank, setCustomBank] = useState(() => {
+    const bankValue = String(formData.bank || '');
+    return bankValue !== '' && bankValue !== 'Cash' && !data.banks.some((b) => b.name === bankValue);
+  });
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-center justify-center p-4">
@@ -214,8 +220,17 @@ export function RecordModal({ app }: RecordModalProps) {
               <label className="block text-sm font-bold text-gray-700 mt-2 mb-1">Payment Through (Bank)</label>
               <select
                 className="w-full border p-2 rounded bg-white"
-                value={String(formData.bank || '')}
-                onChange={(e) => setFormData({ ...formData, bank: e.target.value })}
+                value={customBank ? '__other__' : String(formData.bank || '')}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === '__other__') {
+                    setCustomBank(true);
+                    setFormData({ ...formData, bank: '' });
+                  } else {
+                    setCustomBank(false);
+                    setFormData({ ...formData, bank: v });
+                  }
+                }}
               >
                 <option value="">Select Bank</option>
                 <option value="Cash">Cash</option>
@@ -224,7 +239,18 @@ export function RecordModal({ app }: RecordModalProps) {
                     {b.name}
                   </option>
                 ))}
+                <option value="__other__">Other</option>
               </select>
+              {customBank && (
+                <input
+                  required
+                  autoFocus
+                  placeholder="Enter reason / bank name"
+                  className="w-full border p-2 rounded mt-2"
+                  value={String(formData.bank || '')}
+                  onChange={(e) => setFormData({ ...formData, bank: e.target.value })}
+                />
+              )}
             </>
           )}
 
