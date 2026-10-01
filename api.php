@@ -477,6 +477,24 @@ function parseDegreeFromRegNo($regNo) {
     return substr($canonical, 0, $pos);
 }
 
+/**
+ * Session/batch is encoded right after the "05" marker: 2 digits for the
+ * year, then 1 digit for the term (e.g. BSCAF052630103 → 05 | 26 | 3 | 0103
+ * → Fall 2026). Only term digits 1 (Spring) and 3 (Fall) are recognized
+ * today — anything else returns '' so callers don't guess at a value.
+ */
+function parseBatchFromRegNo($regNo) {
+    $canonical = canonicalRegNo($regNo);
+    if ($canonical === '') return '';
+    $pos = strpos($canonical, '05');
+    if ($pos === false || $pos === 0) return '';
+    $rest = substr($canonical, $pos + 2);
+    if (!preg_match('/^(\d{2})(\d)/', $rest, $m)) return '';
+    $termNames = ['1' => 'Spring', '3' => 'Fall'];
+    if (!isset($termNames[$m[2]])) return '';
+    return $termNames[$m[2]] . ' 20' . $m[1];
+}
+
 function regNoStrictMatch($stored, $search) {
     $storedCanonical = canonicalRegNo($stored);
     $searchCanonical = canonicalRegNo($search);
@@ -527,6 +545,24 @@ function applyDegreeFromRegNo($student) {
     return $student;
 }
 
+/**
+ * Unlike degree, batch is only auto-filled when blank — a transferred
+ * student's real batch can legitimately differ from what their reg_no
+ * implies, so an existing manually-entered value is never overwritten.
+ */
+function applyBatchFromRegNo($student) {
+    if (!is_array($student) || empty($student['reg_no']) || !empty($student['batch'])) return $student;
+    $parsed = parseBatchFromRegNo($student['reg_no']);
+    if ($parsed !== '') {
+        $student['batch'] = $parsed;
+    }
+    return $student;
+}
+
+function applyRegNoDerivedFields($student) {
+    return applyBatchFromRegNo(applyDegreeFromRegNo($student));
+}
+
 function findStudentByRegNo($pdo, $regNo) {
     $searchCanonical = canonicalRegNo($regNo);
     $cleanReg = normStr($searchCanonical);
@@ -543,7 +579,7 @@ function findStudentByRegNo($pdo, $regNo) {
             continue;
         }
 
-        $student = applyDegreeFromRegNo($row);
+        $student = applyRegNoDerivedFields($row);
         $student['reg_no'] = $searchCanonical;
         return $student;
     }
@@ -553,7 +589,7 @@ function findStudentByRegNo($pdo, $regNo) {
         $tstmt = $pdo->query("SELECT DISTINCT reg_no, name FROM `$table` WHERE reg_no IS NOT NULL AND reg_no <> ''");
         while ($row = $tstmt->fetch(PDO::FETCH_ASSOC)) {
             if (normStr($row['reg_no'] ?? '') !== $cleanReg) continue;
-            return applyDegreeFromRegNo([
+            return applyRegNoDerivedFields([
                 'id' => null,
                 'reg_no' => $searchCanonical,
                 'name' => $row['name'] ?? '',
@@ -612,7 +648,7 @@ function semestersMatch($a, $b) {
 }
 
 function findMasterFee($fees, $student) {
-    $student = applyDegreeFromRegNo($student);
+    $student = applyRegNoDerivedFields($student);
     $degree = normStr($student['degree'] ?? '');
     $batch = normStr($student['batch'] ?? '');
     // save_fee dedupes on id, not on (degree, batch), so more than one row can
@@ -669,7 +705,7 @@ function computeClearanceReport($pdo, $regNo, $filterSession = '') {
     if (!regNoEquals($student['reg_no'], $searchCanonical)) return null;
 
     $student['reg_no'] = $searchCanonical;
-    $student = applyDegreeFromRegNo($student);
+    $student = applyRegNoDerivedFields($student);
 
     $fees = $pdo->query("SELECT * FROM fee_structure")->fetchAll();
     $masterFee = findMasterFee($fees, $student);
@@ -786,7 +822,7 @@ function computeClearanceReport($pdo, $regNo, $filterSession = '') {
 function computeSummaryReport($pdo, $filterSession = '') {
     $students = $pdo->query("SELECT * FROM students")->fetchAll();
     $studentMap = [];
-    foreach ($students as $s) $studentMap[normStr($s['reg_no'])] = applyDegreeFromRegNo($s);
+    foreach ($students as $s) $studentMap[normStr($s['reg_no'])] = applyRegNoDerivedFields($s);
 
     $fees = $pdo->query("SELECT * FROM fee_structure")->fetchAll();
     $others = $pdo->query("SELECT * FROM other_charges")->fetchAll();
@@ -967,7 +1003,7 @@ function fetchTablePage($pdo, $tab, $page, $limit, $search, $sortKey, $sortDir, 
 
     if ($tab === 'students') {
         foreach ($rows as &$row) {
-            $row = applyDegreeFromRegNo($row);
+            $row = applyRegNoDerivedFields($row);
         }
         unset($row);
     }
