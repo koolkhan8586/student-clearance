@@ -51,6 +51,7 @@ export function DataDirectoryTab({ app }: DataDirectoryTabProps) {
     sortConfig,
     openModal,
     handleDelete,
+    viewDiscountAttachment,
     num,
     currentPage,
     setCurrentPage,
@@ -146,6 +147,20 @@ export function DataDirectoryTab({ app }: DataDirectoryTabProps) {
             <td className="p-4">{String(item.name ?? '')}</td>
             <td className="p-4 text-gray-500">{String(item.term ?? '')}</td>
             <td className="p-4 text-right font-bold text-purple-600">{String(item.discount ?? '')}%</td>
+            <td className="p-4 text-gray-500 max-w-xs">
+              <span className="truncate block" title={String(item.description ?? '')}>
+                {String(item.description ?? '')}
+              </span>
+              {item.has_attachment ? (
+                <button
+                  type="button"
+                  className="text-blue-600 underline text-xs"
+                  onClick={() => viewDiscountAttachment(item.id)}
+                >
+                  View attachment
+                </button>
+              ) : null}
+            </td>
           </>
         );
       case 'users':

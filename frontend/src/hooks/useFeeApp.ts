@@ -8,6 +8,7 @@ import {
   exportAllRequest,
   fetchTableRequest,
   getClearanceRequest,
+  getDiscountAttachmentRequest,
   getImportIndexRequest,
   getSettingsRequest,
   getSummaryRequest,
@@ -652,6 +653,28 @@ export function useFeeApp() {
     }
   };
 
+  const viewDiscountAttachment = async (id: number | string | undefined | null) => {
+    if (!id) return;
+    try {
+      const res = await getDiscountAttachmentRequest(id);
+      const json = await res.json();
+      if (json.status !== 'success' || !json.dataUrl) {
+        return alert(json.message || 'No attachment found');
+      }
+      const commaIdx = String(json.dataUrl).indexOf(',');
+      const base64 = String(json.dataUrl).slice(commaIdx + 1);
+      const byteChars = atob(base64);
+      const byteNumbers = new Array(byteChars.length);
+      for (let i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
+      const blob = new Blob([new Uint8Array(byteNumbers)], { type: json.mimeType || 'application/octet-stream' });
+      const blobUrl = URL.createObjectURL(blob);
+      window.open(blobUrl, '_blank');
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+    } catch {
+      alert('Network Error');
+    }
+  };
+
   const openModal = (type: string, item: TableRow | null = null) => {
     setModalType(type);
     if (item) {
@@ -705,7 +728,7 @@ export function useFeeApp() {
       case 'loans':
         return ['reg_no', 'name', 'semester', 'amount', 'date'];
       case 'discounts':
-        return ['reg_no', 'name', 'term', 'discount'];
+        return ['reg_no', 'name', 'term', 'discount', 'description'];
       case 'others':
         return ['reg_no', 'name', 'semester', 'fee_name', 'amount'];
       case 'users':
@@ -1143,6 +1166,7 @@ export function useFeeApp() {
     generateReport,
     handleDelete,
     handleSave,
+    viewDiscountAttachment,
     openModal,
     handleRegChange,
     handleFullBackup,

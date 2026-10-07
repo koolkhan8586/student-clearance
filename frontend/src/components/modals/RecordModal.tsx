@@ -13,6 +13,7 @@ export function RecordModal({ app }: RecordModalProps) {
     setFormData,
     editingId,
     handleSave,
+    viewDiscountAttachment,
     handleRegChange,
     setShowModal,
     data,
@@ -383,6 +384,61 @@ export function RecordModal({ app }: RecordModalProps) {
                 className="w-full border p-2 rounded"
                 value={String(formData.discount || '')}
                 onChange={(e) => setFormData({ ...formData, discount: e.target.value })}
+              />
+              <textarea
+                placeholder="Description / Reason (optional)"
+                rows={2}
+                className="w-full border p-2 rounded"
+                value={String(formData.description || '')}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              />
+              <label className="block text-sm font-bold text-gray-700 mt-2 mb-1">Attachment (optional)</label>
+              {formData.has_attachment && !formData.attachment && !formData.removeAttachment && (
+                <div className="flex items-center justify-between bg-gray-50 border p-2 rounded mb-2 text-sm">
+                  <button
+                    type="button"
+                    className="text-blue-600 underline truncate"
+                    onClick={() => viewDiscountAttachment(editingId)}
+                  >
+                    View current: {String(formData.attachment_name || 'attachment')}
+                  </button>
+                  <button
+                    type="button"
+                    className="text-red-600 text-xs ml-2 flex-shrink-0"
+                    onClick={() => setFormData({ ...formData, removeAttachment: true })}
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
+              {formData.removeAttachment ? (
+                <div className="text-xs text-red-600 mb-2">Current attachment will be removed on save.</div>
+              ) : formData.attachment ? (
+                <div className="text-xs text-green-600 mb-2">New file selected: {String(formData.attachmentName || '')}</div>
+              ) : null}
+              <input
+                type="file"
+                accept="image/*,application/pdf"
+                className="w-full border p-2 rounded bg-white text-sm"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  if (file.size > 5 * 1024 * 1024) {
+                    alert('File is too large (max 5MB)');
+                    e.target.value = '';
+                    return;
+                  }
+                  const reader = new FileReader();
+                  reader.onload = () => {
+                    setFormData({
+                      ...formData,
+                      attachment: String(reader.result || ''),
+                      attachmentName: file.name,
+                      removeAttachment: false,
+                    });
+                  };
+                  reader.readAsDataURL(file);
+                }}
               />
             </>
           )}
