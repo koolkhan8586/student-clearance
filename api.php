@@ -425,6 +425,24 @@ try {
         }
     }
 
+    // Read-only check for whether a column actually exists — used by any code
+    // that references a column ensureColumn() was asked to add, since that
+    // ALTER can silently fail (e.g. no ALTER privilege on this DB user) and a
+    // hard-coded reference to a maybe-missing column turns into a fatal
+    // "Unknown column" SQL error instead of the feature just being
+    // unavailable. Cached per request — SHOW COLUMNS is cheap but there's no
+    // reason to repeat it for the same table.column within one request.
+    function columnExists($pdo, $table, $column) {
+        static $cache = [];
+        $key = "$table.$column";
+        if (!isset($cache[$key])) {
+            $stmt = $pdo->prepare("SHOW COLUMNS FROM `$table` LIKE ?");
+            $stmt->execute([$column]);
+            $cache[$key] = $stmt->rowCount() > 0;
+        }
+        return $cache[$key];
+    }
+
     try {
         ensureColumn($pdo, 'payments', 'bank', 'VARCHAR(100) DEFAULT NULL');
         ensureColumn($pdo, 'students', 'mobile', 'VARCHAR(50) DEFAULT NULL');
@@ -1026,9 +1044,22 @@ function fetchTablePage($pdo, $tab, $page, $limit, $search, $sortKey, $sortDir, 
     // attachment_data can be a few MB per row — never pull it into a bulk list;
     // expose only whether one exists, and fetch the actual file separately
     // (get_discount_attachment) only when a specific row's attachment is opened.
-    $selectCols = ($tab === 'discounts')
-        ? '`id`, `reg_no`, `name`, `term`, `discount`, `description`, `attachment_name`, `attachment_type`, (`attachment_data` IS NOT NULL) AS `has_attachment`'
-        : '*';
+    // Built defensively: ensureColumn()'s ALTER can silently fail (e.g. no
+    // ALTER privilege on this DB user), so only reference a column here once
+    // columnExists() confirms it's actually there — otherwise this whole tab
+    // would hard-fail with "Unknown column" instead of just not showing the
+    // new fields yet.
+    $selectCols = '*';
+    if ($tab === 'discounts') {
+        $discountCols = ['`id`', '`reg_no`', '`name`', '`term`', '`discount`'];
+        if (columnExists($pdo, 'discounts', 'description')) $discountCols[] = '`description`';
+        if (columnExists($pdo, 'discounts', 'attachment_name')) $discountCols[] = '`attachment_name`';
+        if (columnExists($pdo, 'discounts', 'attachment_type')) $discountCols[] = '`attachment_type`';
+        $discountCols[] = columnExists($pdo, 'discounts', 'attachment_data')
+            ? '(`attachment_data` IS NOT NULL) AS `has_attachment`'
+            : '0 AS `has_attachment`';
+        $selectCols = implode(', ', $discountCols);
+    }
     $stmt = $pdo->prepare("SELECT $selectCols FROM `$table` WHERE $whereSql ORDER BY `$orderCol` $orderDir LIMIT $limit OFFSET $offset");
     $stmt->execute($params);
     $rows = $stmt->fetchAll();
@@ -1351,6 +1382,10 @@ if ($method === 'POST' && isset($input['action'])) {
         try {
             $discountId = (int) ($data['id'] ?? 0);
             if ($discountId <= 0) throw new Exception("Invalid discount id");
+            if (!columnExists($pdo, 'discounts', 'attachment_data')) {
+                echo json_encode(['status' => 'error', 'message' => 'No attachment found']);
+                exit;
+            }
             $stmt = $pdo->prepare("SELECT attachment_name, attachment_type, attachment_data FROM discounts WHERE id = ?");
             $stmt->execute([$discountId]);
             $row = $stmt->fetch();
@@ -1651,22 +1686,38 @@ if ($method === 'POST' && isset($input['action'])) {
                 $rawDiscount = $data['discount'] ?? 0;
                 $discount = floatval(str_replace('%', '', $rawDiscount));
                 $reg_no = strtoupper($data['reg_no']);
-                $description = $data['description'] ?? '';
 
-                $columns = ['id', 'reg_no', 'name', 'term', 'discount', 'description'];
-                $values = [$dbId, $reg_no, $data['name'], $data['term'], $discount, $description];
-                $updateCols = ['reg_no=?', 'name=?', 'term=?', 'discount=?', 'description=?'];
-                $updateValues = [$reg_no, $data['name'], $data['term'], $discount, $description];
+                $columns = ['id', 'reg_no', 'name', 'term', 'discount'];
+                $values = [$dbId, $reg_no, $data['name'], $data['term'], $discount];
+                $updateCols = ['reg_no=?', 'name=?', 'term=?', 'discount=?'];
+                $updateValues = [$reg_no, $data['name'], $data['term'], $discount];
+
+                // Each of these columns comes from an ensureColumn() auto-migration that
+                // can silently fail (e.g. no ALTER privilege on this DB user) — never
+                // reference one that columnExists() hasn't confirmed is actually there,
+                // or this save would hard-fail with "Unknown column" instead of just
+                // skipping the field that isn't available yet.
+                if (columnExists($pdo, 'discounts', 'description')) {
+                    $description = $data['description'] ?? '';
+                    $columns[] = 'description';
+                    $values[] = $description;
+                    $updateCols[] = 'description=?';
+                    $updateValues[] = $description;
+                }
+
+                $hasAttachmentCols = columnExists($pdo, 'discounts', 'attachment_name')
+                    && columnExists($pdo, 'discounts', 'attachment_type')
+                    && columnExists($pdo, 'discounts', 'attachment_data');
 
                 // Only touch the attachment columns when the frontend actually sent a
                 // new file or an explicit removal — otherwise an edit that doesn't
                 // touch the attachment must leave whatever's already stored alone.
-                if (!empty($data['removeAttachment'])) {
+                if ($hasAttachmentCols && !empty($data['removeAttachment'])) {
                     $columns = array_merge($columns, ['attachment_name', 'attachment_type', 'attachment_data']);
                     $values = array_merge($values, [null, null, null]);
                     $updateCols = array_merge($updateCols, ['attachment_name=?', 'attachment_type=?', 'attachment_data=?']);
                     $updateValues = array_merge($updateValues, [null, null, null]);
-                } elseif (!empty($data['attachment'])) {
+                } elseif ($hasAttachmentCols && !empty($data['attachment'])) {
                     [$mimeType, $base64] = parseDataUrlUpload(
                         $data['attachment'],
                         ['application/pdf', 'image/jpeg', 'image/png', 'image/webp', 'image/gif'],
