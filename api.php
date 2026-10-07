@@ -53,6 +53,28 @@ function buildMimeBody($textBody, $attachment) {
     return [$boundary, $mime];
 }
 
+// --- Decode a browser file upload sent as a data: URL (e.g. from FileReader's
+// readAsDataURL()) into [mimeType, base64 payload]. Used for storing small
+// proof-of-discount attachments directly in the database — kept as base64
+// text (not re-decoded) so it round-trips to the frontend without another
+// encode/decode pass. ---
+function parseDataUrlUpload($dataUrl, $allowedTypes, $maxBytes) {
+    if (!preg_match('/^data:([^;]+);base64,(.+)$/s', (string) $dataUrl, $m)) {
+        throw new Exception("Attachment must be a valid file upload");
+    }
+    $mimeType = $m[1];
+    $base64 = $m[2];
+    if (!in_array($mimeType, $allowedTypes, true)) {
+        throw new Exception("Attachment must be one of: " . implode(', ', $allowedTypes));
+    }
+    $decoded = base64_decode($base64, true);
+    if ($decoded === false) throw new Exception("Attachment could not be decoded");
+    if (strlen($decoded) > $maxBytes) {
+        throw new Exception("Attachment is too large (max " . round($maxBytes / 1024 / 1024, 1) . "MB)");
+    }
+    return [$mimeType, $base64];
+}
+
 function sendSmtpMail($host, $port, $username, $password, $fromEmail, $fromName, $toEmail, $subject, $body, $attachment = null) {
     $secure = ($port == 465) ? 'ssl://' : '';
     $sock = @fsockopen($secure . $host, $port, $errno, $errstr, 15);
@@ -412,6 +434,10 @@ try {
         ensureColumn($pdo, 'settings', 'google_service_account_json', 'TEXT DEFAULT NULL');
         ensureColumn($pdo, 'settings', 'google_delegated_user', 'VARCHAR(255) DEFAULT NULL');
         ensureColumn($pdo, 'settings', 'message_template', 'TEXT DEFAULT NULL');
+        ensureColumn($pdo, 'discounts', 'description', 'TEXT DEFAULT NULL');
+        ensureColumn($pdo, 'discounts', 'attachment_name', 'VARCHAR(255) DEFAULT NULL');
+        ensureColumn($pdo, 'discounts', 'attachment_type', 'VARCHAR(100) DEFAULT NULL');
+        ensureColumn($pdo, 'discounts', 'attachment_data', 'LONGTEXT DEFAULT NULL');
     } catch (\Exception $e) {}
 
     // Seed Admin if missing
@@ -997,7 +1023,13 @@ function fetchTablePage($pdo, $tab, $page, $limit, $search, $sortKey, $sortDir, 
     $orderDir = strtolower($sortDir) === 'asc' ? 'ASC' : 'DESC';
     $offset = max(0, ($page - 1) * $limit);
 
-    $stmt = $pdo->prepare("SELECT * FROM `$table` WHERE $whereSql ORDER BY `$orderCol` $orderDir LIMIT $limit OFFSET $offset");
+    // attachment_data can be a few MB per row — never pull it into a bulk list;
+    // expose only whether one exists, and fetch the actual file separately
+    // (get_discount_attachment) only when a specific row's attachment is opened.
+    $selectCols = ($tab === 'discounts')
+        ? '`id`, `reg_no`, `name`, `term`, `discount`, `description`, `attachment_name`, `attachment_type`, (`attachment_data` IS NOT NULL) AS `has_attachment`'
+        : '*';
+    $stmt = $pdo->prepare("SELECT $selectCols FROM `$table` WHERE $whereSql ORDER BY `$orderCol` $orderDir LIMIT $limit OFFSET $offset");
     $stmt->execute($params);
     $rows = $stmt->fetchAll();
 
@@ -1315,6 +1347,29 @@ if ($method === 'POST' && isset($input['action'])) {
         exit;
     }
 
+    if ($action === 'get_discount_attachment') {
+        try {
+            $discountId = (int) ($data['id'] ?? 0);
+            if ($discountId <= 0) throw new Exception("Invalid discount id");
+            $stmt = $pdo->prepare("SELECT attachment_name, attachment_type, attachment_data FROM discounts WHERE id = ?");
+            $stmt->execute([$discountId]);
+            $row = $stmt->fetch();
+            if (!$row || empty($row['attachment_data'])) {
+                echo json_encode(['status' => 'error', 'message' => 'No attachment found']);
+                exit;
+            }
+            echo json_encode([
+                'status' => 'success',
+                'name' => $row['attachment_name'],
+                'mimeType' => $row['attachment_type'],
+                'dataUrl' => 'data:' . $row['attachment_type'] . ';base64,' . $row['attachment_data'],
+            ]);
+        } catch (Exception $e) {
+            echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+
     if ($action === 'get_import_index') {
         try {
             $type = $data['type'] ?? '';
@@ -1596,15 +1651,43 @@ if ($method === 'POST' && isset($input['action'])) {
                 $rawDiscount = $data['discount'] ?? 0;
                 $discount = floatval(str_replace('%', '', $rawDiscount));
                 $reg_no = strtoupper($data['reg_no']);
+                $description = $data['description'] ?? '';
 
-                $stmt = $pdo->prepare("INSERT INTO discounts (id, reg_no, name, term, discount) VALUES (?, ?, ?, ?, ?)
-                                       ON DUPLICATE KEY UPDATE reg_no=?, name=?, term=?, discount=?");
-                $stmt->execute([$dbId, $reg_no, $data['name'], $data['term'], $discount,
-                                $reg_no, $data['name'], $data['term'], $discount]);
+                $columns = ['id', 'reg_no', 'name', 'term', 'discount', 'description'];
+                $values = [$dbId, $reg_no, $data['name'], $data['term'], $discount, $description];
+                $updateCols = ['reg_no=?', 'name=?', 'term=?', 'discount=?', 'description=?'];
+                $updateValues = [$reg_no, $data['name'], $data['term'], $discount, $description];
+
+                // Only touch the attachment columns when the frontend actually sent a
+                // new file or an explicit removal — otherwise an edit that doesn't
+                // touch the attachment must leave whatever's already stored alone.
+                if (!empty($data['removeAttachment'])) {
+                    $columns = array_merge($columns, ['attachment_name', 'attachment_type', 'attachment_data']);
+                    $values = array_merge($values, [null, null, null]);
+                    $updateCols = array_merge($updateCols, ['attachment_name=?', 'attachment_type=?', 'attachment_data=?']);
+                    $updateValues = array_merge($updateValues, [null, null, null]);
+                } elseif (!empty($data['attachment'])) {
+                    [$mimeType, $base64] = parseDataUrlUpload(
+                        $data['attachment'],
+                        ['application/pdf', 'image/jpeg', 'image/png', 'image/webp', 'image/gif'],
+                        5 * 1024 * 1024
+                    );
+                    $attachmentName = $data['attachmentName'] ?? 'attachment';
+                    $columns = array_merge($columns, ['attachment_name', 'attachment_type', 'attachment_data']);
+                    $values = array_merge($values, [$attachmentName, $mimeType, $base64]);
+                    $updateCols = array_merge($updateCols, ['attachment_name=?', 'attachment_type=?', 'attachment_data=?']);
+                    $updateValues = array_merge($updateValues, [$attachmentName, $mimeType, $base64]);
+                }
+
+                $colList = '`' . implode('`, `', $columns) . '`';
+                $placeholders = implode(', ', array_fill(0, count($columns), '?'));
+                $stmt = $pdo->prepare("INSERT INTO discounts ($colList) VALUES ($placeholders)
+                                       ON DUPLICATE KEY UPDATE " . implode(', ', $updateCols));
+                $stmt->execute(array_merge($values, $updateValues));
                 break;
-            
+
             case 'delete_discount':
-            case 'delete_discounts': 
+            case 'delete_discounts':
                 $stmt = $pdo->prepare("DELETE FROM discounts WHERE id = ?");
                 $stmt->execute([$id]);
                 break;

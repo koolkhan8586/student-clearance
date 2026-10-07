@@ -77,3 +77,7 @@ export async function exportAllRequest() {
 export async function getImportIndexRequest(type: string) {
   return apiPost('get_import_index', { data: { type } });
 }
+
+export async function getDiscountAttachmentRequest(id: number | string) {
+  return apiPost('get_discount_attachment', { data: { id } });
+}
