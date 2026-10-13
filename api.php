@@ -215,7 +215,20 @@ function httpPostJson($url, $headers, $payloadJson, $serviceName) {
     $response = @file_get_contents($url, false, $context);
     if ($response === false) {
         $err = error_get_last();
-        throw new Exception("$serviceName connection failed: " . ($err['message'] ?? 'unknown error'));
+        $portHint = '';
+        $urlPort = parse_url($url, PHP_URL_PORT);
+        if ($urlPort && !in_array((int) $urlPort, [80, 443], true)) {
+            $portHint = " This server is also using port $urlPort, a non-standard port that many hosting " .
+                "providers block for outbound connections (the same way they often block outbound SMTP " .
+                "ports) — if the host is otherwise reachable on 80/443, try putting $serviceName behind a " .
+                "reverse proxy on port 443 instead.";
+        }
+        throw new Exception(
+            "$serviceName connection failed: " . ($err['message'] ?? 'unknown error') . ". " .
+            "This server doesn't have the PHP curl extension, so it fell back to a plainer HTTP client that " .
+            "gives fewer details than curl would (e.g. it can't distinguish a blocked port from a TLS/SSL " .
+            "certificate problem) — ask your host to enable curl for clearer diagnostics." . $portHint
+        );
     }
     $httpCode = 200;
     if (isset($http_response_header[0]) && preg_match('/\s(\d{3})\s/', $http_response_header[0], $m)) {
