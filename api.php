@@ -420,40 +420,40 @@ try {
     )");
     $pdo->exec("INSERT IGNORE INTO settings (id) VALUES (1)");
 
+    // Read-only check for whether a column actually exists, backed by
+    // information_schema rather than "SHOW COLUMNS ... LIKE ?". SHOW
+    // statements are not reliably supported through MySQL's native prepared
+    // statement protocol (this connection uses PDO::ATTR_EMULATE_PREPARES =>
+    // false), and querying information_schema with ordinary bound
+    // parameters sidesteps that entirely. Cached per request — cheap, but
+    // no reason to repeat it for the same table.column within one request.
+    function columnExists($pdo, $table, $column, $forceRefresh = false) {
+        static $cache = [];
+        $key = "$table.$column";
+        if ($forceRefresh || !isset($cache[$key])) {
+            $stmt = $pdo->prepare(
+                "SELECT 1 FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ? LIMIT 1"
+            );
+            $stmt->execute([$table, $column]);
+            $cache[$key] = (bool) $stmt->fetchColumn();
+        }
+        return $cache[$key];
+    }
+
     // --- BULLETPROOF AUTO-COLUMN ADDER ---
     // This safely forces missing columns into existing tables without crashing
     function ensureColumn($pdo, $table, $column, $definition) {
-        $stmt = $pdo->prepare("SHOW COLUMNS FROM `$table` LIKE ?");
-        $stmt->execute([$column]);
-        if ($stmt->rowCount() == 0) {
-            try {
-                $pdo->exec("ALTER TABLE `$table` ADD COLUMN `$column` $definition");
-            } catch (\PDOException $e) {
-                // If the DB user lacks ALTER permissions, this fails silently to avoid
-                // breaking the whole API on every request — but leave a trace in the PHP
-                // error log (visible via most hosting control panels) so a resulting
-                // "Unknown column" error elsewhere is diagnosable instead of a mystery.
-                error_log("ensureColumn: could not add $table.$column — " . $e->getMessage());
-            }
+        if (columnExists($pdo, $table, $column)) return;
+        try {
+            $pdo->exec("ALTER TABLE `$table` ADD COLUMN `$column` $definition");
+            columnExists($pdo, $table, $column, true); // refresh the cache now that it was just added
+        } catch (\PDOException $e) {
+            // If the DB user lacks ALTER permissions, this fails silently to avoid
+            // breaking the whole API on every request — but leave a trace in the PHP
+            // error log (visible via most hosting control panels) so a resulting
+            // "Unknown column" error elsewhere is diagnosable instead of a mystery.
+            error_log("ensureColumn: could not add $table.$column — " . $e->getMessage());
         }
-    }
-
-    // Read-only check for whether a column actually exists — used by any code
-    // that references a column ensureColumn() was asked to add, since that
-    // ALTER can silently fail (e.g. no ALTER privilege on this DB user) and a
-    // hard-coded reference to a maybe-missing column turns into a fatal
-    // "Unknown column" SQL error instead of the feature just being
-    // unavailable. Cached per request — SHOW COLUMNS is cheap but there's no
-    // reason to repeat it for the same table.column within one request.
-    function columnExists($pdo, $table, $column) {
-        static $cache = [];
-        $key = "$table.$column";
-        if (!isset($cache[$key])) {
-            $stmt = $pdo->prepare("SHOW COLUMNS FROM `$table` LIKE ?");
-            $stmt->execute([$column]);
-            $cache[$key] = $stmt->rowCount() > 0;
-        }
-        return $cache[$key];
     }
 
     try {
