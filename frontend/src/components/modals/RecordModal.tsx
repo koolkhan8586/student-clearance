@@ -82,6 +82,12 @@ export function RecordModal({ app }: RecordModalProps) {
                 value={String(formData.total_package || '')}
                 onChange={(e) => setFormData({ ...formData, total_package: e.target.value })}
               />
+              <input
+                placeholder="Reference / Referred By (Optional)"
+                className="w-full border p-2 rounded"
+                value={String(formData.reference || '')}
+                onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
+              />
             </>
           )}
 

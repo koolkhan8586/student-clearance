@@ -461,6 +461,7 @@ try {
         ensureColumn($pdo, 'students', 'mobile', 'VARCHAR(50) DEFAULT NULL');
         ensureColumn($pdo, 'students', 'email', 'VARCHAR(100) DEFAULT NULL');
         ensureColumn($pdo, 'students', 'total_package', 'DECIMAL(10,2) DEFAULT NULL');
+        ensureColumn($pdo, 'students', 'reference', 'VARCHAR(255) DEFAULT NULL');
         ensureColumn($pdo, 'settings', 'brevo_api_key', 'VARCHAR(255) DEFAULT NULL');
         ensureColumn($pdo, 'settings', 'google_service_account_json', 'TEXT DEFAULT NULL');
         ensureColumn($pdo, 'settings', 'google_delegated_user', 'VARCHAR(255) DEFAULT NULL');
@@ -1091,6 +1092,30 @@ function fetchTablePage($pdo, $tab, $page, $limit, $search, $sortKey, $sortDir, 
         }
     }
 
+    // Payments and Other Bank (loans — same table, filtered) show who referred
+    // the student, looked up from the students table rather than re-entered
+    // per payment — one extra query for just this page's reg_nos, not a join
+    // against the whole (12k+ row) payments table.
+    if (($tab === 'payments' || $tab === 'loans') && columnExists($pdo, 'students', 'reference')) {
+        $regNos = [];
+        foreach ($rows as $row) {
+            if (!empty($row['reg_no'])) $regNos[normStr($row['reg_no'])] = $row['reg_no'];
+        }
+        if ($regNos) {
+            $placeholders = implode(', ', array_fill(0, count($regNos), '?'));
+            $refStmt = $pdo->prepare("SELECT reg_no, reference FROM students WHERE reg_no IN ($placeholders)");
+            $refStmt->execute(array_values($regNos));
+            $refMap = [];
+            foreach ($refStmt->fetchAll() as $s) {
+                $refMap[normStr($s['reg_no'])] = $s['reference'];
+            }
+            foreach ($rows as &$row) {
+                $row['student_reference'] = $refMap[normStr($row['reg_no'] ?? '')] ?? '';
+            }
+            unset($row);
+        }
+    }
+
     $stats = null;
     $loanSemesterStats = null;
     if ($tab === 'payments' || $tab === 'loans') {
@@ -1602,27 +1627,41 @@ if ($method === 'POST' && isset($input['action'])) {
             case 'save_student':
                 // ENFORCE UPPERCASE REG NO
                 $reg_no = strtoupper($data['reg_no']);
-                
+
                 // Degree always follows reg_no prefix (legacy index.html correctedStudents logic)
                 $degreeFromReg = parseDegreeFromRegNo($reg_no);
                 $degree = $degreeFromReg !== '' ? $degreeFromReg : ($data['degree'] ?? '');
-                
+
                 $mobile = $data['mobile'] ?? '';
                 $email = $data['email'] ?? '';
-                
+
                 // Safely handle empty total_package amounts
                 $total_package = (isset($data['total_package']) && $data['total_package'] !== '') ? $data['total_package'] : null;
 
-                $stmt = $pdo->prepare("INSERT INTO students (reg_no, name, degree, batch, mobile, email, total_package) 
-                                       VALUES (?, ?, ?, ?, ?, ?, ?) 
-                                       ON DUPLICATE KEY UPDATE 
-                                       name=?, degree=?, batch=?, mobile=?, email=?, total_package=?");
-                $stmt->execute([
-                    $reg_no, $data['name'], $degree, $data['batch'], $mobile, $email, $total_package,
-                    $data['name'], $degree, $data['batch'], $mobile, $email, $total_package
-                ]);
+                $columns = ['reg_no', 'name', 'degree', 'batch', 'mobile', 'email', 'total_package'];
+                $values = [$reg_no, $data['name'], $degree, $data['batch'], $mobile, $email, $total_package];
+                $updateCols = ['name=?', 'degree=?', 'batch=?', 'mobile=?', 'email=?', 'total_package=?'];
+                $updateValues = [$data['name'], $degree, $data['batch'], $mobile, $email, $total_package];
+
+                // reference comes from an ensureColumn() auto-migration that can
+                // silently fail — only reference it once columnExists() confirms
+                // it's actually there, or this save would hard-fail with "Unknown
+                // column" instead of just skipping the field until it exists.
+                if (columnExists($pdo, 'students', 'reference')) {
+                    $reference = $data['reference'] ?? '';
+                    $columns[] = 'reference';
+                    $values[] = $reference;
+                    $updateCols[] = 'reference=?';
+                    $updateValues[] = $reference;
+                }
+
+                $colList = '`' . implode('`, `', $columns) . '`';
+                $placeholders = implode(', ', array_fill(0, count($columns), '?'));
+                $stmt = $pdo->prepare("INSERT INTO students ($colList) VALUES ($placeholders)
+                                       ON DUPLICATE KEY UPDATE " . implode(', ', $updateCols));
+                $stmt->execute(array_merge($values, $updateValues));
                 break;
-            
+
             case 'delete_student':
             case 'delete_students':
                 // The frontend sometimes sends reg_no instead of id

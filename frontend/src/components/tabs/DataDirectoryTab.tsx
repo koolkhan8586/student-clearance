@@ -76,6 +76,7 @@ export function DataDirectoryTab({ app }: DataDirectoryTabProps) {
             <td className="p-4 font-bold text-green-700">
               {item.total_package ? num(item.total_package) : '-'}
             </td>
+            <td className="p-4 text-gray-500">{String(item.reference || '-')}</td>
           </>
         );
       case 'fees':
@@ -112,6 +113,7 @@ export function DataDirectoryTab({ app }: DataDirectoryTabProps) {
             <td className="p-4 text-right font-bold">{num(item.amount)}</td>
             <td className="p-4 text-gray-500">{String(item.date ?? '')}</td>
             <td className="p-4 text-gray-500">{item.bank === 'Loan' ? '' : String(item.bank ?? '')}</td>
+            <td className="p-4 text-gray-500">{String(item.student_reference || '-')}</td>
           </>
         );
       case 'loans':
@@ -124,6 +126,7 @@ export function DataDirectoryTab({ app }: DataDirectoryTabProps) {
             </td>
             <td className="p-4 text-right font-bold">{num(item.amount)}</td>
             <td className="p-4 text-gray-500">{String(item.date ?? '')}</td>
+            <td className="p-4 text-gray-500">{String(item.student_reference || '-')}</td>
           </>
         );
       case 'others':
@@ -393,6 +396,9 @@ export function DataDirectoryTab({ app }: DataDirectoryTabProps) {
                     {sortConfig.key === h && (sortConfig.direction === 'asc' ? ' ▲' : ' ▼')}
                   </th>
                 ))}
+                {(activeTab === 'payments' || activeTab === 'loans') && (
+                  <th className="p-4">Reference</th>
+                )}
                 <th className="p-4 text-center">Actions</th>
               </tr>
             </thead>

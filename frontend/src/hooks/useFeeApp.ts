@@ -718,7 +718,7 @@ export function useFeeApp() {
   const getHeaders = (type: string): string[] => {
     switch (type) {
       case 'students':
-        return ['reg_no', 'name', 'degree', 'batch', 'mobile', 'email', 'total_package'];
+        return ['reg_no', 'name', 'degree', 'batch', 'mobile', 'email', 'total_package', 'reference'];
       case 'fees':
         return ['degree', 'batch', 'per_cr_fee', 'per_course_fee', 'reg_fee', 'other_fee'];
       case 'enrollments':
