@@ -13,6 +13,7 @@ export interface Meta {
   sessions: string[];
   counts: Record<string, number>;
   users: UserRecord[];
+  schemaWarnings?: string[];
 }
 
 export interface FeeStructure {
