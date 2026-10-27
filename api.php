@@ -456,20 +456,31 @@ try {
         }
     }
 
+    // Single source of truth for every optional column this app can add on
+    // its own — looped over both to attempt the ALTER below and (in the GET
+    // handler) to tell an admin exactly which ones didn't take, since that
+    // ALTER can silently fail (e.g. no ALTER privilege on this DB user) and
+    // otherwise the only symptom is "a feature just doesn't show anything."
+    $optionalColumnSpecs = [
+        ['payments', 'bank', 'VARCHAR(100) DEFAULT NULL'],
+        ['students', 'mobile', 'VARCHAR(50) DEFAULT NULL'],
+        ['students', 'email', 'VARCHAR(100) DEFAULT NULL'],
+        ['students', 'total_package', 'DECIMAL(10,2) DEFAULT NULL'],
+        ['students', 'reference', 'VARCHAR(255) DEFAULT NULL'],
+        ['settings', 'brevo_api_key', 'VARCHAR(255) DEFAULT NULL'],
+        ['settings', 'google_service_account_json', 'TEXT DEFAULT NULL'],
+        ['settings', 'google_delegated_user', 'VARCHAR(255) DEFAULT NULL'],
+        ['settings', 'message_template', 'TEXT DEFAULT NULL'],
+        ['discounts', 'description', 'TEXT DEFAULT NULL'],
+        ['discounts', 'attachment_name', 'VARCHAR(255) DEFAULT NULL'],
+        ['discounts', 'attachment_type', 'VARCHAR(100) DEFAULT NULL'],
+        ['discounts', 'attachment_data', 'LONGTEXT DEFAULT NULL'],
+    ];
+
     try {
-        ensureColumn($pdo, 'payments', 'bank', 'VARCHAR(100) DEFAULT NULL');
-        ensureColumn($pdo, 'students', 'mobile', 'VARCHAR(50) DEFAULT NULL');
-        ensureColumn($pdo, 'students', 'email', 'VARCHAR(100) DEFAULT NULL');
-        ensureColumn($pdo, 'students', 'total_package', 'DECIMAL(10,2) DEFAULT NULL');
-        ensureColumn($pdo, 'students', 'reference', 'VARCHAR(255) DEFAULT NULL');
-        ensureColumn($pdo, 'settings', 'brevo_api_key', 'VARCHAR(255) DEFAULT NULL');
-        ensureColumn($pdo, 'settings', 'google_service_account_json', 'TEXT DEFAULT NULL');
-        ensureColumn($pdo, 'settings', 'google_delegated_user', 'VARCHAR(255) DEFAULT NULL');
-        ensureColumn($pdo, 'settings', 'message_template', 'TEXT DEFAULT NULL');
-        ensureColumn($pdo, 'discounts', 'description', 'TEXT DEFAULT NULL');
-        ensureColumn($pdo, 'discounts', 'attachment_name', 'VARCHAR(255) DEFAULT NULL');
-        ensureColumn($pdo, 'discounts', 'attachment_type', 'VARCHAR(100) DEFAULT NULL');
-        ensureColumn($pdo, 'discounts', 'attachment_data', 'LONGTEXT DEFAULT NULL');
+        foreach ($optionalColumnSpecs as $spec) {
+            ensureColumn($pdo, $spec[0], $spec[1], $spec[2]);
+        }
     } catch (\Exception $e) {}
 
     // Seed Admin if missing
@@ -1207,8 +1218,19 @@ if ($method === 'GET') {
                 'others'      => (int) $pdo->query("SELECT COUNT(*) FROM other_charges")->fetchColumn(),
                 'banks'       => (int) $pdo->query("SELECT COUNT(*) FROM banks")->fetchColumn(),
             ];
+        $schemaWarnings = [];
         if (($_SESSION['user']['role'] ?? '') === 'admin') {
             $counts['users'] = (int) $pdo->query("SELECT COUNT(*) FROM users")->fetchColumn();
+
+            // Tell an admin directly when an optional column's auto-migration
+            // didn't take (e.g. the DB user has no ALTER privilege) — otherwise
+            // the only visible symptom is a feature that quietly shows nothing,
+            // which is exactly what happened before this existed.
+            foreach ($optionalColumnSpecs as $spec) {
+                if (!columnExists($pdo, $spec[0], $spec[1])) {
+                    $schemaWarnings[] = "ALTER TABLE `{$spec[0]}` ADD COLUMN `{$spec[1]}` {$spec[2]};";
+                }
+            }
         }
 
         echo json_encode([
@@ -1218,6 +1240,7 @@ if ($method === 'GET') {
             'sessions' => array_values($sessions),
             'users' => $users,
             'counts' => $counts,
+            'schemaWarnings' => $schemaWarnings,
         ]);
     } catch (Exception $e) {
         echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
