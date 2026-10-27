@@ -203,6 +203,14 @@ export function RecordModal({ app }: RecordModalProps) {
                 value={String(formData.name || '')}
                 readOnly
               />
+              {formData.student_reference ? (
+                <input
+                  placeholder="Reference"
+                  className="w-full border p-2 rounded bg-gray-50 text-gray-600"
+                  value={`Referred by: ${String(formData.student_reference)}`}
+                  readOnly
+                />
+              ) : null}
               <input
                 required
                 placeholder="Semester (e.g. Spring 2024)"
@@ -276,6 +284,14 @@ export function RecordModal({ app }: RecordModalProps) {
                 value={String(formData.name || '')}
                 readOnly
               />
+              {formData.student_reference ? (
+                <input
+                  placeholder="Reference"
+                  className="w-full border p-2 rounded bg-gray-50 text-gray-600"
+                  value={`Referred by: ${String(formData.student_reference)}`}
+                  readOnly
+                />
+              ) : null}
               <input
                 required
                 placeholder="Semester (e.g. Spring 2024)"
