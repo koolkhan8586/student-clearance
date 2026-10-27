@@ -708,7 +708,12 @@ export function useFeeApp() {
       const res = await lookupStudentRequest(reg);
       const json = await res.json();
       if (json.status === 'success' && json.student) {
-        setFormData((prev) => ({ ...prev, reg_no: reg, name: json.student.name }));
+        setFormData((prev) => ({
+          ...prev,
+          reg_no: reg,
+          name: json.student.name,
+          student_reference: json.student.reference || '',
+        }));
       }
     } catch {
       /* ignore */
